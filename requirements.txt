@@ -1,0 +1,57 @@
+tqdm
+rich
+ninja
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+opencv-python
+imageio
+imageio-ffmpeg
+omegaconf
+
+# Deep learning dependencies
+torch>=2.0.0
+einops
+plyfile
+pygltflib
+
+# GUI dependencies
+dearpygui
+
+# Stable-diffusion dependencies
+huggingface_hub
+diffusers
+accelerate
+transformers
+
+# 3D mesh processing
+xatlas
+trimesh
+PyMCubes
+pymeshlab
+
+# Background removal
+rembg[gpu,cli]
+
+# Web interface
+gradio
+
+
+### Evaluation metrics
+git+https://github.com/openai/CLIP.git
+pytorch-fid 
+psutil 
+seaborn
+wandb
+torchmetrics[image]
+torch-fidelity  # Required for FID diversity metric
+lpips
+
+transformers
+timm
+
+torchvision
+notebook
+ipykernel
