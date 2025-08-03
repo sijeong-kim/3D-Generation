@@ -3,6 +3,7 @@ import cv2
 import time
 import tqdm
 import numpy as np
+import random
 import dearpygui.dearpygui as dpg
 
 import torch
@@ -13,6 +14,7 @@ from gs_renderer import Renderer, MiniCam
 
 from grid_put import mipmap_linear_grid_put_2d
 from mesh import Mesh, safe_normalize
+from guidance.sd_utils import StableDiffusion
 
 class GUI:
     def __init__(self, opt):
@@ -39,7 +41,12 @@ class GUI:
         self.enable_zero123 = False
 
         # renderer
-        self.renderer = Renderer(sh_degree=self.opt.sh_degree)
+        # self.renderer = Renderer(sh_degree=self.opt.sh_degree)
+        self.renderers = []
+        for i in range(self.opt.num_particles):
+            self.renderers.append(Renderer(sh_degree=self.opt.sh_degree))
+            
+
         self.gaussain_scale_factor = 1
 
         # input image
@@ -67,19 +74,26 @@ class GUI:
         if self.opt.negative_prompt is not None:
             self.negative_prompt = self.opt.negative_prompt
 
+        self.seeds = []
         # override if provide a checkpoint
-        if self.opt.load is not None:
-            self.renderer.initialize(self.opt.load)            
-        else:
-            # initialize gaussians to a blob
-            self.renderer.initialize(num_pts=self.opt.num_pts)
-
+        for i in range(self.opt.num_particles):
+            # Set different seed for each particle during initialization
+            init_seed = self.seed + i * 1000
+            self.seeds.append(init_seed)
+            self.seed_everything(init_seed)
+            
+            if self.opt.load is not None:
+                self.renderers[i].initialize(self.opt.load) # TODO: load from different checkpoints for each particle
+            else:
+                # initialize gaussians to a blob
+                self.renderers[i].initialize(num_pts=self.opt.num_pts)
+            
     def __del__(self):
         pass
 
-    def seed_everything(self):
+    def seed_everything(self, seed):
         try:
-            seed = int(self.seed)
+            seed = int(seed)
         except:
             seed = np.random.randint(0, 1000000)
 
@@ -90,17 +104,20 @@ class GUI:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = True
 
-        self.last_seed = seed
-
     def prepare_train(self):
 
         self.step = 0
+        self.optimizers = []
+        for i in range(self.opt.num_particles):
+            self.renderers[i].gaussians.training_setup(self.opt)
+            self.renderers[i].gaussians.active_sh_degree = self.renderers[i].gaussians.max_sh_degree
+            self.optimizers.append(self.renderers[i].gaussians.optimizer)
 
-        # setup training
-        self.renderer.gaussians.training_setup(self.opt)
-        # do not do progressive sh-level
-        self.renderer.gaussians.active_sh_degree = self.renderer.gaussians.max_sh_degree
-        self.optimizer = self.renderer.gaussians.optimizer
+        # # setup training
+        # self.renderer.gaussians.training_setup(self.opt)
+        # # do not do progressive sh-level
+        # self.renderer.gaussians.active_sh_degree = self.renderer.gaussians.max_sh_degree
+        # self.optimizer = self.renderer.gaussians.optimizer
 
         pose = orbit_camera(self.opt.elevation, 0, self.opt.radius)
         self.fixed_cam = MiniCam(
@@ -113,11 +130,10 @@ class GUI:
             self.cam.far,
         )
 
-        self.enable_sd = self.opt.lambda_sd > 0 and self.prompt != ""
-        self.enable_zero123 = self.opt.lambda_zero123 > 0 and self.input_img is not None
+        # self.enable_sd = self.opt.lambda_sd > 0 and self.prompt != ""
+        # self.enable_zero123 = self.opt.lambda_zero123 > 0 and self.input_img is not None
 
         print(f"[INFO] loading SD...")
-        from guidance.sd_utils import StableDiffusion
         self.guidance_sd = StableDiffusion(self.device)
         print(f"[INFO] loaded SD!")
 
@@ -130,166 +146,105 @@ class GUI:
         ender = torch.cuda.Event(enable_timing=True)
         starter.record()
 
-        for _ in range(self.train_steps):
+        # for i in range(self.train_steps):
 
-            self.step += 1
-            step_ratio = min(1, self.step / self.opt.iters)
+        self.step += 1
+        step_ratio = min(1, self.step / self.opt.iters)
 
+        loss = 0
+
+        ### novel view (manual batch)
+        render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
+        images = []
+        outputs = []
+        poses = []
+        vers, hors, radii = [], [], []
+        # avoid too large elevation (> 80 or < -80), and make sure it always cover [min_ver, max_ver]
+        min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
+        max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation), 80 - self.opt.elevation)
+
+        for j in range(self.opt.num_particles):
+            
+            # set seed for each particle
+            self.seed_everything(self.seeds[j])
             # update lr
-            self.renderer.gaussians.update_learning_rate(self.step)
+            self.renderers[j].gaussians.update_learning_rate(self.step)
 
-            loss = 0
+            # render random view
+            ver = np.random.randint(min_ver, max_ver)
+            hor = np.random.randint(-180, 180)
+            radius = 0
 
-            ### novel view (manual batch)
-            render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
-            images = []
-            poses = []
-            vers, hors, radii = [], [], []
-            # avoid too large elevation (> 80 or < -80), and make sure it always cover [min_ver, max_ver]
-            min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
-            max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation), 80 - self.opt.elevation)
+            vers.append(ver)
+            hors.append(hor)
+            radii.append(radius)
 
-            for _ in range(self.opt.batch_size):
+            pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
+            poses.append(pose)
 
-                # render random view
-                ver = np.random.randint(min_ver, max_ver)
-                hor = np.random.randint(-180, 180)
-                radius = 0
+            cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
 
-                vers.append(ver)
-                hors.append(hor)
-                radii.append(radius)
+            bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+            out = self.renderers[j].render(cur_cam, bg_color=bg_color)
 
-                pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
-                poses.append(pose)
+            image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
+            images.append(image)
+            # Store output for each particle
+            outputs.append(out)
+                
+        images = torch.cat(images, dim=0) # [N, 3, H, W]
+        poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
 
-                cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
-
-                bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
-                out = self.renderer.render(cur_cam, bg_color=bg_color)
-
-                image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
-                images.append(image)
-
-                # enable mvdream training
-                if self.opt.mvdream or self.opt.imagedream:
-                    for view_i in range(1, 4):
-                        pose_i = orbit_camera(self.opt.elevation + ver, hor + 90 * view_i, self.opt.radius + radius)
-                        poses.append(pose_i)
-
-                        cur_cam_i = MiniCam(pose_i, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
-
-                        # bg_color = torch.tensor([0.5, 0.5, 0.5], dtype=torch.float32, device="cuda")
-                        out_i = self.renderer.render(cur_cam_i, bg_color=bg_color)
-
-                        image = out_i["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
-                        images.append(image)
-                    
-            images = torch.cat(images, dim=0)
-            poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device)
-
+        for j in range(self.opt.num_particles):
             loss = loss + self.opt.lambda_sd * self.guidance_sd.train_step(images, step_ratio=step_ratio if self.opt.anneal_timestep else None)
+            # TODO: Add guidance loss for each particle
 
-            # optimize step
-            loss.backward()
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+        # optimize step
+        
+        # 2. Backward pass (Compute gradients)
+        loss.backward()
+        
+        # 3. Optimize step (Update parameters)
+        for j in range(self.opt.num_particles):
+            self.optimizers[j].step()
 
-            # densify and prune
+        # densify and prune (after backward pass so gradients are available)
+        for j in range(self.opt.num_particles):
             if self.step >= self.opt.density_start_iter and self.step <= self.opt.density_end_iter:
-                viewspace_point_tensor, visibility_filter, radii = out["viewspace_points"], out["visibility_filter"], out["radii"]
-                self.renderer.gaussians.max_radii2D[visibility_filter] = torch.max(self.renderer.gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
-                self.renderer.gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
-
+                viewspace_point_tensor, visibility_filter, radii = outputs[j]["viewspace_points"], outputs[j]["visibility_filter"], outputs[j]["radii"]
+                self.renderers[j].gaussians.max_radii2D[visibility_filter] = torch.max(self.renderers[j].gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
+                self.renderers[j].gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
+                
                 if self.step % self.opt.densification_interval == 0:
-                    self.renderer.gaussians.densify_and_prune(self.opt.densify_grad_threshold, min_opacity=0.01, extent=4, max_screen_size=1)
+                        self.renderers[j].gaussians.densify_and_prune(self.opt.densify_grad_threshold, min_opacity=0.01, extent=4, max_screen_size=1)
                 
                 if self.step % self.opt.opacity_reset_interval == 0:
-                    self.renderer.gaussians.reset_opacity()
+                        self.renderers[j].gaussians.reset_opacity()
+                        
+                # 4. Zero gradients (Prepare for next iteration)
+        for j in range(self.opt.num_particles):
+            self.optimizers[j].zero_grad()
+
 
         ender.record()
         torch.cuda.synchronize()
         t = starter.elapsed_time(ender)
 
-        self.need_update = True
 
     @torch.no_grad()
-    def test_step(self):
-        # ignore if no need to update
-        if not self.need_update:
-            return
-
-        starter = torch.cuda.Event(enable_timing=True)
-        ender = torch.cuda.Event(enable_timing=True)
-        starter.record()
-
-        # should update image
-        if self.need_update:
-            # render image
-
-            cur_cam = MiniCam(
-                self.cam.pose,
-                self.W,
-                self.H,
-                self.cam.fovy,
-                self.cam.fovx,
-                self.cam.near,
-                self.cam.far,
-            )
-
-            out = self.renderer.render(cur_cam, self.gaussain_scale_factor)
-
-            buffer_image = out[self.mode]  # [3, H, W]
-
-            if self.mode in ['depth', 'alpha']:
-                buffer_image = buffer_image.repeat(3, 1, 1)
-                if self.mode == 'depth':
-                    buffer_image = (buffer_image - buffer_image.min()) / (buffer_image.max() - buffer_image.min() + 1e-20)
-
-            buffer_image = F.interpolate(
-                buffer_image.unsqueeze(0),
-                size=(self.H, self.W),
-                mode="bilinear",
-                align_corners=False,
-            ).squeeze(0)
-
-            self.buffer_image = (
-                buffer_image.permute(1, 2, 0)
-                .contiguous()
-                .clamp(0, 1)
-                .contiguous()
-                .detach()
-                .cpu()
-                .numpy()
-            )
-
-            # display input_image
-            if self.overlay_input_img and self.input_img is not None:
-                self.buffer_image = (
-                    self.buffer_image * (1 - self.overlay_input_img_ratio)
-                    + self.input_img * self.overlay_input_img_ratio
-                )
-
-            self.need_update = False
-
-        ender.record()
-        torch.cuda.synchronize()
-        t = starter.elapsed_time(ender)
-
-    @torch.no_grad()
-    def save_model(self, mode='geo', texture_size=1024):
+    def save_model(self, mode='geo', texture_size=1024, particle_id=0):
         os.makedirs(self.opt.outdir, exist_ok=True)
         if mode == 'geo':
-            path = os.path.join(self.opt.outdir, self.opt.save_path + '_mesh.ply')
-            mesh = self.renderer.gaussians.extract_mesh(path, self.opt.density_thresh)
+            path = os.path.join(self.opt.outdir, f'{self.opt.save_path}_particle_{particle_id}_mesh.ply')
+            mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
             mesh.write_ply(path)
 
         elif mode == 'geo+tex':
-            path = os.path.join(self.opt.outdir, self.opt.save_path + '_mesh.' + self.opt.mesh_format)
-            mesh = self.renderer.gaussians.extract_mesh(path, self.opt.density_thresh)
+            path = os.path.join(self.opt.outdir, f'{self.opt.save_path}_particle_{particle_id}_mesh.' + self.opt.mesh_format)
+            mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
 
             # perform texture extraction
-            print(f"[INFO] unwrap uv...")
+            print(f"[INFO] particle {particle_id} unwrap uv...")
             h = w = texture_size
             mesh.auto_uv()
             mesh.auto_normal()
@@ -323,7 +278,7 @@ class GUI:
                     self.cam.far,
                 )
                 
-                cur_out = self.renderer.render(cur_cam)
+                cur_out = self.renderers[particle_id].render(cur_cam)
 
                 rgbs = cur_out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
                     
@@ -404,10 +359,10 @@ class GUI:
             mesh.write(path)
 
         else:
-            path = os.path.join(self.opt.outdir, self.opt.save_path + '_model.ply')
-            self.renderer.gaussians.save_ply(path)
+            path = os.path.join(self.opt.outdir, f'{self.opt.save_path}_particle_{particle_id}_model.ply')
+            self.renderers[particle_id].gaussians.save_ply(path)
 
-        print(f"[INFO] save model to {path}.")
+            print(f"[INFO] particle {particle_id} save model to {path}.")
     
     # no gui mode
     def train(self, iters=500):
@@ -416,10 +371,12 @@ class GUI:
             for i in tqdm.trange(iters):
                 self.train_step()
             # do a last prune
-            self.renderer.gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
+            for j in range(self.opt.num_particles):
+                self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
         # save
-        self.save_model(mode='model')
-        self.save_model(mode='geo+tex')
+        for j in range(self.opt.num_particles):
+            self.save_model(mode='model', particle_id=j)
+            self.save_model(mode='geo+tex', particle_id=j)
         
 
 if __name__ == "__main__":

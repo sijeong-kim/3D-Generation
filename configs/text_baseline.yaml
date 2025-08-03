@@ -1,3 +1,5 @@
+num_particles: 4
+
 ### Input
 # input rgba image path (default to None, can be load in GUI too)
 input: 
