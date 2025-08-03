@@ -8,8 +8,6 @@ import dearpygui.dearpygui as dpg
 import torch
 import torch.nn.functional as F
 
-import rembg
-
 from cam_utils import orbit_camera, OrbitCamera
 from gs_renderer import Renderer, MiniCam
 
@@ -61,10 +59,7 @@ class GUI:
         self.optimizer = None
         self.step = 0
         self.train_steps = 1  # steps per rendering loop
-        
-        # load input data from cmdline
-        if self.opt.input is not None:
-            self.load_input(self.opt.input)
+    
         
         # override prompt from cmdline
         if self.opt.prompt is not None:
@@ -375,31 +370,6 @@ class GUI:
                 "_texture", self.buffer_image
             )  # buffer must be contiguous, else seg fault!
 
-    
-    def load_input(self, file):
-        # load image
-        print(f'[INFO] load image from {file}...')
-        img = cv2.imread(file, cv2.IMREAD_UNCHANGED)
-        if img.shape[-1] == 3:
-            if self.bg_remover is None:
-                self.bg_remover = rembg.new_session()
-            img = rembg.remove(img, session=self.bg_remover)
-
-        img = cv2.resize(img, (self.W, self.H), interpolation=cv2.INTER_AREA)
-        img = img.astype(np.float32) / 255.0
-
-        self.input_mask = img[..., 3:]
-        # white bg
-        self.input_img = img[..., :3] * self.input_mask + (1 - self.input_mask)
-        # bgr to rgb
-        self.input_img = self.input_img[..., ::-1].copy()
-
-        # load prompt
-        file_prompt = file.replace("_rgba.png", "_caption.txt")
-        if os.path.exists(file_prompt):
-            print(f'[INFO] load prompt from {file_prompt}...')
-            with open(file_prompt, "r") as f:
-                self.prompt = f.read().strip()
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024):
