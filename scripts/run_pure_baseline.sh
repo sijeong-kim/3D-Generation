@@ -79,8 +79,8 @@ echo "====================================="
 # --------------------------------
 # Run Main Script
 # --------------------------------
-CMD="python ${WORKING_DIR}/main.py \
-    --config ${WORKING_DIR}/configs/text.yaml \
+CMD="python ${WORKING_DIR}/main_pure_baseline.py \
+    --config ${WORKING_DIR}/configs/text_pure_baseline.yaml \
     prompt=\"${PROMPT}\" \
     save_path=${PROMPT// /_} \
     outdir=${OUTPUT_DIR} \
