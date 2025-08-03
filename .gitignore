@@ -210,3 +210,6 @@ __marimo__/
 # submodules
 diff-gaussian-rasterization/
 simple-knn/
+
+# outputs
+outputs/
