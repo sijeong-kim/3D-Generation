@@ -2,89 +2,91 @@
 #SBATCH --job-name=text_to_3d_baseline
 #SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
-#SBATCH --mail-type=ALL
+#SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err
 
-# Load user shell environment
+# --------------------------------
+# Environment & Paths
+# --------------------------------
 if [ -f ~/.bashrc ]; then
     source ~/.bashrc
 fi
 
-# Define paths
-export USER_PATH=/vol/bitbucket/${USER}
-export PROJ_HOME=${USER_PATH}/3D-Generation
-export WORKING_DIR=${PROJ_HOME}/dreamgaussian
-export PATH=${PROJ_HOME}/venv/bin:$PATH
+export BASE_DIR=/vol/bitbucket/${USER}/3D-Generation
+export WORKING_DIR=${BASE_DIR}
+export VENV_DIR=${BASE_DIR}/venv
 
-# Activate virtual environment
-source ${PROJ_HOME}/venv/bin/activate
+export PATH=${VENV_DIR}/bin:$PATH
+source ${VENV_DIR}/bin/activate
 
-# Load CUDA
+# Add .so Library Paths
+export LD_LIBRARY_PATH=${VENV_DIR}/lib/python3.12/site-packages/pymeshlab/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=${VENV_DIR}/lib/python3.12/site-packages:$LD_LIBRARY_PATH
+
+# Ensure Python uses correct site-packages
+export PYTHONPATH=${VENV_DIR}/lib/python3.12/site-packages:$PYTHONPATH
+
+# --------------------------------
+# CUDA Configuration
+# --------------------------------
 export CUDA_HOME=/vol/cuda/12.4.0
 source ${CUDA_HOME}/setup.sh
 
-# PyTorch CUDA settings
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export CUDA_LAUNCH_BLOCKING=1
+export TORCH_CUDA_ARCH_LIST="8.0;8.6"
 
-# Cache directories
-export HF_HOME=${PROJ_HOME}/.cache/huggingface
-export TORCH_HOME=${PROJ_HOME}/.cache/torch
-export MPLCONFIGDIR=${PROJ_HOME}/.cache/matplotlib
+# Cache Directories
+export HF_HOME=${BASE_DIR}/.cache/huggingface
+export TORCH_HOME=${BASE_DIR}/.cache/torch
+export MPLCONFIGDIR=${BASE_DIR}/.cache/matplotlib
 mkdir -p $MPLCONFIGDIR
 
-# # Setup wandb environment
-# if [ -z "${WANDB_API_KEY_GAUSSIAN}" ]; then
-#     echo "[WARNING] WANDB_API_KEY_GAUSSIAN not set. Wandb will run in offline mode."
-#     export WANDB_MODE="offline"
-# else
-#     export WANDB_API_KEY="${WANDB_API_KEY_GAUSSIAN}"
-#     echo "[INFO] WANDB API key loaded from environment."
-# fi
-
-# export WANDB_PROJECT="gaussian-splatting-metrics"
-# export WANDB_CONSOLE="off"
-
-
-
-
-# Go to project directory
-cd ${WORKING_DIR}
-
+# --------------------------------
+# Run Parameters
+# --------------------------------
 SEED=42
-# PROMPT="a small saguaro cactus planted in a clay pot" # "A photo of a hamburger" "a campfire" "a bunny"
 PROMPT="a photo of a hamburger"
 
 TASK_NAME="${PROMPT// /_}_pure_baseline_seed_${SEED}"
+OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
+mkdir -p ${OUTPUT_DIR}
+
+# --------------------------------
 # Diagnostic Info
-sleep 5
-echo "========== SYSTEM INFO =========="
+# --------------------------------
+echo "========== SLURM JOB INFO =========="
 echo "Job ID        : ${SLURM_JOB_ID}"
 echo "Job Name      : ${SLURM_JOB_NAME}"
-echo "Task Name     : ${TASK_NAME}"
 echo "Prompt        : ${PROMPT}"
+echo "Task Name     : ${TASK_NAME}"
+echo "User          : ${USER}"
 echo "Run Host      : $(hostname)"
 echo "Working Dir   : $(pwd)"
-echo "Date & Time   : $(date)"
-echo "Uptime        : $(uptime)"
-echo "User          : ${USER}"
 echo "CUDA Path     : ${CUDA_HOME}"
+echo "Date & Time   : $(date)"
 echo "PyTorch Ver   : $(python -c 'import torch; print(torch.__version__)')"
 echo "CUDA (PyTorch): $(python -c 'import torch; print(torch.version.cuda)')"
-nvcc --version
+echo "nvcc Version  : $(nvcc --version | grep release)"
 nvidia-smi
-echo "=================================="
-
-OUTPUT_DIR="${PROJ_HOME}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
-mkdir -p ${OUTPUT_DIR}
+echo "====================================="
 echo "Output will be saved to: ${OUTPUT_DIR}"
+echo "====================================="
 
-CMD="python ${WORKING_DIR}/main.py --config ${WORKING_DIR}/configs/text.yaml prompt=\"${PROMPT}\" save_path=${PROMPT// /_} outdir=${OUTPUT_DIR} seed=${SEED}"
-# python main.py --config configs/text.yaml prompt="a photo of a hamburger" save_path=hamburger 
+# --------------------------------
+# Run Main Script
+# --------------------------------
+CMD="python ${WORKING_DIR}/main.py \
+    --config ${WORKING_DIR}/configs/text.yaml \
+    prompt=\"${PROMPT}\" \
+    save_path=${PROMPT// /_} \
+    outdir=${OUTPUT_DIR} \
+    seed=${SEED}"
+
 echo "[RUNNING COMMAND] $CMD"
 eval $CMD
 
-echo "[INFO] Job completed."
+echo "[INFO] Job completed successfully."

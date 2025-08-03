@@ -1,12 +1,13 @@
+# Basic utilities
 tqdm
 rich
 ninja
-numpy
+numpy==1.26.4
 pandas
 scipy
 scikit-learn
 matplotlib
-opencv-python
+opencv-python  # Replaced opencv-python-headless to avoid numpy version conflicts
 imageio
 imageio-ffmpeg
 omegaconf
@@ -20,38 +21,26 @@ pygltflib
 # GUI dependencies
 dearpygui
 
-# Stable-diffusion dependencies
+# Stable Diffusion related
 huggingface_hub
 diffusers
 accelerate
 transformers
+timm
+torchvision
 
 # 3D mesh processing
-xatlas
-trimesh
-PyMCubes
-pymeshlab
-
-# Background removal
-rembg[gpu,cli]
-
-# Web interface
-gradio
-
-
-### Evaluation metrics
+xatlas 
+pymeshlab==2023.12
+# Evaluation metrics and utilities
 git+https://github.com/openai/CLIP.git
 pytorch-fid 
 psutil 
 seaborn
-wandb
 torchmetrics[image]
-torch-fidelity  # Required for FID diversity metric
+torch-fidelity
 lpips
 
-transformers
-timm
-
-torchvision
+# Development tools
 notebook
 ipykernel
