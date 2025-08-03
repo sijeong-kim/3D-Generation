@@ -213,3 +213,7 @@ simple-knn/
 
 # outputs
 outputs/
+*.png
+*.jpg
+*.jpeg
+*.gif
