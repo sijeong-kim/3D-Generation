@@ -213,3 +213,6 @@ simple-knn/
 
 # outputs
 outputs/
+
+qt-everywhere-src-5.15.2/*
+qt-everywhere-src-5.15.2.tar.gz
