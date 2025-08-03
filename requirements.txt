@@ -1,0 +1,46 @@
+# Basic utilities
+tqdm
+rich
+ninja
+numpy==1.26.4
+pandas
+scipy
+scikit-learn
+matplotlib
+opencv-python  # Replaced opencv-python-headless to avoid numpy version conflicts
+imageio
+imageio-ffmpeg
+omegaconf
+
+# Deep learning dependencies
+torch>=2.0.0
+einops
+plyfile
+pygltflib
+
+# GUI dependencies
+dearpygui
+
+# Stable Diffusion related
+huggingface_hub
+diffusers
+accelerate
+transformers
+timm
+torchvision
+
+# 3D mesh processing
+xatlas 
+pymeshlab==2023.12
+# Evaluation metrics and utilities
+git+https://github.com/openai/CLIP.git
+pytorch-fid 
+psutil 
+seaborn
+torchmetrics[image]
+torch-fidelity
+lpips
+
+# Development tools
+notebook
+ipykernel
