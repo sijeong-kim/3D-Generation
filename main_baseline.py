@@ -16,6 +16,8 @@ from grid_put import mipmap_linear_grid_put_2d
 from mesh import Mesh, safe_normalize
 from guidance.sd_utils import StableDiffusion
 
+from visualizer import GaussianVisualizer
+
 class GUI:
     def __init__(self, opt):
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -87,6 +89,11 @@ class GUI:
             else:
                 # initialize gaussians to a blob
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
+                
+        if self.opt.visualize:
+            self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
+        else:
+            self.visualizer = None
             
     def __del__(self):
         pass
@@ -146,8 +153,8 @@ class GUI:
         ender = torch.cuda.Event(enable_timing=True)
         starter.record()
 
+        # 1. Forward pass
         # for i in range(self.train_steps):
-
         self.step += 1
         step_ratio = min(1, self.step / self.opt.iters)
 
@@ -189,6 +196,7 @@ class GUI:
 
             image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
             images.append(image)
+            
             # Store output for each particle
             outputs.append(out)
                 
@@ -199,7 +207,7 @@ class GUI:
             loss = loss + self.opt.lambda_sd * self.guidance_sd.train_step(images, step_ratio=step_ratio if self.opt.anneal_timestep else None)
             # TODO: Add guidance loss for each particle
 
-        # optimize step
+        ### optimize step ### 
         
         # 2. Backward pass (Compute gradients)
         loss.backward()
@@ -221,9 +229,21 @@ class GUI:
                 if self.step % self.opt.opacity_reset_interval == 0:
                         self.renderers[j].gaussians.reset_opacity()
                         
-                # 4. Zero gradients (Prepare for next iteration)
+        
+        # 4. Zero gradients (Prepare for next iteration)
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
+        
+        # visualize and save rendered gaussians images
+        with torch.no_grad():
+            if self.opt.visualize and self.visualizer is not None:
+                # save rendered images (save at the end of each interval)
+                if self.step % self.opt.save_rendered_images_interval == 0:
+                    self.visualizer.save_rendered_images(self.step, images)
+                
+                # Multi-viewpoints for 30 fps video (save at the end of training)
+                if self.step == self.opt.iters:
+                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_viewpoints=120, save_individual_particles=True) # 360 / 120 for 30 fps
 
 
         ender.record()
@@ -233,14 +253,16 @@ class GUI:
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
-        os.makedirs(self.opt.outdir, exist_ok=True)
+        path = os.path.join(self.opt.outdir, f'saved_models')
+        os.makedirs(path, exist_ok=True)
+        
         if mode == 'geo':
-            path = os.path.join(self.opt.outdir, f'{self.opt.save_path}_particle_{particle_id}_mesh.ply')
+            path = os.path.join(path, f'particle_{particle_id}_mesh.ply')
             mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
             mesh.write_ply(path)
 
         elif mode == 'geo+tex':
-            path = os.path.join(self.opt.outdir, f'{self.opt.save_path}_particle_{particle_id}_mesh.' + self.opt.mesh_format)
+            path = os.path.join(path, f'particle_{particle_id}_mesh.' + self.opt.mesh_format)
             mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
 
             # perform texture extraction
@@ -359,7 +381,7 @@ class GUI:
             mesh.write(path)
 
         else:
-            path = os.path.join(self.opt.outdir, f'{self.opt.save_path}_particle_{particle_id}_model.ply')
+            path = os.path.join(path, f'particle_{particle_id}_model.ply')
             self.renderers[particle_id].gaussians.save_ply(path)
 
             print(f"[INFO] particle {particle_id} save model to {path}.")
@@ -373,6 +395,7 @@ class GUI:
             # do a last prune
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
+                
         # save
         for j in range(self.opt.num_particles):
             self.save_model(mode='model', particle_id=j)

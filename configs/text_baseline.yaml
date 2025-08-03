@@ -1,4 +1,8 @@
 num_particles: 4
+num_viewpoints: 1
+visualize: True
+save_rendered_images_interval: 100 # for debugging
+save_individual_particles: True # for visualization
 
 ### Input
 # input rgba image path (default to None, can be load in GUI too)
