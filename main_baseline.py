@@ -5,6 +5,7 @@ import tqdm
 import numpy as np
 import random
 import dearpygui.dearpygui as dpg
+# import torchvision.utils as vutils
 
 import torch
 import torch.nn.functional as F
@@ -80,7 +81,7 @@ class GUI:
         # override if provide a checkpoint
         for i in range(self.opt.num_particles):
             # Set different seed for each particle during initialization
-            init_seed = self.seed + i * 1000
+            init_seed = self.seed + i * self.opt.iters
             self.seeds.append(init_seed)
             self.seed_everything(init_seed)
             
@@ -120,12 +121,6 @@ class GUI:
             self.renderers[i].gaussians.active_sh_degree = self.renderers[i].gaussians.max_sh_degree
             self.optimizers.append(self.renderers[i].gaussians.optimizer)
 
-        # # setup training
-        # self.renderer.gaussians.training_setup(self.opt)
-        # # do not do progressive sh-level
-        # self.renderer.gaussians.active_sh_degree = self.renderer.gaussians.max_sh_degree
-        # self.optimizer = self.renderer.gaussians.optimizer
-
         pose = orbit_camera(self.opt.elevation, 0, self.opt.radius)
         self.fixed_cam = MiniCam(
             pose,
@@ -136,9 +131,6 @@ class GUI:
             self.cam.near,
             self.cam.far,
         )
-
-        # self.enable_sd = self.opt.lambda_sd > 0 and self.prompt != ""
-        # self.enable_zero123 = self.opt.lambda_zero123 > 0 and self.input_img is not None
 
         print(f"[INFO] loading SD...")
         self.guidance_sd = StableDiffusion(self.device)
@@ -172,8 +164,8 @@ class GUI:
 
         for j in range(self.opt.num_particles):
             
-            # set seed for each particle
-            self.seed_everything(self.seeds[j])
+            # set seed for each particle + iteration step for different viewpoints each iter
+            self.seed_everything(self.seeds[j] + self.step)
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
 
@@ -240,11 +232,7 @@ class GUI:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                
-                # Multi-viewpoints for 30 fps video (save at the end of training)
-                if self.step == self.opt.iters:
-                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_viewpoints=120, save_individual_particles=True) # 360 / 120 for 30 fps
-
+                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_viewpoints=4, save_individual_particles=True) 
 
         ender.record()
         torch.cuda.synchronize()
@@ -395,8 +383,12 @@ class GUI:
             # do a last prune
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
-                
-        # save
+    
+        # Multi-viewpoints for 30 fps video (save at the end of training)
+        if self.step == self.opt.iters:
+            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_viewpoints=120, save_individual_particles=True) # 360 / 120 for 30 fps
+
+        # save model
         for j in range(self.opt.num_particles):
             self.save_model(mode='model', particle_id=j)
             self.save_model(mode='geo+tex', particle_id=j)
