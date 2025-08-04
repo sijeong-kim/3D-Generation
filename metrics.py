@@ -6,9 +6,15 @@ import os
 from typing import Tuple
 
 class MetricsCalculator:
-    def __init__(self, save_dir: str, opt: dict = None, prompt: str = "a photo of a cat"):
-        self.save_dir = save_dir
+    def __init__(self, opt: dict = None, prompt: str = "a photo of a cat"):
+        # Validate opt parameter
+        if opt is None:
+            raise ValueError("opt parameter cannot be None")
         self.opt = opt
+        
+        self.save_dir = os.path.join(self.opt.outdir, 'metrics')
+        os.makedirs(self.save_dir, exist_ok=True)
+            
         self.prompt = prompt
 
         # CLIP settings

@@ -5,7 +5,6 @@ import tqdm
 import numpy as np
 import random
 import dearpygui.dearpygui as dpg
-# import torchvision.utils as vutils
 
 import torch
 import torch.nn.functional as F
@@ -18,6 +17,8 @@ from mesh import Mesh, safe_normalize
 from guidance.sd_utils import StableDiffusion
 
 from visualizer import GaussianVisualizer
+from metrics import MetricsCalculator
+from feature_extractor import DINOv2FeatureExtractor
 
 class GUI:
     def __init__(self, opt):
@@ -91,6 +92,7 @@ class GUI:
                 # initialize gaussians to a blob
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
                 
+        # visualizer
         if self.opt.visualize:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
@@ -131,6 +133,15 @@ class GUI:
             self.cam.near,
             self.cam.far,
         )
+        
+        # feature extractor
+        self.feature_extractor = DINOv2FeatureExtractor(self.opt.feature_extractor_model_name).eval().to(self.device)
+        
+        # metrics
+        if self.opt.metrics:
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
+        else:
+            self.metrics_calculator = None
 
         print(f"[INFO] loading SD...")
         self.guidance_sd = StableDiffusion(self.device)
@@ -141,16 +152,18 @@ class GUI:
             self.guidance_sd.get_text_embeds([self.prompt], [self.negative_prompt])
 
     def train_step(self):
-        starter = torch.cuda.Event(enable_timing=True)
-        ender = torch.cuda.Event(enable_timing=True)
-        starter.record()
-
+        
+        with torch.no_grad():
+            if self.opt.metrics and self.metrics_calculator is not None:
+                starter = torch.cuda.Event(enable_timing=True)
+                ender = torch.cuda.Event(enable_timing=True)
+                starter.record()
+                
         # 1. Forward pass
-        # for i in range(self.train_steps):
         self.step += 1
         step_ratio = min(1, self.step / self.opt.iters)
 
-        loss = 0
+        total_loss = 0
 
         ### novel view (manual batch)
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
@@ -194,15 +207,17 @@ class GUI:
                 
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
+        
+        features = self.feature_extractor(images) # [N, D_featture]
 
         for j in range(self.opt.num_particles):
-            loss = loss + self.opt.lambda_sd * self.guidance_sd.train_step(images, step_ratio=step_ratio if self.opt.anneal_timestep else None)
+            total_loss = total_loss + self.opt.lambda_sd * self.guidance_sd.train_step(images, step_ratio=step_ratio if self.opt.anneal_timestep else None)
             # TODO: Add guidance loss for each particle
 
         ### optimize step ### 
         
         # 2. Backward pass (Compute gradients)
-        loss.backward()
+        total_loss.backward()
         
         # 3. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
@@ -226,18 +241,41 @@ class GUI:
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
         
-        # visualize and save rendered gaussians images
+        # log metrics and visualize
         with torch.no_grad():
+            if self.opt.metrics and self.metrics_calculator is not None:
+                # time
+                ender.record()
+                torch.cuda.synchronize()
+                t = starter.elapsed_time(ender)
+                
+                # memory usage
+                memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
+                max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
+                
+                # losses
+                attraction_loss_val = 0
+                repulsion_loss_val = 0
+                scaled_repulsion_loss_val = 0
+                total_loss_val = total_loss.item()
+            
+                # quantitative metrics
+                multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
+                representative_images, clip_similaritlies = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images) # [V, N, 3, H, W]
+
+                fidelity = clip_similaritlies.mean().item()
+                features = self.feature_extractor(representative_images) # [V, N, D_featture]
+                diversity = self.metrics_calculator.compute_rlsd_diversity(features)
+
+                # log
+                self.metrics_calculator.log_metrics(step=self.step, diversity=diversity, fidelity=fidelity, attraction_loss=attraction_loss_val, repulsion_loss=repulsion_loss_val, scaled_repulsion_loss = scaled_repulsion_loss_val, total_loss=total_loss_val, time=t, memory_allocated_mb=memory_allocated, max_memory_allocated_mb=max_memory_allocated)
+
+            # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_viewpoints=4, save_individual_particles=True) 
-
-        ender.record()
-        torch.cuda.synchronize()
-        t = starter.elapsed_time(ender)
-
+                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
@@ -386,7 +424,7 @@ class GUI:
     
         # Multi-viewpoints for 30 fps video (save at the end of training)
         if self.step == self.opt.iters:
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_viewpoints=120, save_individual_particles=True) # 360 / 120 for 30 fps
+            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
 
         # save model
         for j in range(self.opt.num_particles):

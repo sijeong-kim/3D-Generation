@@ -8,17 +8,14 @@ import torchvision.utils as vutils
 import matplotlib.pyplot as plt
 
 class GaussianVisualizer:
-    def __init__(self, save_dir=None, opt=None, renderers=None, cam=None, debug=False):
+    def __init__(self, opt=None, renderers=None, cam=None, debug=False):
         # Validate opt parameter
         if opt is None:
             raise ValueError("opt parameter cannot be None")
         self.opt = opt
         
         if self.opt.visualize:
-            if save_dir is not None:
-                self.save_dir = save_dir
-            else:
-                self.save_dir = os.path.join(self.opt.outdir, 'visualizations')
+            self.save_dir = os.path.join(self.opt.outdir, 'visualizations')
             os.makedirs(self.save_dir, exist_ok=True)
             
         self.renderers = renderers
@@ -28,12 +25,13 @@ class GaussianVisualizer:
         self.device = torch.device("cuda")
         
         # viewpoints for multi-viewpoints
-        self.multi_viewpoints = self.set_viewpoints(opt.num_viewpoints)
-        
-    def set_viewpoints(self, num_viewpoints=8):
-        vers = [0.0] * num_viewpoints
-        hors = np.linspace(0, 360, num_viewpoints)
-        return [(vers[i], hors[i]) for i in range(num_viewpoints)]
+        self.multi_viewpoints = self.set_viewpoints(opt.num_views)
+    
+    @torch.no_grad()
+    def set_viewpoints(self, num_views=8):
+        vers = [0.0] * num_views
+        hors = np.linspace(0, 360, num_views)
+        return [(vers[i], hors[i]) for i in range(num_views)]
 
     @torch.no_grad()
     def save_rendered_images(self, step, images):
@@ -47,39 +45,41 @@ class GaussianVisualizer:
             normalize=False
         )
 
-
     # TODO: refactor this function to include legend and labels
     @torch.no_grad()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_viewpoints=None, save_individual_particles=None): # [V, N, 3, H, W]
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None,save_iid=None): # [V, N, 3, H, W]
         """
         Render images from specific viewpoints.
         
         Args:
             step: Current training step
-            num_viewpoints: Number of viewpoints to render
-            save_individual_particles: Whether to save individual particle images
+            num_views: Number of viewpoints to render
+            save_iid: Whether to save individual particle images
         
         Returns:
             multi_viewpoint_images: [V, N, 3, H, W]
         """
         # Create multi-viewpoints surrounding the object horizontally
-        if num_viewpoints is None:
-            num_viewpoints = self.opt.num_viewpoints # for evaluation use default number of view points
-        multi_viewpoints = self.set_viewpoints(num_viewpoints) # for visualization, customizable number of view points
+        if num_views is None:
+            num_views = self.opt.num_views # for evaluation use default number of view points
+        multi_viewpoints = self.set_viewpoints(num_views) # for visualization, customizable number of view points
         
-        if save_individual_particles is None:
-            save_individual_particles = self.opt.save_individual_particles
+        if save_iid is None:
+            save_iid = self.opt.save_iid
+            
+        if visualize is None:
+            visualize = self.opt.visualize
             
         # Create output directory
-        if self.opt.visualize:
+        if visualize:
             if self.opt.num_particles > 1:
-                multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_viewpoints}_all_particles')
+                multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_all_particles')
                 os.makedirs(multi_viewpoints_dir, exist_ok=True)
             
-            if save_individual_particles:
+            if save_iid:
                 save_paths = []
                 for particle_id in range(self.opt.num_particles):
-                    path = os.path.join(self.save_dir, f'step_{step}_view_{num_viewpoints}_particle_{particle_id}')
+                    path = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_particle_{particle_id}')
                     os.makedirs(path, exist_ok=True)
                     save_paths.append(path)
         
@@ -113,7 +113,7 @@ class GaussianVisualizer:
                 
                 # Save individual particle images
                 # TODO: refactor this to include legend and labels
-                if self.opt.visualize and save_individual_particles:
+                if visualize and save_iid:
                     vutils.save_image(
                         image,
                         os.path.join(save_paths[particle_id], f'view_{i:03d}.png'),  # Use 3-digit padding for proper ordering
@@ -126,7 +126,7 @@ class GaussianVisualizer:
             
             # Save combined image of all particles
             # TODO: refactor this to include legend and labels
-            if self.opt.visualize and self.opt.num_particles > 1:
+            if visualize and self.opt.num_particles > 1:
                 vutils.save_image(
                     particle_images, # [N, 3, H, W]
                         os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
