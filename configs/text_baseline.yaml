@@ -8,6 +8,7 @@ save_iid: False # for visualization
 
 # metrics
 metrics: True
+clip_metrics_type: hf_clip # openclip, hf_clip
 feature_extractor_model_name: facebook/dinov2-base
 
 # losses
