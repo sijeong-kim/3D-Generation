@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=text_to_3d_baseline
-#SBATCH --partition=gpgpu
+#SBATCH --job-name=baseline
+#SBATCH --partition=AMD7-A100-T
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk

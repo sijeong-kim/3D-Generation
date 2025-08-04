@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=text_to_3d_baseline
+#SBATCH --job-name=metrics_test
 #SBATCH --partition=gpgpuC
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
