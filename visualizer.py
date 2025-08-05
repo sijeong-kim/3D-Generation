@@ -133,7 +133,7 @@ class GaussianVisualizer:
                         normalize=False
                     )
         
-        multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=1) # [V, N, 3, H, W]
+        multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0) # [V, N, 3, H, W]
         
         return multi_viewpoint_images
 
