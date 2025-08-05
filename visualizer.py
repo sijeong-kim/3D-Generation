@@ -47,7 +47,7 @@ class GaussianVisualizer:
 
     # TODO: refactor this function to include legend and labels
     @torch.no_grad()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None,save_iid=None): # [V, N, 3, H, W]
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N, 3, H, W]
         """
         Render images from specific viewpoints.
         
