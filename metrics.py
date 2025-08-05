@@ -208,7 +208,7 @@ class MetricsCalculator:
             
             # Process images directly as tensors
             vision_inputs = self.processor.image_processor(
-                images_uint8.cpu().numpy(),  # HF expects numpy for batch processing
+                images_uint8.cpu(),  # Pass tensor directly for efficiency
                 return_tensors="pt"
             )
             
