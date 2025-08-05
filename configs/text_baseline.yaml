@@ -1,3 +1,24 @@
+# training
+num_particles: 4
+
+# visualize
+visualize: True
+save_rendered_images_interval: 100 # for debugging
+save_iid: False # for visualization
+
+# metrics
+metrics: True
+clip_metrics_type: hf_clip # openclip, hf_clip
+feature_extractor_model_name: facebook/dinov2-base
+
+# losses
+losses_interval: 1
+efficiency_interval: 1
+quantitative_metrics_interval: 1
+
+# multi-viewpoints
+num_views: 4
+
 ### Input
 # input rgba image path (default to None, can be load in GUI too)
 input: 

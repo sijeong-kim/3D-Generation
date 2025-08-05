@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=baseline
-#SBATCH --partition=AMD7-A100-T
+#SBATCH --job-name=baseline_1500
+#SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
@@ -49,8 +49,9 @@ mkdir -p $MPLCONFIGDIR
 # --------------------------------
 SEED=42
 PROMPT="a photo of a hamburger"
+ITER=1500
 
-TASK_NAME="${PROMPT// /_}_pure_baseline_seed_${SEED}"
+TASK_NAME="${PROMPT// /_}_pure_baseline_iter_${ITER}_seed_${SEED}"
 OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
 mkdir -p ${OUTPUT_DIR}
@@ -84,7 +85,8 @@ CMD="python ${WORKING_DIR}/main_baseline.py \
     prompt=\"${PROMPT}\" \
     save_path=${PROMPT// /_} \
     outdir=${OUTPUT_DIR} \
-    seed=${SEED}"
+    seed=${SEED} \
+    iter=${ITER}"
 
 echo "[RUNNING COMMAND] $CMD"
 eval $CMD

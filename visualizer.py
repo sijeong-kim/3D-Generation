@@ -8,36 +8,35 @@ import torchvision.utils as vutils
 import matplotlib.pyplot as plt
 
 class GaussianVisualizer:
-    def __init__(self, save_dir=None, opt=None, renderers=None, cam=None, debug=False):
+    def __init__(self, opt=None, renderers=None, cam=None, debug=False):
         # Validate opt parameter
         if opt is None:
             raise ValueError("opt parameter cannot be None")
         self.opt = opt
         
-        if self.opt.visualize and not save_dir is None:
+        if self.opt.visualize:
             self.save_dir = os.path.join(self.opt.outdir, 'visualizations')
             os.makedirs(self.save_dir, exist_ok=True)
             
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.renderers = renderers
         # Handle both single camera and list of cameras for backward compatibility
         self.cam = cam
         
+        self.device = torch.device("cuda")
+        
         # viewpoints for multi-viewpoints
-        self.viewpoints = self.set_viewpoints(opt.num_viewpoints)
-        # viewpoints for 360 degree rotation
-        self.viewpoints_360 = self.set_viewpoints(120) # 120 viewpoints for 360 degree rotation
-        
-        
-    def set_viewpoints(self, num_viewpoints=8):
-        vers = [0.0] * num_viewpoints
-        hors = np.linspace(0, 360, num_viewpoints)
-        return [(vers[i], hors[i]) for i in range(num_viewpoints)]
+        self.multi_viewpoints = self.set_viewpoints(opt.num_views)
+    
+    @torch.no_grad()
+    def set_viewpoints(self, num_views=8):
+        vers = [0.0] * num_views
+        hors = np.linspace(0, 360, num_views)
+        return [(vers[i], hors[i]) for i in range(num_views)]
 
     @torch.no_grad()
-    def save_rendered_images(self, images, step):
+    def save_rendered_images(self, step, images):
         # Create output directories for rendered images and visualizations
-        if not os.path.exists(os.path.join(self.save_dir, 'rendered_images')) and self.opt.visualize:
+        if not os.path.exists(os.path.join(self.save_dir, 'rendered_images')):
             os.makedirs(os.path.join(self.save_dir, 'rendered_images'), exist_ok=True)
         
         vutils.save_image(
@@ -46,81 +45,47 @@ class GaussianVisualizer:
             normalize=False
         )
 
-        
+    # TODO: refactor this function to include legend and labels
     @torch.no_grad()
-    def visualize_all_particles_360(self, step, save_individual_particles=False):
-        
-        
-        if self.opt.visualize:
-            save_all_particles_path = os.path.join(self.save_dir, f'gaussians_rendered_step_{step}_all_particles_360')
-            os.makedirs(save_all_particles_path, exist_ok=True)
-        
-            if save_individual_particles:
-                save_paths = []
-                for particle_idx in range(self.opt.num_particles):
-                    path = os.path.join(self.save_dir, f'gaussians_rendered_step_{step}_particle_{particle_idx}_360')
-                    os.makedirs(path, exist_ok=True)
-                    save_paths.append(path)
-        
-        for i, (ver, hor) in enumerate(self.viewpoints_360):
-            
-            # Get camera pose using orbit_camera function
-            pose = orbit_camera(ver, hor, self.cam.radius)
-            
-            # Create MiniCam with current camera state
-            camera = MiniCam(
-                pose,
-                self.opt.W,
-                self.opt.H,
-                self.cam.fovy,
-                self.cam.fovx,
-                self.cam.near,
-                self.cam.far
-            )
-            bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
-            images = []
-            
-            for particle_idx in range(self.opt.num_particles):
-                out = self.renderers[particle_idx].render(camera, bg_color=bg_color)
-                image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
-                images.append(image)
-                
-                if save_individual_particles:
-                    # Save individual particle images
-                    vutils.save_image(
-                        image,
-                        os.path.join(save_paths[particle_idx], f'view_{i:03d}.png'),  # Use 3-digit padding for proper ordering
-                        normalize=False
-                    )
-                
-            # save all particles images in one image in parallel
-            vutils.save_image(
-                torch.cat(images, dim=0),
-                os.path.join(save_all_particles_path, f'view_{i:03d}.png'),
-                normalize=False
-            )
-
-            
-    # TODO: refactor this function
-    @torch.no_grad()
-    def visualize_all_particles_multi_viewpoints(self, step, num_viewpoints=8): # [N, V, 3, H, W]
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N, 3, H, W]
         """
         Render images from specific viewpoints.
         
         Args:
             step: Current training step
-            num_viewpoints: Number of viewpoints to render
+            num_views: Number of viewpoints to render
+            save_iid: Whether to save individual particle images
+        
+        Returns:
+            multi_viewpoint_images: [V, N, 3, H, W]
         """
+        # Create multi-viewpoints surrounding the object horizontally
+        if num_views is None:
+            num_views = self.opt.num_views # for evaluation use default number of view points
+        multi_viewpoints = self.set_viewpoints(num_views) # for visualization, customizable number of view points
         
+        if save_iid is None:
+            save_iid = self.opt.save_iid
+            
+        if visualize is None:
+            visualize = self.opt.visualize
+            
         # Create output directory
-        if self.opt.visualize and self.step % self.opt.vis_interval == 0:
-            viewpoint_dir = os.path.join(self.save_dir, f'all_particles_viewpoints_step_{step}')
-            os.makedirs(viewpoint_dir, exist_ok=True)
-
+        if visualize:
+            if self.opt.num_particles > 1:
+                multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_all_particles')
+                os.makedirs(multi_viewpoints_dir, exist_ok=True)
+            
+            if save_iid:
+                save_paths = []
+                for particle_id in range(self.opt.num_particles):
+                    path = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_particle_{particle_id}')
+                    os.makedirs(path, exist_ok=True)
+                    save_paths.append(path)
         
-        viewpoint_images = []
-        
-        for i, (ver, hor) in enumerate(self.viewpoints):
+        # Render images from each viewpoint
+        multi_viewpoint_images = []
+        for i, (ver, hor) in enumerate(multi_viewpoints):
             
             # Get camera pose using orbit_camera function
             pose = orbit_camera(ver, hor, self.cam.radius)
@@ -135,31 +100,40 @@ class GaussianVisualizer:
                 self.cam.near,
                 self.cam.far
             )
+            
             # Render each particle from this viewpoint
             particle_images = []
-            for particle_idx in range(self.opt.num_particles):
+            for particle_id in range(self.opt.num_particles):
 
                 # Render with white background
                 bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
-                out = self.renderers[particle_idx].render(camera, bg_color=bg_color)
+                out = self.renderers[particle_id].render(camera, bg_color=bg_color)
                 image = out["image"].unsqueeze(0)  # [1, 3, H, W]
                 particle_images.append(image)
+                
+                # Save individual particle images
+                # TODO: refactor this to include legend and labels
+                if visualize and save_iid:
+                    vutils.save_image(
+                        image,
+                        os.path.join(save_paths[particle_id], f'view_{i:03d}.png'),  # Use 3-digit padding for proper ordering
+                        normalize=False
+                    )
             
             # save all particles images in one image in parallel
-            particle_images = torch.cat(particle_images, dim=0) # [N, 3, H, W]
-            
-            viewpoint_images.append(particle_images)
+            particle_images = torch.cat(particle_images, dim=0) # [N, 3, H, W]            
+            multi_viewpoint_images.append(particle_images) # [V, N, 3, H, W]
             
             # Save combined image of all particles
-            if self.opt.num_particles > 1 and self.opt.visualize:
-                filename = f'view_{i:03d}_all_particles.png'
+            # TODO: refactor this to include legend and labels
+            if visualize and self.opt.num_particles > 1:
                 vutils.save_image(
                     particle_images, # [N, 3, H, W]
-                        os.path.join(viewpoint_dir, filename),
+                        os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
                         normalize=False
                     )
         
-        multi_viewpoint_images = torch.stack(viewpoint_images, dim=1) # [N, V, 3, H, W]
+        multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0) # [V, N, 3, H, W]
         
         return multi_viewpoint_images
 
@@ -176,7 +150,7 @@ class GaussianVisualizer:
         
         # Create output directory
         if self.opt.visualize:
-            viewpoint_dir = os.path.join(self.save_dir, f'fixed_viewpoints_step_{step}_elev{elevation}_hor{horizontal}')
+            viewpoint_dir = os.path.join(self.save_dir, f'step_{step}_view_{elevation}_{horizontal}')
             os.makedirs(viewpoint_dir, exist_ok=True)
         
         # Get camera pose
@@ -194,17 +168,17 @@ class GaussianVisualizer:
         )
         # Render each particle from this viewpoint
         particle_images = []
-        for particle_idx in range(self.opt.num_particles):
+        for particle_id in range(self.opt.num_particles):
             
             # Render with white background
             bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
-            out = self.renderers[particle_idx].render(camera, bg_color=bg_color)
+            out = self.renderers[particle_id].render(camera, bg_color=bg_color)
             image = out["image"].unsqueeze(0)  # [1, 3, H, W]
             particle_images.append(image)
         
             # Save individual particle images
             if self.opt.visualize:
-                filename = f'particle_{particle_idx}.png'
+                filename = f'particle_{particle_id}.png'
                 vutils.save_image(
                     image,
                     os.path.join(viewpoint_dir, filename),
@@ -233,26 +207,26 @@ class GaussianVisualizer:
         print(f"[DEBUG] Number of particles: {self.opt.num_particles}")
         
         # Enhanced debugging - Print Gaussian stats for debugging
-        for particle_idx in range(self.opt.num_particles):
-            gaussians = self.renderers[particle_idx].gaussians
+        for particle_id in range(self.opt.num_particles):
+            gaussians = self.renderers[particle_id].gaussians
             num_gaussians = gaussians.get_xyz.shape[0]
             xyz = gaussians.get_xyz
             opacity = gaussians.get_opacity
             scaling = gaussians.get_scaling
             
-            print(f"[DEBUG] Particle {particle_idx}: {num_gaussians} Gaussians")
-            print(f"[DEBUG] Particle {particle_idx}: XYZ mean={xyz.mean(dim=0)}, std={xyz.std(dim=0)}")
-            print(f"[DEBUG] Particle {particle_idx}: XYZ min={xyz.min(dim=0)[0]}, max={xyz.max(dim=0)[0]}")
-            print(f"[DEBUG] Particle {particle_idx}: Opacity mean={opacity.mean():.6f}, min={opacity.min():.6f}, max={opacity.max():.6f}")
-            print(f"[DEBUG] Particle {particle_idx}: Scaling mean={scaling.mean(dim=0)}, min={scaling.min(dim=0)[0]}, max={scaling.max(dim=0)[0]}")
+            print(f"[DEBUG] Particle {particle_id}: {num_gaussians} Gaussians")
+            print(f"[DEBUG] Particle {particle_id}: XYZ mean={xyz.mean(dim=0)}, std={xyz.std(dim=0)}")
+            print(f"[DEBUG] Particle {particle_id}: XYZ min={xyz.min(dim=0)[0]}, max={xyz.max(dim=0)[0]}")
+            print(f"[DEBUG] Particle {particle_id}: Opacity mean={opacity.mean():.6f}, min={opacity.min():.6f}, max={opacity.max():.6f}")
+            print(f"[DEBUG] Particle {particle_id}: Scaling mean={scaling.mean(dim=0)}, min={scaling.min(dim=0)[0]}, max={scaling.max(dim=0)[0]}")
             
             # Check if any Gaussians are visible (opacity > threshold)
             visible_gaussians = (opacity > 0.01).sum()
-            print(f"[DEBUG] Particle {particle_idx}: Visible Gaussians (opacity > 0.01): {visible_gaussians}")
+            print(f"[DEBUG] Particle {particle_id}: Visible Gaussians (opacity > 0.01): {visible_gaussians}")
             
             # Check distance from origin
             distances = torch.norm(xyz, dim=1)
-            print(f"[DEBUG] Particle {particle_idx}: Distance from origin - mean={distances.mean():.3f}, min={distances.min():.3f}, max={distances.max():.3f}")
+            print(f"[DEBUG] Particle {particle_id}: Distance from origin - mean={distances.mean():.3f}, min={distances.min():.3f}, max={distances.max():.3f}")
         
         print(f"[DEBUG] Camera radius: {self.cam.radius}")
         print(f"[DEBUG] Camera fovy: {self.cam.fovy}")
@@ -274,8 +248,8 @@ class GaussianVisualizer:
         
         bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device) # white
         
-        for particle_idx in range(min(2, self.opt.num_particles)):  # Test first 2 particles only
-            print(f"[DEBUG] Testing particle {particle_idx}")
+        for particle_id in range(min(2, self.opt.num_particles)):  # Test first 2 particles only
+            print(f"[DEBUG] Testing particle {particle_id}")
             
             for radius_idx, test_radius in enumerate(test_radii):
             # for bg_idx, bg_color in enumerate(test_backgrounds):
@@ -290,11 +264,11 @@ class GaussianVisualizer:
                     self.cam.far
                 )
                 
-                out = self.renderers[particle_idx].render(camera, bg_color=bg_color)
+                out = self.renderers[particle_id].render(camera, bg_color=bg_color)
                 image = out["image"]
                 
                 # Save test image
-                filename = f'test_particle_{particle_idx}_radius_{test_radius}.png'
+                filename = f'test_particle_{particle_id}_radius_{test_radius}.png'
                 vutils.save_image(
                     image.unsqueeze(0),
                     os.path.join(test_output_dir, filename),
@@ -311,7 +285,7 @@ class GaussianVisualizer:
                 print(f"[DEBUG]   Radius {test_radius}, BG: white, non-bg pixels = {non_bg_pixels}")
 
     @torch.no_grad()
-    def _debug_rendered_images(self, step, image, out, particle_idx):
+    def _debug_rendered_images(self, step, image, out, particle_id):
         image_stats = {
             'min': image.min().item(),
             'max': image.max().item(), 
@@ -320,14 +294,14 @@ class GaussianVisualizer:
             'unique_values': len(torch.unique(image.view(-1))),
             'shape': image.shape
         }
-        print(f"[DEBUG] Step {step}, Particle {particle_idx}: {image_stats}")
+        print(f"[DEBUG] Step {step}, Particle {particle_id}: {image_stats}")
         
         # Additional render output analysis
         if 'depth' in out:
             depth = out['depth']
-            print(f"[DEBUG] Step {step}, Particle {particle_idx}: Depth - min={depth.min():.3f}, max={depth.max():.3f}, mean={depth.mean():.3f}")
+            print(f"[DEBUG] Step {step}, Particle {particle_id}: Depth - min={depth.min():.3f}, max={depth.max():.3f}, mean={depth.mean():.3f}")
         if 'alpha' in out:
             alpha = out['alpha'] 
-            print(f"[DEBUG] Step {step}, Particle {particle_idx}: Alpha - min={alpha.min():.3f}, max={alpha.max():.3f}, mean={alpha.mean():.3f}")
+            print(f"[DEBUG] Step {step}, Particle {particle_id}: Alpha - min={alpha.min():.3f}, max={alpha.max():.3f}, mean={alpha.mean():.3f}")
 
         
