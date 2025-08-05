@@ -67,7 +67,7 @@ class MetricsCalculator:
         if opt is not None and hasattr(opt, 'metrics') and opt.metrics:
             self.metrics_csv_path = os.path.join(self.save_dir, "quantitative_metrics.csv")
             self.metrics_csv_file = open(self.metrics_csv_path, "w")
-            self.metrics_csv_file.write("step,diversity,fidelity\n")
+            self.metrics_csv_file.write(f"step,diversity,fidelity({self.clip_metrics_type})\n")
         
             self.losses_csv_path = os.path.join(self.save_dir, "losses.csv")
             self.losses_csv_file = open(self.losses_csv_path, "w")
