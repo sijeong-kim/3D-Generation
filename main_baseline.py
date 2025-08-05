@@ -261,9 +261,9 @@ class GUI:
             
                 # quantitative metrics
                 multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
-                representative_images, clip_similaritlies = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images) # [V, N, 3, H, W]
+                representative_images, clip_similarities = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images) # [V, N, 3, H, W]
 
-                fidelity = clip_similaritlies.mean().item()
+                fidelity = clip_similarities.mean().item()
                 features = self.feature_extractor(representative_images) # [V, N, D_featture]
                 diversity = self.metrics_calculator.compute_rlsd_diversity(features)
 
