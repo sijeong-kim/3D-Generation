@@ -1,3 +1,8 @@
+# sd_utils.py
+# This is DDIM, not DDPM...
+# This is the code for the paper:
+# https://arxiv.org/abs/2507.03895
+
 from diffusers import (
     DDIMScheduler,
     StableDiffusionPipeline,
@@ -142,6 +147,8 @@ class StableDiffusion(nn.Module):
         guidance_scale=100,
         as_latent=False,
         vers=None, hors=None,
+        repulsion_enabled=False,
+        repulsion_gradient_type="svgd",
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -166,6 +173,10 @@ class StableDiffusion(nn.Module):
 
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
+            
+            if repulsion_enabled:
+                sigma_t = torch.sqrt(w)
+                sigma_t = sigma_t.mean()
 
             # predict the noise residual with unet, NO grad!
             # add noise
@@ -201,10 +212,273 @@ class StableDiffusion(nn.Module):
             # seems important to avoid NaN...
             # grad = grad.clamp(-1, 1)
 
+        
         target = (latents - grad).detach()
-        loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
+        
+        if repulsion_enabled:
+            if repulsion_gradient_type == "svgd":
+                loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
+            elif repulsion_gradient_type == "rlsd":
+                loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
+            return loss, sigma_t
+        else:
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
 
         return loss
+    
+
+    def train_step_for_baseline(
+        self,
+        pred_rgb,
+        step_ratio=None,
+        guidance_scale=100,
+        as_latent=False,
+        vers=None, hors=None,
+    ):
+        
+        batch_size = pred_rgb.shape[0]
+        pred_rgb = pred_rgb.to(self.dtype)
+
+        if as_latent: 
+            latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1 # [B, 3, 64, 64]
+        else: # [O]
+            # interp to 512x512 to be fed into vae.
+            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False) # [B, 3, 512, 512]
+            # encode image into latents with vae, requires grad!
+            latents = self.encode_imgs(pred_rgb_512) # [B, 4, 64, 64]
+
+        with torch.no_grad():
+            if step_ratio is not None: # [O]
+                # dreamtime-like
+                # t = self.max_step - (self.max_step - self.min_step) * np.sqrt(step_ratio)
+                t = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
+                t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
+            else:
+                t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+
+            # w(t), sigma_t^2
+            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1) 
+            # weighted function from DDPM paper
+
+            # predict the noise residual with unet, NO grad!
+            # add noise
+            noise = torch.randn_like(latents)
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+            # pred noise
+            latent_model_input = torch.cat([latents_noisy] * 2)
+            tt = torch.cat([t] * 2)
+
+            if hors is None:
+                embeddings = torch.cat([self.embeddings['pos'].expand(batch_size, -1, -1), self.embeddings['neg'].expand(batch_size, -1, -1)])
+            else:
+                def _get_dir_ind(h):
+                    if abs(h) < 60: return 'front'
+                    elif abs(h) < 120: return 'side'
+                    else: return 'back'
+
+                embeddings = torch.cat([self.embeddings[_get_dir_ind(h)] for h in hors] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+
+            # the noise prediction is from the unet
+            noise_pred = self.unet(
+                latent_model_input, tt, encoder_hidden_states=embeddings
+            ).sample
+
+            # perform guidance (high scale from paper!)
+            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (
+                noise_pred_cond - noise_pred_uncond
+            )
+            
+            # the denoising gradient that contains the guidance information
+            grad = w * (noise_pred - noise) # w(t) * (noise_pred - noise) # weighted score matching
+            grad = torch.nan_to_num(grad) # avoid NaN
+
+            # seems important to avoid NaN...
+            # grad = grad.clamp(-1, 1)
+
+        # backpropagate the loss to the latents
+        target = (latents - grad).detach() # [B, 4, 64, 64]
+        loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]
+        
+        return loss
+        
+        
+    # ∇_x log p(x)
+    def train_step_for_rlsd_repulsion(
+        self,
+        pred_rgb, # [N, 3, H, W]
+        step_ratio=None,
+        guidance_scale=100,
+        as_latent=False,
+        vers=None, hors=None,
+    ):
+        """
+        Computes the SDS gradient ∇ log p(x) for given predicted RGB images (pred_rgb),
+        without performing backward(), useful for SVGD attraction term.
+        
+        Returns:
+            grad: Tensor of shape [B, 4, 64, 64] (same as latents)
+        """
+
+        batch_size = pred_rgb.shape[0] # N
+        pred_rgb = pred_rgb.to(self.dtype) # [N, 3, H, W]
+
+        # 1. Convert image to latents
+        if as_latent: # [X]
+            latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
+        else: # [O]
+            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
+            latents = self.encode_imgs(pred_rgb_512)  # [B, 4, 64, 64]
+        
+        with torch.no_grad():
+            if step_ratio is not None: # [O]
+                t_val = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
+                t = torch.full((batch_size,), t_val, dtype=torch.long, device=self.device)
+            else:
+                t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+
+            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)  # noise scale # w(t)
+            # w(t) is the weight of the noise at time t
+            # weighting function from DDPM paper
+            # w(t) = sigma_t^2
+                        
+            sigma_t = torch.sqrt(w)
+            sigma_t = sigma_t.mean() # [N, 1, 1, 1] -> [1]
+            
+
+            # 2. Add noise
+            noise = torch.randn_like(latents)
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+
+            # 3. Predict noise
+            latent_model_input = torch.cat([latents_noisy] * 2)
+            tt = torch.cat([t] * 2)
+
+            if hors is None:
+                embeddings = torch.cat([
+                    self.embeddings['pos'].expand(batch_size, -1, -1),
+                    self.embeddings['neg'].expand(batch_size, -1, -1)
+                ])
+            else:
+                def _get_dir_ind(h):
+                    if abs(h) < 60: return 'front'
+                    elif abs(h) < 120: return 'side'
+                    else: return 'back'
+                embeddings = torch.cat([
+                    self.embeddings[_get_dir_ind(h)] for h in hors
+                ] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+
+        
+            # the noise prediction is from the unet
+            noise_pred = self.unet(
+                latent_model_input, tt, encoder_hidden_states=embeddings
+            ).sample
+
+            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+
+            grad = w * (noise_pred - noise) # w(t) * (noise_pred - noise) # weighted score matching
+            grad = torch.nan_to_num(grad) # avoid NaN
+
+        # sds loss - use same formulation as baseline for consistency
+        target = (latents - grad).detach() # [B, 4, 64, 64]
+        sds_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]
+
+        return sds_loss, sigma_t
+
+    # ∇_x log p(x)
+    def train_step_for_svgd_repulsion(
+        self,
+        pred_rgb, # [N, 3, H, W]
+        step_ratio=None,
+        guidance_scale=100,
+        as_latent=False,
+        vers=None, hors=None,
+    ):
+        """
+        Computes the SDS gradients ∇ log p(x) for given predicted RGB images (pred_rgb),
+        without performing backward(), useful for SVGD attraction term.
+        
+        Returns:
+            score_gradients: Tensor of shape [N] - scalar gradient per particle
+            sigma_t: scalar timestep weighting
+        """
+
+        batch_size = pred_rgb.shape[0] # N
+        pred_rgb = pred_rgb.to(self.dtype) # [N, 3, H, W]
+
+        # 1. Convert image to latents
+        if as_latent: # [X]
+            latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
+        else: # [O]
+            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
+            latents = self.encode_imgs(pred_rgb_512)  # [B, 4, 64, 64]
+
+        with torch.no_grad():
+            if step_ratio is not None: # [O]
+                t_val = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
+                t = torch.full((batch_size,), t_val, dtype=torch.long, device=self.device)
+            else:
+                t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+
+            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)  # noise scale # w(t)
+            # w(t) is the weight of the noise at time t
+            # weighting function from DDPM paper
+            # w(t) = sigma_t^2
+                        
+            sigma_t = torch.sqrt(w)
+            sigma_t = sigma_t.mean() # [N, 1, 1, 1] -> [1]
+            
+
+            # 2. Add noise
+            noise = torch.randn_like(latents)
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+
+            # 3. Predict noise
+            latent_model_input = torch.cat([latents_noisy] * 2)
+            tt = torch.cat([t] * 2)
+
+            if hors is None:
+                embeddings = torch.cat([
+                    self.embeddings['pos'].expand(batch_size, -1, -1),
+                    self.embeddings['neg'].expand(batch_size, -1, -1)
+                ])
+            else:
+                def _get_dir_ind(h):
+                    if abs(h) < 60: return 'front'
+                    elif abs(h) < 120: return 'side'
+                    else: return 'back'
+                embeddings = torch.cat([
+                    self.embeddings[_get_dir_ind(h)] for h in hors
+                ] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+
+        
+            # the noise prediction is from the unet
+            noise_pred = self.unet(
+                latent_model_input, tt, encoder_hidden_states=embeddings
+            ).sample
+
+            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+
+            grad = w * (noise_pred - noise) # w(t) * (noise_pred - noise) # weighted score matching
+            grad = torch.nan_to_num(grad) # avoid NaN
+
+        # Compute SDS loss per particle (not averaged) to get [N] shape gradients
+        target = (latents - grad).detach() # [B, 4, 64, 64]
+        sds_losses_per_particle = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
+        
+        # These represent ∇_xj log p(xj) for each particle j
+        score_gradients = sds_losses_per_particle # [N]
+
+        return score_gradients, sigma_t
+        
+        # # Flatten to vector ∇ log p(x_j)
+        # score_gradients = grad.view(batch_size, -1)  # [N, D_latent]
+
+        # return score_gradients, sigma_t # [N, D_latent], [1]
+
+
 
     @torch.no_grad()
     def produce_latents(
