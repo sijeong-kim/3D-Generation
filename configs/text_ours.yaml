@@ -1,4 +1,5 @@
 # training
+seed: 42
 num_particles: 4
 
 # repulsive loss
