@@ -253,10 +253,10 @@ class GUI:
                     # [Question] should we divide by num_particles (mean)? in SVGD paper, they did divide by num_particles (mean)                              
         
                 scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-                total_loss = self.opt.lambda_sds * attraction_loss - scaled_repulsion_loss
+                total_loss = self.opt.lambda_sd * attraction_loss - scaled_repulsion_loss
 
             else: # baseline
-                total_loss = self.opt.lambda_sds * self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
+                total_loss = self.opt.lambda_sd * self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
 
         ### optimize step ### 
         
