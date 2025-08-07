@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ours_svgd
+#SBATCH --job-name=ours_hp
 #SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
@@ -45,102 +45,38 @@ export MPLCONFIGDIR=${BASE_DIR}/.cache/matplotlib
 mkdir -p $MPLCONFIGDIR
 
 # --------------------------------
-# Run Parameters
+# Diagnostic Info
 # --------------------------------
-SEED=42
-PROMPT="a photo of a hamburger"
-ITER=1500
-
-REPULSION_ENABLED=True
-REPULSION_GRADIENT_TYPE="svgd"
-LAMBDA_REPULSION=600
-REPULSION_TAU=0
-KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
-
-# TASK_NAME="${PROMPT// /_}_ours_${REPULSION_GRADIENT_TYPE}_${LAMBDA_REPULSION}_${SEED}"
-# OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
-
-# mkdir -p ${OUTPUT_DIR}
-
-# # --------------------------------
-# # Diagnostic Info
-# # --------------------------------
-# echo "========== SLURM JOB INFO =========="
-# echo "Job ID        : ${SLURM_JOB_ID}"
-# echo "Job Name      : ${SLURM_JOB_NAME}"
-# echo "Prompt        : ${PROMPT}"
-# echo "Task Name     : ${TASK_NAME}"
-# echo "User          : ${USER}"
-# echo "Run Host      : $(hostname)"
-# echo "Working Dir   : $(pwd)"
-# echo "CUDA Path     : ${CUDA_HOME}"
-# echo "Date & Time   : $(date)"
-# echo "PyTorch Ver   : $(python -c 'import torch; print(torch.__version__)')"
-# echo "CUDA (PyTorch): $(python -c 'import torch; print(torch.version.cuda)')"
-# echo "nvcc Version  : $(nvcc --version | grep release)"
-# nvidia-smi
-# echo "====================================="
-# echo "Output will be saved to: ${OUTPUT_DIR}"
-# echo "====================================="
+echo "========== SLURM JOB INFO =========="
+echo "Job ID        : ${SLURM_JOB_ID}"
+echo "Job Name      : ${SLURM_JOB_NAME}"
+echo "User          : ${USER}"
+echo "Run Host      : $(hostname)"
+echo "Working Dir   : $(pwd)"
+echo "CUDA Path     : ${CUDA_HOME}"
+echo "Date & Time   : $(date)"
+echo "PyTorch Ver   : $(python -c 'import torch; print(torch.__version__)')"
+echo "CUDA (PyTorch): $(python -c 'import torch; print(torch.version.cuda)')"
+echo "nvcc Version  : $(nvcc --version | grep release)"
+nvidia-smi
+echo "====================================="
+echo "Output will be saved to: outputs/${SLURM_JOB_ID}/"
+echo "====================================="
 
 # --------------------------------
-# Run Main Script
+# Run Hyperparameter Tuning Script
 # --------------------------------
 
+# Set output directory for the hyperparameter tuning
+OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}"
+mkdir -p ${OUTPUT_DIR}
 
-PROMPTS=("a photo of a hamburger" "a small saguaro cactus planted in a clay pot")
+# Run hp.py with the config file and custom output directory
+CMD="python ${WORKING_DIR}/hp.py \
+    --config ${WORKING_DIR}/configs/text_ours.yaml \
+    outdir=${OUTPUT_DIR}"
 
+echo "[RUNNING COMMAND] $CMD"
+eval $CMD
 
-for PROMPT in "${PROMPTS[@]}"; do
-
-    REPULSION_ENABLED=False
-    TASK_NAME="${PROMPT// /_}_ours_baseline_${SEED}"
-    OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
-    
-    CMD="python ${WORKING_DIR}/main_ours.py \
-        --config ${WORKING_DIR}/configs/text_ours.yaml \
-        prompt=\"${PROMPT}\" \
-        save_path=${PROMPT// /_} \
-        outdir=${OUTPUT_DIR} \
-        seed=${SEED} \
-        iter=${ITER} \
-        repulsion_enabled=${REPULSION_ENABLED} \
-        repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
-        repulsion_tau=${REPULSION_TAU} \
-        lambda_repulsion=${LAMBDA_REPULSION} \
-        kernel_type=${KERNEL_TYPE}"
-
-    echo "[RUNNING COMMAND] $CMD"
-    eval $CMD
-    echo "[INFO] Job completed successfully."
-
-
-    REPULSION_ENABLED=True
-    for REPULSION_GRADIENT_TYPE in "svgd" "rlsd"; do
-        for LAMBDA_REPULSION in 500 550 600 650 700 750 800 850 900 950 1000 1050 1100 1150 1200 1250 1300 1350 1400 1450 1500; do
-
-            TASK_NAME="${PROMPT// /_}_ours_${REPULSION_GRADIENT_TYPE}_${LAMBDA_REPULSION}_${SEED}"
-            OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
-
-            CMD="python ${WORKING_DIR}/main_ours.py \
-                --config ${WORKING_DIR}/configs/text_ours.yaml \
-                prompt=\"${PROMPT}\" \
-                save_path=${PROMPT// /_} \
-                outdir=${OUTPUT_DIR} \
-                seed=${SEED} \
-                iter=${ITER} \
-                repulsion_enabled=${REPULSION_ENABLED} \
-                repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
-                repulsion_tau=${REPULSION_TAU} \
-                lambda_repulsion=${LAMBDA_REPULSION} \
-                kernel_type=${KERNEL_TYPE}"
-
-            echo "[RUNNING COMMAND] $CMD"
-            eval $CMD
-
-            echo "[INFO] Job completed successfully."
-
-        done
-    done
-
-done
+echo "[INFO] Hyperparameter tuning completed successfully."

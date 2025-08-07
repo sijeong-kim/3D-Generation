@@ -7,7 +7,7 @@ from copy import deepcopy
 import torch
 import numpy as np
 
-from main import seed_everything, GUI
+from main_ours import GUI
 
 def run_hyperparameter_sweeping(base_opt):
     """Run hyperparameter tuning experiments with different parameter combinations."""
@@ -16,16 +16,18 @@ def run_hyperparameter_sweeping(base_opt):
     
     
     # Define hyperparameter grid
-    # LAMBDAS = [1, 10, 100, 1000, 10000] # coarse grid
-    LAMBDAS = [200, 300, 400, 500, 600, 700, 800] # fine grid
-    # LAMBDAS=[350, 400, 450, 500, 550, 600, 650] # finer grid
+    LAMBDAS = [1, 10, 100, 1000, 10000] # coarse grid
+    # LAMBDAS = [200, 300, 400, 500, 600, 700, 800] # fine grid
+    # LAMBDAS = [250, 350, 450, 550, 650, 750, 850] # fine grid
+
     GRADIENT_TYPES = ["svgd", "rlsd"] 
     
         
     # PROMPTS = ["a ripe strawberry", "a delicious hamburger", "a photo of a hamburger", 
     #           "a photo of an ice cream", "a campfire", "a small saguaro cactus planted in a clay pot", 
     #           "a photo of a tulip", "a 3D model of a fox"]
-    COMPARISON_PROMPTS = ["a small saguaro cactus planted in a clay pot"] # for baseline comparison (single viewpoint)
+    # COMPARISON_PROMPTS = ["a small saguaro cactus planted in a clay pot"] # for baseline comparison (single viewpoint)
+    COMPARISON_PROMPTS = ["a photo of a hamburger"]
     MULTI_VIEW_PROMPTS = ["a 3D model of a fox", "a delicious hamburger"] # for multi-viewpoint comparison (multi-viewpoint)
     DIVERSITY_PROMPTS = ["a ripe strawberry", "a campfire"] # for diversity comparison (diversity)
     # PROMPTS = COMPARISON_PROMPTS + MULTI_VIEW_PROMPTS + DIVERSITY_PROMPTS
@@ -33,7 +35,7 @@ def run_hyperparameter_sweeping(base_opt):
     PROMPTS = COMPARISON_PROMPTS
     
     opt.iters = 1500
-    opt.visualize = False
+    opt.visualize = True
     opt.metrics = True
     opt.losses_interval = 10
     opt.efficiency_interval = 10
@@ -61,7 +63,7 @@ def run_hyperparameter_sweeping(base_opt):
         print(f"\n[INFO] Running with seed {seed} ({seed_idx + 1}/{len(SEEDS)})")
         
         # Set seed for this run
-        seed_everything(seed)
+        opt.seed = seed
             
         for prompt in PROMPTS:
             print(f"\n[INFO] Running experiments for prompt: '{prompt}'")
@@ -78,8 +80,8 @@ def run_hyperparameter_sweeping(base_opt):
                     opt.lambda_repulsion = repulsion_lambda
                     
                     # Set output directory and save path
-                    opt.outdir = job_dir + f"/{prompt_clean}_w_repulsion_{gradient_type}_{repulsion_lambda}_seed_{seed}"
-                    opt.save_path = f"{prompt_clean}_w_repulsion_{gradient_type}_{repulsion_lambda}_seed_{seed}"
+                    opt.outdir = job_dir + f"/{prompt_clean}_ours_w_repulsion_{gradient_type}_{repulsion_lambda}_{seed}"
+                    opt.save_path = f"{prompt_clean}_ours_w_repulsion_{gradient_type}_{repulsion_lambda}_{seed}"
                     
                     # Create output directory
                     os.makedirs(opt.outdir, exist_ok=True)
@@ -102,8 +104,8 @@ def run_hyperparameter_sweeping(base_opt):
             opt.repulsion_enabled = False
             
             # Set output directory and save path for baseline
-            opt.outdir = job_dir + f"/{prompt_clean}_wo_repulsion_seed_{seed}"
-            opt.save_path = f"{prompt_clean}_wo_repulsion_seed_{seed}"
+            opt.outdir = job_dir + f"/{prompt_clean}_ours_wo_repulsion_{seed}"
+            opt.save_path = f"{prompt_clean}_ours_wo_repulsion_{seed}"
             
             # Create output directory
             os.makedirs(opt.outdir, exist_ok=True)
@@ -119,7 +121,7 @@ def run_hyperparameter_sweeping(base_opt):
             print(f"[INFO] Completed baseline without repulsion, seed={seed}")
     
     print("\n[INFO] Hyperparameter tuning completed!")
-    print(f"[INFO] Results saved in outputs/hypertuning/ with seed-specific subdirectories")
+    print(f"[INFO] Results saved in outputs/job_id/ with seed-specific subdirectories")
     print(f"[INFO] Each configuration was run {len(SEEDS)} times for statistical analysis")
 
 
