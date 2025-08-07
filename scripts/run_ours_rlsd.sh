@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=bl
+#SBATCH --job-name=ours_rlsd
 #SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
@@ -51,7 +51,13 @@ SEED=42
 PROMPT="a photo of a hamburger"
 ITER=1500
 
-TASK_NAME="${PROMPT// /_}_baseline_iter_${ITER}_seed_${SEED}"
+REPULSION_ENABLED=True
+REPULSION_GRADIENT_TYPE="rlsd"
+LAMBDA_REPULSION=600
+REPULSION_TAU=0
+KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
+
+TASK_NAME="${PROMPT// /_}_ours_${REPULSION_GRADIENT_TYPE}_${LAMBDA_REPULSION}_${SEED}"
 OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
 mkdir -p ${OUTPUT_DIR}
@@ -80,13 +86,18 @@ echo "====================================="
 # --------------------------------
 # Run Main Script
 # --------------------------------
-CMD="python ${WORKING_DIR}/main_baseline.py \
-    --config ${WORKING_DIR}/configs/text_baseline.yaml \
+CMD="python ${WORKING_DIR}/main_ours.py \
+    --config ${WORKING_DIR}/configs/text_ours.yaml \
     prompt=\"${PROMPT}\" \
     save_path=${PROMPT// /_} \
     outdir=${OUTPUT_DIR} \
     seed=${SEED} \
-    iter=${ITER}"
+    iter=${ITER} \
+    repulsion_enabled=${REPULSION_ENABLED} \
+    repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
+    repulsion_tau=${REPULSION_TAU} \
+    lambda_repulsion=${LAMBDA_REPULSION} \
+    kernel_type=${KERNEL_TYPE}"
 
 echo "[RUNNING COMMAND] $CMD"
 eval $CMD

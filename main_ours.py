@@ -20,6 +20,8 @@ from visualizer import GaussianVisualizer
 from metrics import MetricsCalculator
 from feature_extractor import DINOv2FeatureExtractor
 
+from loss_utils import rbf_kernel_and_grad
+
 class GUI:
     def __init__(self, opt):
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -82,7 +84,7 @@ class GUI:
         # override if provide a checkpoint
         for i in range(self.opt.num_particles):
             # Set different seed for each particle during initialization
-            init_seed = self.seed + i * self.opt.iters
+            init_seed = self.seed + i * self.opt.iters # 42, 42 + 1500, 42 + 2 * 1500, 42 + 3 * 1500, 42 + 4 * 1500
             self.seeds.append(init_seed)
             self.seed_everything(init_seed)
             
@@ -169,7 +171,7 @@ class GUI:
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
         images = []
         outputs = []
-        poses = []
+        # poses = []
         vers, hors, radii = [], [], []
         # avoid too large elevation (> 80 or < -80), and make sure it always cover [min_ver, max_ver]
         min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
@@ -178,7 +180,7 @@ class GUI:
         for j in range(self.opt.num_particles):
             
             # set seed for each particle + iteration step for different viewpoints each iter
-            self.seed_everything(self.seeds[j] + self.step)
+            self.seed_everything(self.seeds[j] + self.step - 1) # 42 , 42 + 1, 42 + 2, 42 + 3, ..., 42 + 1499
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
 
@@ -192,7 +194,7 @@ class GUI:
             radii.append(radius)
 
             pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
-            poses.append(pose)
+            # poses.append(pose)
 
             cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
 
@@ -206,13 +208,55 @@ class GUI:
             outputs.append(out)
                 
         images = torch.cat(images, dim=0) # [N, 3, H, W]
-        poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
+        # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
         features = self.feature_extractor(images) # [N, D_featture]
 
         for j in range(self.opt.num_particles):
-            total_loss = total_loss + self.opt.lambda_sd * self.guidance_sd.train_step(images, step_ratio=step_ratio if self.opt.anneal_timestep else None)
-            # TODO: Add guidance loss for each particle
+
+            if self.opt.repulsion_enabled:
+                
+                # score matching regulizers (sds_loss) - computed without gradients
+                if self.opt.repulsion_gradient_type == 'rlsd':  
+                    sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1]
+                    
+                    # 2. RBF kernel gradient wrt features
+                    rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_gradient_type) # [N, N], [N, D_feature] 
+                    
+                    # 3. Attraction loss (SDS) + 1/D_latent
+                    attraction_loss = sds_loss # [1]
+                    
+                    # 4. Repulsion loss (Repulsion)
+                    repulsion_loss = sigma_t * (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+                    # repulsion_loss = sigma_t * torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
+                    
+                elif self.opt.repulsion_gradient_type == 'svgd':
+                    score_gradients, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
+                    
+                    # 2. RBF kernel computation
+                    rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_gradient_type) # [N, N], [N, D_feature] 
+                    
+                    # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
+                    # rbf_kernel: [N, N] where rbf_kernel[i,j] = k(xj, xi)
+                    # score_gradients: [N] where score_gradients[j] = ∇_xj log p(xj)
+                    # Multiply kernel matrix with score gradients: [N, N] * [N] -> [N] (sum over j for each i)
+                    # 1/D_latent
+                    attraction_per_particle = (rbf_kernel * score_gradients.unsqueeze(0)).sum(dim=1) # [N]
+                    attraction_loss = attraction_per_particle.mean() # [1]
+                    
+                    # # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
+                    # weighted_grad = rbf_kernel @ score_gradients  # [N, D_latent]
+                    # attraction_loss = weighted_grad.norm(dim=1).mean()  # optional scalar for loss tracking
+                    
+                    # 4. Repulsion loss (same as before)
+                    repulsion_loss = sigma_t * (rbf_kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+                    # [Question] should we divide by num_particles (mean)? in SVGD paper, they did divide by num_particles (mean)                              
+        
+                scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+                total_loss = self.opt.lambda_sd * attraction_loss - scaled_repulsion_loss
+
+            else: # baseline
+                total_loss = self.opt.lambda_sd * self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
 
         ### optimize step ### 
         
@@ -254,9 +298,15 @@ class GUI:
                 max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
                 
                 # losses
-                attraction_loss_val = 0
-                repulsion_loss_val = 0
-                scaled_repulsion_loss_val = 0
+                if self.opt.repulsion_enabled:
+                    attraction_loss_val = attraction_loss.item()
+                    repulsion_loss_val = repulsion_loss.item()
+                    scaled_repulsion_loss_val = repulsion_loss_val * self.opt.lambda_repulsion
+                else:
+                    attraction_loss_val = 0
+                    repulsion_loss_val = 0
+                    scaled_repulsion_loss_val = 0
+                    
                 total_loss_val = total_loss.item()
             
                 # quantitative metrics
@@ -275,7 +325,8 @@ class GUI:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
+                if self.step == 1000:
+                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
