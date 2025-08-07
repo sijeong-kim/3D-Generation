@@ -34,7 +34,7 @@ class MetricsCalculator:
             # OpenCLIP settings
             self.features_normalized = True
             self.model_name = "ViT-H-14"
-            self.pretrained = "laion2b_s34b_b88k"
+            self.pretrained = "laion2b_s32b_b79k"
             self.device = "cuda"
 
             # Load OpenCLIP
