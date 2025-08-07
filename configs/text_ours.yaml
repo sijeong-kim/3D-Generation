@@ -14,6 +14,7 @@ kernel_type: "rbf" # "rbf" or "laplacian" -- to be added
 visualize: True
 save_rendered_images_interval: 100 # for debugging
 save_iid: False # for visualization
+save_multi_viewpoints_interval: 1000 # for debugging
 
 # metrics
 metrics: True
@@ -26,7 +27,7 @@ efficiency_interval: 1
 quantitative_metrics_interval: 1
 
 # multi-viewpoints
-num_views: 4
+num_views: 8
 
 ### Input
 # input rgba image path (default to None, can be load in GUI too)

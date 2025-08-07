@@ -141,7 +141,7 @@ class GUI:
         
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, multi_view_type=self.opt.multi_view_type)
         else:
             self.metrics_calculator = None
 
@@ -311,7 +311,7 @@ class GUI:
             
                 # quantitative metrics
                 multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
-                representative_images, clip_similarities = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images) # [V, N, 3, H, W]
+                representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type) # [V, N, 3, H, W]
 
                 fidelity = clip_similarities.mean().item()
                 features = self.feature_extractor(representative_images) # [V, N, D_featture]
@@ -325,8 +325,6 @@ class GUI:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                if self.step == 1000:
-                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
@@ -473,9 +471,9 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters and self.visualizer is not None and self.opt.visualize:
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+        # # Multi-viewpoints for 30 fps video (save at the end of training)
+        # if self.step == self.opt.iters and self.visualizer is not None and self.opt.visualize:
+        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=False) # 360 / 120 for 30 fps
 
         # save model
         for j in range(self.opt.num_particles):

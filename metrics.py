@@ -13,7 +13,7 @@ except ImportError:
     TRANSFORMERS_AVAILABLE = False
 
 class MetricsCalculator:
-    def __init__(self, opt: dict = None, prompt: str = "a photo of a cat", clip_metrics_type: str = None):
+    def __init__(self, opt: dict = None, prompt: str = "a photo of a cat", clip_metrics_type: str = None, multi_view_type: str = None):
         # Validate opt parameter
         if opt is None:
             raise ValueError("opt parameter cannot be None")
@@ -28,13 +28,18 @@ class MetricsCalculator:
             self.clip_metrics_type = clip_metrics_type
         else:
             self.clip_metrics_type = self.opt.clip_metrics_type
+            
+        if self.opt.multi_view_type is not None:
+            self.multi_view_type = multi_view_type
+        else:
+            self.multi_view_type = self.opt.multi_view_type
 
 
         if self.clip_metrics_type == "openclip":
-            # OpenCLIP settings
+            # OpenCLIP settings - using laion/CLIP-ViT-bigG-14-laion2B-39B-b160k1
             self.features_normalized = True
-            self.model_name = "ViT-H-14"
-            self.pretrained = "laion2b_s32b_b79k"
+            self.model_name = "ViT-bigG-14"
+            self.pretrained = "laion2b_s39b_b160k"
             self.device = "cuda"
 
             # Load OpenCLIP
@@ -230,16 +235,17 @@ class MetricsCalculator:
         return similarities.mean().item()
     
     @torch.no_grad()
-    def select_best_views_by_clip_fidelity(self, images: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def compute_clip_fidelity_in_multi_viewpoints(self, images: torch.Tensor, multi_view_type: str = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Vectorized: Select best view per particle based on CLIP similarity.
+        Compute CLIP fidelity across multiple viewpoints using different aggregation strategies.
 
         Args:
-            images: [N, V, 3, H, W] in [0, 1]
+            images: [N, V, 3, H, W] in [0, 1] - N particles, V views per particle
+            multi_view_type: Strategy for aggregating views ('best_views', 'average_views', 'cross_attention_views')
 
         Returns:
-            best_images: [N, 3, H, W]
-            best_similarities: [N]
+            best_images: [N, 3, H, W] - Selected images for each particle
+            best_similarities: [N] - Similarity scores for selected images
         """
         N, V, C, H, W = images.shape
         device = images.device
@@ -303,8 +309,22 @@ class MetricsCalculator:
 
         sims = sims.view(N, V)  # [N, V]
 
-        # Find best similarity and corresponding view index
-        best_sim_vals, best_view_indices = sims.max(dim=1)  # [N]
+
+        # Use instance default if not specified
+        if multi_view_type is None:
+            multi_view_type = self.multi_view_type
+            
+        if multi_view_type == "best_views":
+            # Find best similarity and corresponding view index
+            best_sim_vals, best_view_indices = sims.max(dim=1)  # [N]
+        elif multi_view_type == "average_views":
+            # Compute average similarity across all views
+            best_sim_vals = sims.mean(dim=1)  # [N]
+            # For average case, we still need to select one representative image
+            # Choose the view closest to the average similarity for each particle
+            _, best_view_indices = torch.min(torch.abs(sims - best_sim_vals.unsqueeze(1)), dim=1)
+        else:
+            raise ValueError(f"Invalid multi-view type: {multi_view_type}. Valid options: 'best_views', 'average_views', 'cross_attention_views'")
 
         # Select best images (V>=1)
         best_images = images[torch.arange(N, device=device), best_view_indices] # [N, 3, H, W]
@@ -475,9 +495,9 @@ if __name__ == "__main__":
             fidelity = metrics.compute_clip_fidelity(images)
             print(f"  Fidelity Score: {fidelity:.4f}")
             
-            # Test 2: select_best_views_by_clip_fidelity with multi-view images
-            print("Testing select_best_views_by_clip_fidelity...")
-            best_images, best_similarities = metrics.select_best_views_by_clip_fidelity(multi_view_images)
+            # Test 2: compute_clip_fidelity_in_multi_viewpoints with multi-view images
+            print("Testing compute_clip_fidelity_in_multi_viewpoints...")
+            best_images, best_similarities = metrics.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, "best_views")
             print(f"  Best images shape: {best_images.shape}")
             print(f"  Best similarities shape: {best_similarities.shape}")
             print(f"  Best similarities: {best_similarities.cpu().numpy()}")

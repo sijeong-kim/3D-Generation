@@ -126,7 +126,7 @@ class GaussianVisualizer:
             
             # Save combined image of all particles
             # TODO: refactor this to include legend and labels
-            if visualize and self.opt.num_particles > 1:
+            if (visualize and self.opt.num_particles > 1) or (self.step % self.opt.save_multi_viewpoints_interval == 0):
                 vutils.save_image(
                     particle_images, # [N, 3, H, W]
                         os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
