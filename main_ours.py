@@ -84,7 +84,7 @@ class GUI:
         # override if provide a checkpoint
         for i in range(self.opt.num_particles):
             # Set different seed for each particle during initialization
-            init_seed = self.seed + i * self.opt.iters
+            init_seed = self.seed + i * self.opt.iters # 42, 42 + 1500, 42 + 2 * 1500, 42 + 3 * 1500, 42 + 4 * 1500
             self.seeds.append(init_seed)
             self.seed_everything(init_seed)
             
@@ -180,7 +180,7 @@ class GUI:
         for j in range(self.opt.num_particles):
             
             # set seed for each particle + iteration step for different viewpoints each iter
-            self.seed_everything(self.seeds[j] + self.step)
+            self.seed_everything(self.seeds[j] + self.step - 1) # 42 , 42 + 1, 42 + 2, 42 + 3, ..., 42 + 1499
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
 
@@ -325,7 +325,8 @@ class GUI:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
+                if self.step == 1000:
+                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
