@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ours_rlsd
-#SBATCH --partition=AMD7-A100-T
+#SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
@@ -53,11 +53,11 @@ ITER=1500
 
 REPULSION_ENABLED=True
 REPULSION_GRADIENT_TYPE="rlsd"
-LAMBDA_REPULSION=100
+LAMBDA_REPULSION=600
 REPULSION_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 
-TASK_NAME="${PROMPT// /_}_ours_iter_${ITER}_seed_${SEED}_w_repulsion_${REPULSION_GRADIENT_TYPE}_${REPULSION_LAMBDA}"
+TASK_NAME="${PROMPT// /_}_ours_${REPULSION_GRADIENT_TYPE}_${LAMBDA_REPULSION}_${SEED}"
 OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
 mkdir -p ${OUTPUT_DIR}
