@@ -95,7 +95,7 @@ class GUI:
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
                 
         # visualizer
-        if self.opt.visualize:
+        if self.opt.visualize or self.opt.metrics:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
@@ -474,7 +474,7 @@ class GUI:
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
         # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters:
+        if self.step == self.opt.iters and self.visualizer is not None and self.opt.visualize:
             self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
 
         # save model
