@@ -79,7 +79,7 @@ echo "====================================="
 # --------------------------------
 # Run Main Script
 # --------------------------------
-CMD="python ${WORKING_DIR}/metrics.py \
+CMD="python ${WORKING_DIR}/experiments/clip_metrics_with_hf_clip.py \
     --prompt \"${PROMPT}\" \
     --outdir \"${OUTPUT_DIR}\""
 
