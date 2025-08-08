@@ -18,7 +18,7 @@ from guidance.sd_utils import StableDiffusion
 
 from visualizer import GaussianVisualizer
 from metrics import MetricsCalculator
-from feature_extractor import DINOv2FeatureExtractor
+from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from loss_utils import rbf_kernel_and_grad
 
@@ -137,7 +137,13 @@ class GUI:
         )
         
         # feature extractor
-        self.feature_extractor = DINOv2FeatureExtractor(self.opt.feature_extractor_model_name).eval().to(self.device)
+        # Use multi-layer extractor for specific layer extraction
+        # Supports: 'early' (25% depth), 'mid' (50% depth), 'last' (final layer)
+        print(f"[INFO] Using DINOv2 features from '{self.opt.feature_layer}' layer")
+        self.feature_extractor = DINOv2MultiLayerFeatureExtractor(
+            model_name=self.opt.feature_extractor_model_name, 
+            device=self.device
+        )
         
         # metrics
         if self.opt.metrics:
@@ -210,7 +216,7 @@ class GUI:
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
-        features = self.feature_extractor(images) # [N, D_featture]
+        features = self.feature_extractor(images, layer_name=self.opt.feature_layer) # [N, D_feature]
 
         for j in range(self.opt.num_particles):
 
@@ -314,7 +320,10 @@ class GUI:
                 representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type) # [V, N, 3, H, W]
 
                 fidelity = clip_similarities.mean().item()
-                features = self.feature_extractor(representative_images) # [V, N, D_featture]
+                
+                # Extract features for diversity computation
+                features = self.feature_extractor(representative_images, layer_name=self.opt.feature_layer) # [V*N, D_feature]
+                
                 diversity = self.metrics_calculator.compute_rlsd_diversity(features)
 
                 # log
