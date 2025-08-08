@@ -216,7 +216,7 @@ class GUI:
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
-        features = self.feature_extractor(images, layer_name=self.opt.feature_layer) # [N, D_feature]
+        features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images) # [N, D_feature]
 
         for j in range(self.opt.num_particles):
 
@@ -322,7 +322,7 @@ class GUI:
                 fidelity = clip_similarities.mean().item()
                 
                 # Extract features for diversity computation
-                features = self.feature_extractor(representative_images, layer_name=self.opt.feature_layer) # [V*N, D_feature]
+                features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, representative_images) # [V*N, D_feature]
                 
                 diversity = self.metrics_calculator.compute_rlsd_diversity(features)
 

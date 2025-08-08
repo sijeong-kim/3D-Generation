@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=ours_hp
+#SBATCH --job-name=ours_hp_lambda
 #SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
@@ -72,7 +72,7 @@ OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}"
 mkdir -p ${OUTPUT_DIR}
 
 # Run hp.py with the config file and custom output directory
-CMD="python ${WORKING_DIR}/hp.py \
+CMD="python ${WORKING_DIR}/hp_lambda.py \
     --config ${WORKING_DIR}/configs/text_ours.yaml \
     outdir=${OUTPUT_DIR}"
 
