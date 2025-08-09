@@ -14,7 +14,7 @@ feature_layer: 0 # 0-2: early, 3-7: mid, 8-11: late
 visualize: True
 save_rendered_images_interval: 100 # for debugging
 save_iid: False # for visualization
-save_multi_viewpoints_interval: 1000 # for debugging
+save_multi_viewpoints_interval: 500 # for debugging
 
 # metrics
 metrics: True
@@ -26,8 +26,9 @@ losses_interval: 1
 efficiency_interval: 1
 quantitative_metrics_interval: 1
 
-# multi-viewpoints
+# multi-viewpoints (for metrics)
 num_views: 8
+multi_view_type: "average_views" # "best_views", "average_views", "cross_attention_views"
 
 ### Input
 # input rgba image path (default to None, can be load in GUI too)

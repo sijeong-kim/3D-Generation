@@ -185,8 +185,11 @@ class MetricsCalculator:
         # Flatten views for batch CLIP processing
         images_flat = images.view(N * V, C, H, W)
 
+        # Preprocess images for CLIP
+        images_clip = self._preprocess_images_tensor(images_flat)  # [N*V, 3, 224, 224]
+
         # Encode image features
-        image_features = self.model.encode_image(images_flat)
+        image_features = self.model.encode_image(images_clip)
         image_features = F.normalize(image_features, dim=1)
 
         # Encode repeated prompt
@@ -208,18 +211,12 @@ class MetricsCalculator:
         if multi_view_type == "best_views":
             # Find best similarity and corresponding view index
             best_sim_vals, best_view_indices = sims.max(dim=1)  # [N]
-            
-            return best_sim_vals, best_view_indices
-        
         elif multi_view_type == "average_views":
             # Compute average similarity across all views
-            mean_sim_vals = sims.mean(dim=1)  # [N]
+            best_sim_vals = sims.mean(dim=1)  # [N]
             # For average case, we still need to select one representative image
             # Choose the view closest to the average similarity for each particle
-            _, mean_view_indices = torch.min(torch.abs(sims - mean_sim_vals.unsqueeze(1)), dim=1)
-            
-            return mean_sim_vals, mean_view_indices
-            
+            _, best_view_indices = torch.min(torch.abs(sims - best_sim_vals.unsqueeze(1)), dim=1)
         elif multi_view_type == "cross_attention_views":
             # Compute cross-attention similarity between image and text
             cross_attn = self.model.get_cross_attention(images_flat, tokens)
@@ -227,11 +224,13 @@ class MetricsCalculator:
             # For cross-attention case, we still need to select one representative image
             # Choose the view closest to the average similarity for each particle
             _, best_view_indices = torch.min(torch.abs(sims - best_sim_vals.unsqueeze(1)), dim=1)
-            
-            return best_sim_vals, best_view_indices
-        
         else:
             raise ValueError(f"Invalid multi-view type: {multi_view_type}. Valid options: 'best_views', 'average_views', 'cross_attention_views'")
+
+        # Select best images (V>=1)
+        best_images = images[torch.arange(N, device=device), best_view_indices] # [N, 3, H, W]
+
+        return best_images, best_sim_vals
 
 
 if __name__ == "__main__":
