@@ -17,7 +17,7 @@ def run_hyperparameter_sweeping(base_opt):
     
     # Define hyperparameter grid
     # LAMBDAS = [1, 10, 100, 1000, 10000] # coarse grid
-    LAMBDAS = [600] # fine grid
+    LAMBDAS = [200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900] # fine grid
     # LAMBDAS = [250, 350, 450, 550, 650, 750, 850] # fine grid
 
     GRADIENT_TYPES = ["svgd", "rlsd"] 
@@ -32,10 +32,9 @@ def run_hyperparameter_sweeping(base_opt):
     # PROMPTS = COMPARISON_PROMPTS + MULTI_VIEW_PROMPTS + DIVERSITY_PROMPTS
     
     PROMPTS = COMPARISON_PROMPTS
+    LAYERS = [5]
     
-    LAYERS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] # 0-2: early, 3-7: mid, 8-11: late
-    
-    opt.iters = 1000
+    opt.iters = 2000
     opt.visualize = True
     opt.metrics = True
     opt.losses_interval = 10
@@ -44,9 +43,10 @@ def run_hyperparameter_sweeping(base_opt):
 
     # Multiple seeds for statistical significance
     # SEEDS = [42, 123, 456, 789, 999]  # 5 different seeds for each configuration
-    SEEDS = [42]
+    SEEDS = [42, 123, 456]
+    VIEWS = ['best_views', 'average_views', 'cross_attention_views']
     
-    total_experiments = len(PROMPTS) * len(SEEDS) * ((len(LAMBDAS) * len(GRADIENT_TYPES) * len(LAYERS)) + 1)
+    total_experiments = len(PROMPTS) * len(SEEDS) * ((len(LAYERS) * len(VIEWS) * len(LAMBDAS) * len(GRADIENT_TYPES)) + 1)
     print("[INFO] Starting hyperparameter tuning...")
     print(f"[INFO] Will run {total_experiments} experiments total")
     print(f"[INFO] {len(SEEDS)} seeds per configuration for statistical significance")
@@ -54,22 +54,18 @@ def run_hyperparameter_sweeping(base_opt):
     job_dir= opt.outdir
     
     print(f"--------------------------------")
-    print(f"[INFO] Sweeping parameters:")
-    print(f"[INFO] GRADIENT_TYPES: {GRADIENT_TYPES}")
-    print(f"[INFO] LAYERS: {LAYERS}")
-    print(f"--------------------------------")
-    print(f"[INFO] Fixed parameters:")
-    print(f"[INFO] LAMBDAS: {LAMBDAS}")
     print(f"[INFO] SEEDS: {SEEDS}")
-    print(f"[INFO] PROMPTS: {PROMPTS}")
-    print(f"[INFO] iters: {opt.iters}")
-    
+    print(f"[INFO] GRADIENT_TYPES: {GRADIENT_TYPES}")
+    print(f"[INFO] VIEWS: {VIEWS}")
+    print(f"[INFO] total_experiments: {total_experiments}")
     print(f"--------------------------------")
-    print(f"[INFO] Experiment settings:")
+    print(f"[INFO] fixed parameters:")
+    print(f"[INFO] PROMPTS: {PROMPTS}")
+    print(f"[INFO] LAYERS: {LAYERS}")
+    print(f"[INFO] LAMBDAS: {LAMBDAS}")
     print(f"[INFO] outdir: {opt.outdir}")
-    print(f"[INFO] save_path: {opt.save_path}")
+    print(f"[INFO] iters: {opt.iters}")
     print(f"[INFO] visualize: {opt.visualize}")
-    
     print(f"[INFO] metrics: {opt.metrics}")
     print(f"[INFO] losses_interval: {opt.losses_interval}")
     print(f"[INFO] efficiency_interval: {opt.efficiency_interval}")
@@ -83,51 +79,19 @@ def run_hyperparameter_sweeping(base_opt):
         opt.seed = seed
             
         for prompt in PROMPTS:
-            
             print(f"\n[INFO] Running experiments for prompt: '{prompt}'")
             opt.prompt = prompt
             prompt_clean = prompt.replace(" ", "_")
             
             
-
-
-            # Experiments with repulsion enabled
-            for layer in LAYERS:
-                for repulsion_lambda in LAMBDAS:
-                    for gradient_type in GRADIENT_TYPES:
-                        print(f"\n[INFO] Running: {gradient_type} with lambda={repulsion_lambda}, layer={layer}, seed={seed}")
-
-                        opt.repulsion_enabled = True
-                        opt.repulsion_gradient_type = gradient_type
-                        opt.lambda_repulsion = repulsion_lambda
-                        
-                        # Set output directory and save path
-                        opt.outdir = job_dir + f"/{prompt_clean}_ours_w_repulsion_{gradient_type}_{repulsion_lambda}_layer_{layer}_seed_{seed}"
-                        opt.save_path = f"{prompt_clean}_ours_w_repulsion_{gradient_type}_{repulsion_lambda}_layer_{layer}_seed_{seed}"
-                        
-                        # Create output directory
-                        os.makedirs(opt.outdir, exist_ok=True)
-
-
-                        # Run experiment
-                        gui = GUI(opt)
-                        gui.train(opt.iters)
-                        
-                        # Clean up GPU memory
-                        del gui
-                        torch.cuda.empty_cache()
-                            
-                        print(f"[INFO] Completed: {gradient_type} with lambda={repulsion_lambda}, layer={layer}, seed={seed}")
-                        
-                        
             # Experiment without repulsion (baseline) - using the same seed
             print(f"\n[INFO] Running baseline without repulsion, seed={seed}")
             
             opt.repulsion_enabled = False
             
             # Set output directory and save path for baseline
-            opt.outdir = job_dir + f"/{prompt_clean}_ours_wo_repulsion_seed_{seed}"
-            opt.save_path = f"{prompt_clean}_ours_wo_repulsion_seed_{seed}"
+            opt.outdir = job_dir + f"/{prompt_clean}_ours_wo_repulsion_{seed}"
+            opt.save_path = f"{prompt_clean}_ours_wo_repulsion_{seed}"
             
             # Create output directory
             os.makedirs(opt.outdir, exist_ok=True)
@@ -141,6 +105,33 @@ def run_hyperparameter_sweeping(base_opt):
             torch.cuda.empty_cache()
             
             print(f"[INFO] Completed baseline without repulsion, seed={seed}")
+            
+            # Experiments with repulsion enabled
+            for repulsion_lambda in LAMBDAS:
+                for gradient_type in GRADIENT_TYPES:
+                    print(f"\n[INFO] Running: {gradient_type} with lambda={repulsion_lambda}, seed={seed}")
+
+                    opt.repulsion_enabled = True
+                    opt.repulsion_gradient_type = gradient_type
+                    opt.lambda_repulsion = repulsion_lambda
+                    
+                    # Set output directory and save path
+                    opt.outdir = job_dir + f"/{prompt_clean}_ours_w_repulsion_{gradient_type}_{repulsion_lambda}_{seed}"
+                    opt.save_path = f"{prompt_clean}_ours_w_repulsion_{gradient_type}_{repulsion_lambda}_{seed}"
+                    
+                    # Create output directory
+                    os.makedirs(opt.outdir, exist_ok=True)
+
+
+                    # Run experiment
+                    gui = GUI(opt)
+                    gui.train(opt.iters)
+                    
+                    # Clean up GPU memory
+                    del gui
+                    torch.cuda.empty_cache()
+                        
+                    print(f"[INFO] Completed: {gradient_type} with lambda={repulsion_lambda}, seed={seed}")
 
     
     print("\n[INFO] Hyperparameter tuning completed!")

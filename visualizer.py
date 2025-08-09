@@ -47,7 +47,7 @@ class GaussianVisualizer:
 
     # TODO: refactor this function to include legend and labels
     @torch.no_grad()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N, 3, H, W]
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N,3, H, W]
         """
         Render images from specific viewpoints.
         
@@ -70,9 +70,9 @@ class GaussianVisualizer:
         if visualize is None:
             visualize = self.opt.visualize
             
-        # Create output directory
+        
         if visualize:
-            if self.opt.num_particles > 1:
+            if self.opt.num_particles > 1 or (step % self.opt.save_multi_viewpoints_interval == 0):
                 multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_all_particles')
                 os.makedirs(multi_viewpoints_dir, exist_ok=True)
             
@@ -126,16 +126,17 @@ class GaussianVisualizer:
             
             # Save combined image of all particles
             # TODO: refactor this to include legend and labels
-            if (visualize and self.opt.num_particles > 1) or (self.step % self.opt.save_multi_viewpoints_interval == 0):
-                vutils.save_image(
-                    particle_images, # [N, 3, H, W]
-                        os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
-                        normalize=False
-                    )
+            if (visualize and self.opt.num_particles > 1) or (step % self.opt.save_multi_viewpoints_interval == 0):
+                if multi_viewpoints_dir is not None:
+                    vutils.save_image(
+                        particle_images, # [N, 3, H, W]
+                            os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
+                            normalize=False
+                        )
         
         multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0) # [V, N, 3, H, W]
         
-        return multi_viewpoint_images
+        return multi_viewpoint_images #  [V, N, 3, H, W]
 
     @torch.no_grad()
     def visualize_fixed_viewpoint(self, step, elevation, horizontal):

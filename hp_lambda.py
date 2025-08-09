@@ -32,6 +32,12 @@ def run_hyperparameter_sweeping(base_opt):
     # PROMPTS = COMPARISON_PROMPTS + MULTI_VIEW_PROMPTS + DIVERSITY_PROMPTS
     
     PROMPTS = COMPARISON_PROMPTS
+    ITERS = 2000
+    LAYERS = [2, 5, 10]
+    
+    VIEWS = ['best_views', 'average_views', 'cross_attention_views']
+    
+    
     
     opt.iters = 2000
     opt.visualize = True
@@ -52,11 +58,21 @@ def run_hyperparameter_sweeping(base_opt):
     job_dir= opt.outdir
     
     print(f"--------------------------------")
-    print(f"[INFO] outdir: {opt.outdir}")
+    print(f"[INFO] Sweeping parameters:")
+    print(f"[INFO] GRADIENT_TYPES: {GRADIENT_TYPES}")
+    print(f"[INFO] LAMBDAS: {LAMBDAS}")
+    print(f"--------------------------------")
+    print(f"[INFO] Fixed parameters:")
     print(f"[INFO] SEEDS: {SEEDS}")
     print(f"[INFO] PROMPTS: {PROMPTS}")
-    print(f"[INFO] LAMBDAS: {LAMBDAS}")
-    print(f"[INFO] GRADIENT_TYPES: {GRADIENT_TYPES}")
+    print(f"--------------------------------")
+    print(f"[INFO] Experiment settings:")
+    print(f"[INFO] iters: {opt.iters}")
+    print(f"[INFO] visualize: {opt.visualize}")
+    print(f"[INFO] metrics: {opt.metrics}")
+    print(f"[INFO] losses_interval: {opt.losses_interval}")
+    print(f"[INFO] efficiency_interval: {opt.efficiency_interval}")
+    print(f"[INFO] quantitative_metrics_interval: {opt.quantitative_metrics_interval}")
     print(f"--------------------------------\n")
     
     for seed_idx, seed in enumerate(SEEDS):
