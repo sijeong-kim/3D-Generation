@@ -50,8 +50,6 @@ from sklearn.manifold import TSNE
             
 #         return F.normalize(features, dim=-1)  # normalize features
 
-
-
 class DINOv2MultiLayerFeatureExtractor:
     """DINOv2 implementation for feature extraction using function-based approach"""
     def __init__(self, model_name='facebook/dinov2-base', device='cuda'):
@@ -90,7 +88,7 @@ class DINOv2MultiLayerFeatureExtractor:
         # }
         
 
-    def extract_cls_from_layer(self, layer_idx, inputs):
+    def extract_cls_from_layer(self, layer_idx, images):
         """Register hook to extract CLS token from specified layer."""
         cls_output = {}
 
@@ -98,7 +96,21 @@ class DINOv2MultiLayerFeatureExtractor:
             # Handle case where output might be a tuple (extract the tensor)
             if isinstance(output, tuple):
                 output = output[0]  # First element is usually the hidden states tensor
-            cls_output['value'] = output[:, 0, :].detach().cpu()
+            cls_output['value'] = output[:, 0, :].detach().to(self.device)
+
+        # images: [B, 3, H, W] in [0, 1]
+        # Fast processing: skip PIL conversion and process tensors directly
+        if torch.is_tensor(images):
+            # Resize to 224x224 (DINOv2 expected size) and normalize
+            images_resized = F.interpolate(images, size=(224, 224), mode='bilinear', align_corners=False)
+            # Normalize using ImageNet stats (DINOv2 preprocessing)
+            mean = torch.tensor([0.485, 0.456, 0.406], device=images.device).view(1, 3, 1, 1)
+            std = torch.tensor([0.229, 0.224, 0.225], device=images.device).view(1, 3, 1, 1)
+            images_normalized = (images_resized - mean) / std
+            inputs = {"pixel_values": images_normalized}
+        else:
+            # Fallback to processor for PIL images
+            inputs = self.processor(images=images, return_tensors="pt").to(self.device)
 
         handle = self.model.encoder.layer[layer_idx].register_forward_hook(hook_fn)
         with torch.no_grad():
@@ -107,7 +119,7 @@ class DINOv2MultiLayerFeatureExtractor:
 
         return F.normalize(cls_output['value'], dim=-1)
 
-    def extract_attention_from_layer(self, layer_idx, inputs):
+    def extract_attention_from_layer(self, layer_idx, images):
         """Register hook to extract attention maps from specified layer."""
         attention_output = {}
 
@@ -124,8 +136,22 @@ class DINOv2MultiLayerFeatureExtractor:
                 # last row: how much the last token attends to each patch
                 # middle rows: how much each token attends to each other token
                 # cls_attention: how much the CLS token attends to each patch
-                attention_output['value'] = cls_attention.detach().cpu()
+                attention_output['value'] = cls_attention.detach().to(self.device)
                 # values: attention weights (sum to 1 after softmax)
+
+        # images: [B, 3, H, W] in [0, 1]
+        # Fast processing: skip PIL conversion and process tensors directly
+        if torch.is_tensor(images):
+            # Resize to 224x224 (DINOv2 expected size) and normalize
+            images_resized = F.interpolate(images, size=(224, 224), mode='bilinear', align_corners=False)
+            # Normalize using ImageNet stats (DINOv2 preprocessing)
+            mean = torch.tensor([0.485, 0.456, 0.406], device=images.device).view(1, 3, 1, 1)
+            std = torch.tensor([0.229, 0.224, 0.225], device=images.device).view(1, 3, 1, 1)
+            images_normalized = (images_resized - mean) / std
+            inputs = {"pixel_values": images_normalized}
+        else:
+            # Fallback to processor for PIL images
+            inputs = self.processor(images=images, return_tensors="pt").to(self.device)
 
         handle = self.model.encoder.layer[layer_idx].attention.register_forward_hook(hook_fn)
         with torch.no_grad():
@@ -264,9 +290,6 @@ if __name__ == "__main__":
     print(f"Initializing {args.model_name} feature extractor on {args.device}...")
     feature_extractor = DINOv2MultiLayerFeatureExtractor(model_name=args.model_name, device=args.device)
     
-    # Process images with the processor
-    inputs = feature_extractor.processor(images=images_pil, return_tensors="pt").to(args.device)
-    
     # Extract features and attention maps from multiple layers
     print("Extracting features and attention maps...")
     
@@ -279,11 +302,11 @@ if __name__ == "__main__":
     
     with torch.no_grad():
         for layer in layer_ids:
-            feats = feature_extractor.extract_cls_from_layer(layer, inputs)
+            feats = feature_extractor.extract_cls_from_layer(layer, images_pil)
             features_list.append(feats)
             
             # Extract attention maps
-            attention_maps = feature_extractor.extract_attention_from_layer(layer, inputs)
+            attention_maps = feature_extractor.extract_attention_from_layer(layer, images_pil)
             attention_maps_list.append(attention_maps)
     
     # Display results
