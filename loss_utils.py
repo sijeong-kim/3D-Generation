@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 @torch.no_grad()
-def rbf_kernel_and_grad(features, tau=0.5, gradient_type="svgd"):
+def rbf_kernel_and_grad(features, tau=0.5, gradient_type="svgd", device="cuda"):
     """
     Compute RBF kernel matrix and its gradients.
     
@@ -16,6 +16,7 @@ def rbf_kernel_and_grad(features, tau=0.5, gradient_type="svgd"):
         K: [N, N] kernel matrix where K[i,j] = k(x_j, x_i)
         K_grad: [N,  D_feature] kernel gradients where K_grad[i,j] = ∇_{x_j} (∑ over j k(x_j, x_i)) or ∇_{x_j} log(∑ over j k(x_j, x_i))
     """
+    features = features.to(device)
     N, D_feature = features.shape
     
     # Compute pairwise differences and squared distances

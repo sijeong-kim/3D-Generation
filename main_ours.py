@@ -216,7 +216,7 @@ class GUI:
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
-        features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images) # [N, D_feature]
+        features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
 
         for j in range(self.opt.num_particles):
 
