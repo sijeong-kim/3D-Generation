@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ours_svgd
-#SBATCH --partition=gpgpu
+#SBATCH --partition=AMD7-A100-T
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
@@ -51,9 +51,8 @@ SEED=42
 PROMPT="a photo of a hamburger"
 ITER=1500
 
-REPULSION_ENABLED=True
 REPULSION_GRADIENT_TYPE="svgd"
-LAMBDA_REPULSION=600
+LAMBDA_REPULSION=100
 REPULSION_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 
@@ -93,7 +92,6 @@ CMD="python ${WORKING_DIR}/main_ours.py \
     outdir=${OUTPUT_DIR} \
     seed=${SEED} \
     iter=${ITER} \
-    repulsion_enabled=${REPULSION_ENABLED} \
     repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
     repulsion_tau=${REPULSION_TAU} \
     lambda_repulsion=${LAMBDA_REPULSION} \

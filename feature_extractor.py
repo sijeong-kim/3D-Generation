@@ -88,6 +88,7 @@ class DINOv2MultiLayerFeatureExtractor:
         # }
         
 
+    @torch.no_grad()
     def extract_cls_from_layer(self, layer_idx, images):
         """Register hook to extract CLS token from specified layer."""
         cls_output = {}
@@ -119,6 +120,7 @@ class DINOv2MultiLayerFeatureExtractor:
 
         return F.normalize(cls_output['value'], dim=-1)
 
+    @torch.no_grad()
     def extract_attention_from_layer(self, layer_idx, images):
         """Register hook to extract attention maps from specified layer."""
         attention_output = {}

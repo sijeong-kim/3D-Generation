@@ -221,12 +221,12 @@ class GUI:
 
         # --- before the branch, init for logging ---
         total_loss = 0
-        attraction_scalar = None
-        repulsion_scalar = None
-        sigma_t_val = 1.0  # default
-
-        # --- SVGD ---
-        if self.opt.repulsion_enabled and self.opt.repulsion_gradient_type == 'svgd':
+        attraction_loss = None
+        repulsion_loss = None
+        sigma_t = 1.0  # default
+        
+        # --- SVGD loss computation (루프 밖, 모든 파티클 동시에) ---
+        if self.opt.repulsion_type == 'svgd':
             # 1. Score gradients from SD guidance
             score_grad, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(
                 images, 
@@ -242,24 +242,20 @@ class GUI:
 
             # 3. Attraction: (1/N) * sum_i sum_j K[j,i] * score_grad[j]
             #    K[i,j] = k(xi, xj) -> transpose해서 K[j,i]
-            attraction = (K.t().unsqueeze(-1) * score_grad.unsqueeze(0)).sum(dim=1).mean()
+            attraction_loss = (K.t().unsqueeze(-1) * score_grad.unsqueeze(0)).sum(dim=1).mean()
 
             # 4. Repulsion: (1/N) * sum_i sum_j ∇_{x_j}k(x_j,x_i)
             #    대칭커널이면 ∇_{x_j}k(x_j,x_i) = -∇_{x_i}k(x_i,x_j)
             rep_vec = -G_wrt_xi                           # [N,D]
-            repulsion = rep_vec.norm(dim=1).mean()        # 스칼라
-            
-            attraction_scalar = attraction        # torch scalar
-            repulsion_scalar = repulsion          # torch scalar
-            sigma_t_val = float(sigma_t)          # python float
+            repulsion_loss = rep_vec.norm(dim=1).mean()        # 스칼라
 
             # 5. Total loss
             total_loss = (
-                self.opt.lambda_sd * attraction_scalar 
-                - self.opt.lambda_repulsion * sigma_t * repulsion_scalar
+                self.opt.lambda_sd * attraction_loss 
+                - self.opt.lambda_repulsion * sigma_t * repulsion_loss
             )
-        # --- RLSD ---
-        elif self.opt.repulsion_enabled and self.opt.repulsion_gradient_type == 'rlsd':
+
+        elif self.opt.repulsion_type == 'rlsd':
             # RLSD 방식 그대로 (기존 로직 유지)
             sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(
                 images, 
@@ -269,22 +265,20 @@ class GUI:
                 features, tau=self.opt.repulsion_tau, gradient_type='rlsd'
             )
             attraction_loss = sds_loss
-            repulsion = G_rlsd.norm(dim=1).mean()
+            repulsion_loss = G_rlsd.norm(dim=1).mean()
+            total_loss = self.opt.lambda_sd * attraction_loss - self.opt.lambda_repulsion * sigma_t * repulsion_loss
+
+        elif self.opt.repulsion_type == 'wo':
+            # baseline
             
-            attraction_scalar = attraction_loss
-            repulsion_scalar = repulsion
-            sigma_t_val = float(sigma_t)
-            total_loss = self.opt.lambda_sd * attraction_scalar - self.opt.lambda_repulsion * sigma_t * repulsion_scalar
-        
-        # --- Baseline ---
-        else:
-            baseline_loss = self.guidance_sd.train_step_for_baseline(
+            attraction_loss = self.guidance_sd.train_step_for_baseline(
                 images, step_ratio=step_ratio if self.opt.anneal_timestep else None
             )
-            attraction_scalar = baseline_loss
-            repulsion_scalar = torch.tensor(0.0, device=images.device)
-            sigma_t_val = 1.0
-            total_loss = self.opt.lambda_sd * attraction_scalar
+            repulsion_loss = torch.tensor(0.0, device=images.device)
+            total_loss = self.opt.lambda_sd * attraction_loss
+
+        else:
+            raise ValueError(f"[ERROR] Invalid repulsion type: {self.opt.repulsion_type}")
 
         ### optimize step ### 
         
@@ -324,24 +318,19 @@ class GUI:
                 # memory usage
                 memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
                 max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
-
-                # safe scalar extraction
-                attr_val = float(attraction_scalar.item()) if attraction_scalar is not None else 0.0
-                rep_val  = float(repulsion_scalar.item())  if repulsion_scalar  is not None else 0.0
-                tot_val  = float(total_loss.item())
                 
                 # scaled versions (match how total_loss is formed)
-                scaled_rep_val = self.opt.lambda_repulsion * sigma_t_val * rep_val
-                scaled_attr_val = self.opt.lambda_sd * attr_val
+                scaled_repulsion_loss = self.opt.lambda_repulsion * sigma_t * repulsion_loss
+                scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
 
                 # quantitative metrics (guard visualizer)
                 if self.visualizer is not None:
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(
                         self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
                     )  # [V, N, 3, H, W]
-                    representative_images, clip_similarities = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images)
+                    representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type)
                     fidelity = float(clip_similarities.mean().item())
-                    rep_features = self.feature_extractor(representative_images)  # [V, N, D]
+                    rep_features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, representative_images).to(self.device)  # [V, N, D]
                     diversity = float(self.metrics_calculator.compute_rlsd_diversity(rep_features))
                 else:
                     fidelity, diversity = 0.0, 0.0  # or skip logging these
@@ -350,11 +339,12 @@ class GUI:
                     step=self.step,
                     diversity=diversity,
                     fidelity=fidelity,
-                    attraction_loss=attr_val,                 # unscaled
-                    repulsion_loss=rep_val,                   # unscaled
-                    scaled_repulsion_loss=scaled_rep_val,     # includes lambda_rep * sigma_t
-                    scaled_attraction_loss=scaled_attr_val,   # includes lambda_sd
-                    total_loss=tot_val,
+                    attraction_loss=attraction_loss,                 # unscaled
+                    repulsion_loss=repulsion_loss,                   # unscaled
+                    sigma_t=sigma_t,
+                    scaled_repulsion_loss=scaled_repulsion_loss,     # includes lambda_rep * sigma_t
+                    scaled_attraction_loss=scaled_attraction_loss,   # includes lambda_sd
+                    total_loss=total_loss,
                     time=t,
                     memory_allocated_mb=memory_allocated,
                     max_memory_allocated_mb=max_memory_allocated,
