@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=debug
-#SBATCH --partition=gpgpuB
+#SBATCH --partition=AMD7-A100-T
 #SBATCH --gres=gpu:1
-#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-type=FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err
+#SBATCH --mem=24G
 
 # SLURM batch script for DEBUG testing - Quick validation of main_ours.py
 # Usage: sbatch scripts/run_ours_debug.sh debug_quick_test [prompts...]

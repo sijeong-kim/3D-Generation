@@ -45,7 +45,7 @@ class MetricsCalculator:
         
             self.losses_csv_path = os.path.join(self.save_dir, "losses.csv")
             self.losses_csv_file = open(self.losses_csv_path, "w")
-            self.losses_csv_file.write("step,attraction_loss,repulsion_loss,sigma_t,scaled_attraction_loss,scaled_repulsion_loss,total_loss\n")
+            self.losses_csv_file.write("step,attraction_loss,repulsion_loss,scaled_attraction_loss,scaled_repulsion_loss,total_loss\n")
             
             self.efficiency_csv_path = os.path.join(self.save_dir, "efficiency.csv")
             self.efficiency_csv_file = open(self.efficiency_csv_path, "w")
@@ -62,9 +62,9 @@ class MetricsCalculator:
             self.metrics_csv_file.flush()
             
     @torch.no_grad()
-    def log_losses(self, step: int, attraction_loss: float, repulsion_loss: float, sigma_t: float, scaled_attraction_loss: float, scaled_repulsion_loss: float, total_loss: float):
+    def log_losses(self, step: int, attraction_loss: float, repulsion_loss: float, scaled_attraction_loss: float, scaled_repulsion_loss: float, total_loss: float):
         if self.losses_csv_file is not None:
-            self.losses_csv_file.write(f"{step},{attraction_loss},{repulsion_loss},{sigma_t},{scaled_attraction_loss},{scaled_repulsion_loss},{total_loss}\n")
+            self.losses_csv_file.write(f"{step},{attraction_loss},{repulsion_loss},{scaled_attraction_loss},{scaled_repulsion_loss},{total_loss}\n")
             self.losses_csv_file.flush()
             
     @torch.no_grad()
@@ -74,12 +74,12 @@ class MetricsCalculator:
             self.efficiency_csv_file.flush()
             
     @torch.no_grad()
-    def log_metrics(self, step: int, diversity: float, fidelity: float, attraction_loss: float, repulsion_loss: float, sigma_t: float, scaled_repulsion_loss: float, scaled_attraction_loss: float, total_loss: float, time: float, memory_allocated_mb: float = None, max_memory_allocated_mb: float = None):
+    def log_metrics(self, step: int, diversity: float, fidelity: float, attraction_loss: float, repulsion_loss: float, scaled_attraction_loss: float, scaled_repulsion_loss: float, total_loss: float, time: float, memory_allocated_mb: float = None, max_memory_allocated_mb: float = None):
         if self.opt is not None and self.save_dir is not None:
             if hasattr(self.opt, 'quantitative_metrics_interval') and step % self.opt.quantitative_metrics_interval == 0:
                 self.log_quantitative_metrics(step=step, diversity=diversity, fidelity=fidelity)
             if hasattr(self.opt, 'losses_interval') and step % self.opt.losses_interval == 0:
-                self.log_losses(step=step, attraction_loss=attraction_loss, repulsion_loss=repulsion_loss, sigma_t=sigma_t, scaled_attraction_loss=scaled_attraction_loss, scaled_repulsion_loss=scaled_repulsion_loss, total_loss=total_loss)
+                self.log_losses(step=step, attraction_loss=attraction_loss, repulsion_loss=repulsion_loss, scaled_attraction_loss=scaled_attraction_loss, scaled_repulsion_loss=scaled_repulsion_loss, total_loss=total_loss)
             if hasattr(self.opt, 'efficiency_interval') and step % self.opt.efficiency_interval == 0:
                 self.log_efficiency(step=step, time=time, memory_allocated_mb=memory_allocated_mb, max_memory_allocated_mb=max_memory_allocated_mb)
 
