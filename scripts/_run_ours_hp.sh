@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=ours_svgd
-#SBATCH --partition=gpgpu
+#SBATCH --job-name=ours_hp
+#SBATCH --partition=AMD7-A100
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk

@@ -6,8 +6,6 @@
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err
-#SBATCH --time=00:30:00
-#SBATCH --mem=16G
 
 # SLURM batch script for DEBUG testing - Quick validation of main_ours.py
 # Usage: sbatch scripts/run_ours_debug.sh debug_quick_test [prompts...]
@@ -127,8 +125,8 @@ echo ""
 echo "====================================="
 echo "DEBUG test completed!"
 echo "Results saved in: ${BASE_DIR}/logs"
-echo "Check logs/debug_001/ for 3 runs:"
-echo "  - run_001_*_svgd_* (SVGD method)"
-echo "  - run_002_*_rlsd_* (RLSD method)"  
-echo "  - run_003_*_wo_*   (baseline without repulsion)"
+echo "Check logs/debug_quick_test/${SLURM_JOB_ID}/ for 3 runs:"
+echo "  - run_001_rep[method]_s42/ (with sweep parameters)"
+echo "  - run_002_rep[method]_s42/ (with sweep parameters)"  
+echo "  - run_003_rep[method]_s42/ (with sweep parameters)"
 echo "====================================="

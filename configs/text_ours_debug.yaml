@@ -25,7 +25,7 @@
 #   Storage: ~20-40MB per run (3 runs ≈ 60-120MB total)
 #   Recommended SLURM: --time=00:30:00 --mem=16G --gres=gpu:1
 debug_001:
-  name: debug_quick_test
+  name: all_3_methods
   method: grid
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
@@ -41,17 +41,46 @@ debug_001:
     lambda_repulsion: [100]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
-    iters: [50]                            # Very short for debugging (~2-4 min per run)
+    iters: [200]                            # Very short for debugging (~2-4 min per run)
 
   settings:
     visualize: true
     save_iid: true
-    save_rendered_images_interval: 25      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 25     # Less frequent saves to reduce memory
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 100     # Less frequent saves to reduce memory
     metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 5                    # Less frequent for memory
-    efficiency_interval: 5               # Less frequent for memory
+    quantitative_metrics_interval: 50     # Less frequent metrics
+    losses_interval: 25                    # Less frequent for memory
+    efficiency_interval: 25               # Less frequent for memory
+
+debug_002:
+  name: svgd
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd']  # Test all 3 methods quickly
+  
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
+    multi_view_type: ['average_views']
+    num_views: [2]                         # Ultra minimal views for debugging
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    lambda_repulsion: [100]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [200]                            # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: true
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 100     # Less frequent saves to reduce memory
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 50     # Less frequent metrics
+    losses_interval: 25                    # Less frequent for memory
+    efficiency_interval: 25               # Less frequent for memory
 
 # ============================================================================
 # DEBUG CONFIGURATION COMPLETE

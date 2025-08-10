@@ -2,6 +2,7 @@
 
 import subprocess
 import os
+import time
 from copy import deepcopy
 import itertools
 from typing import Dict, List, Any
@@ -158,38 +159,46 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
             # Get seed from parameters for directory naming
             seed = params.get('seed', 42)
             
-            # Create experiment identifier with shorter names
-            # Use experiment count as main identifier and hash for uniqueness
-            param_str = "_".join([f"{k}-{v}" for k, v in params.items()])
-            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:8]  # Short 8-char hash
+            # Get SLURM job ID from environment or use timestamp as fallback
+            job_id = os.environ.get('SLURM_JOB_ID', f"local_{int(time.time())}")
             
-            # Create hierarchical directory structure: exp_id/run_name
-            exp_id = selected_experiment['exp_id']
+            # Create dynamic run name based on sweep parameters
+            sweep_params = {k: v for k, v in params.items() if k in selected_experiment['sweep_parameters']}
             
-            # CUSTOMIZE YOUR NAMING FORMAT HERE:
-            # Option 1 - Short run names: run_001
-            run_name = f"run_{experiment_count:03d}_{param_hash}_s{seed}"
+            # Create abbreviated parameter string from sweep parameters
+            param_parts = []
+            for key, value in sweep_params.items():
+                # Create short abbreviations for common parameter names
+                abbreviations = {
+                    'repulsion_type': 'rep',
+                    'lambda_repulsion': 'lr',
+                    'feature_layer': 'fl',
+                    'num_particles': 'np',
+                    'num_views': 'nv',
+                    'learning_rate': 'lr',
+                    'batch_size': 'bs',
+                    'kernel_type': 'kt'
+                }
+                abbrev = abbreviations.get(key, key[:3])  # Use abbreviation or first 3 chars
+                param_parts.append(f"{abbrev}{value}")
             
-            # Option 2 - With sweep name: run_001_lamdda_repulsion_coarse_14b5cad4_s42
-            # run_name = f"run_{experiment_count:03d}_{sweep_name}_{param_hash}_s{seed}"
+            param_string = "_".join(param_parts) if param_parts else "default"
+            run_name = f"run_{experiment_count:03d}_{param_string}_s{seed}"
             
-            # Option 3 - With key params: run_001_svgd_lr100_s42
-            # repulsion_type = params.get('repulsion_type', 'unknown')
-            # lambda_rep = params.get('lambda_repulsion', 'unknown')
-            # run_name = f"run_{experiment_count:03d}_{repulsion_type}_lr{lambda_rep}_s{seed}"
-            
-            # Create hierarchical path: exp_id/run_name
-            exp_dir = os.path.join(job_dir, exp_id)
-            run_dir = os.path.join(exp_dir, run_name)
+            # New directory structure: sweep_name/job_id/run_sweep_parameters/
+            sweep_dir = os.path.join(job_dir, sweep_name)
+            job_dir_full = os.path.join(sweep_dir, str(job_id))
+            run_dir = os.path.join(job_dir_full, run_name)
             
             # Set output directory and save path
             opt.outdir = run_dir
-            opt.save_path = os.path.join(exp_id, run_name)
+            opt.save_path = os.path.join(sweep_name, str(job_id), run_name)
             
             # Save parameter details to a config file for reference
             param_config = {
                 'experiment_id': experiment_count,
-                'exp_id': exp_id,
+                'job_id': job_id,
+                'exp_id': selected_experiment['exp_id'],
                 'sweep_name': sweep_name,
                 'prompt': prompt,
                 'seed': seed,
@@ -197,7 +206,12 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
                 'sweep_parameters': {k: v for k, v in params.items() if k in selected_experiment['sweep_parameters']},
                 'fixed_parameters': {k: v for k, v in params.items() if k in selected_experiment['fixed_parameters']},
                 'settings': selected_experiment['settings'],
-                'param_hash': param_hash
+                'directory_structure': {
+                    'sweep_dir': sweep_name,
+                    'job_dir': str(job_id),
+                    'run_dir': run_name,
+                    'full_path': opt.save_path
+                }
             }
             
             # Create output directory
@@ -208,7 +222,7 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
             with open(config_file, 'w') as f:
                 json.dump(param_config, f, indent=2)
             
-            print(f"[INFO] Experiment directory: {exp_id}/{run_name}")
+            print(f"[INFO] Experiment directory: {sweep_name}/{job_id}/{run_name}")
             print(f"[INFO] Full parameters saved to: experiment_config.json")
             
             # Run experiment
@@ -235,7 +249,7 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
     
     print(f"\n[INFO] Hyperparameter tuning completed!")
     print(f"[INFO] Ran {experiment_count} experiments")
-    print(f"[INFO] Results saved in {job_dir} with experiment-specific subdirectories")
+    print(f"[INFO] Results saved in {job_dir}/{sweep_name}/ organized by job ID and run parameters")
 
 
 if __name__ == "__main__":

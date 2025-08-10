@@ -174,10 +174,10 @@ class StableDiffusion(nn.Module):
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
             
-            if repulsion_enabled:
+            if repulsion_type == "svgd" or repulsion_type == "rlsd":
                 sigma_t = torch.sqrt(w)
                 sigma_t = sigma_t.mean()
-
+    
             # predict the noise residual with unet, NO grad!
             # add noise
             noise = torch.randn_like(latents)
@@ -215,17 +215,19 @@ class StableDiffusion(nn.Module):
         
         target = (latents - grad).detach()
         
-        if repulsion_enabled:
-            if repulsion_type == "svgd":
-                loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
-            elif repulsion_type == "rlsd":
-                loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
+        if repulsion_type == "svgd":
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
+            return loss, sigma_t
+        elif repulsion_type == "rlsd":
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
+            return loss, sigma_t
+        elif repulsion_type == "wo":
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
             return loss, sigma_t
         else:
-            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
+            raise ValueError(f"Invalid repulsion type: {repulsion_type}")
 
-        return loss
-    
+
 
     def train_step_for_baseline(
         self,

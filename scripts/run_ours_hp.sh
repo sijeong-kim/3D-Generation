@@ -1,13 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=hp
-#SBATCH --partition=gpgpu
+#SBATCH --partition=AMD7-A100-T 
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err
-#SBATCH --time=48:00:00
-#SBATCH --mem=32G
 
 # SLURM batch script for hyperparameter tuning
 # Usage: sbatch scripts/run_hp_slurm.sh <sweep_name> [prompts...]
