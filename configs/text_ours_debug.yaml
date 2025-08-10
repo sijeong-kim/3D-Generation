@@ -1,0 +1,67 @@
+# DEBUG CONFIGURATION - Quick tests to verify main_ours.py runs correctly
+#
+# DEBUG COST SUMMARY:
+# ===================
+# Total experiments: 3 runs (very fast)
+# Total estimated time: ~6-12 minutes
+# GPU memory required: ~3-5GB
+# Storage needed: ~50-100MB total
+# 
+# PURPOSE: 
+# - Verify main_ours.py runs without errors
+# - Test all 3 repulsion types ('svgd', 'rlsd', 'wo')
+# - Quick validation of pipeline
+# - Fast iteration cycles for debugging
+#
+# USAGE:
+# sbatch scripts/run_ours_debug.sh debug_quick_test
+
+# DEBUG: Quick test - 3 repulsion types with minimal iterations
+# COST ESTIMATE:
+#   Total combinations: 3 × 1 = 3 runs (very fast!)
+#   Time per run: ~2-4 min (50 iters)
+#   Total time: ~6-12 minutes
+#   GPU memory: ~3-5GB peak per run
+#   Storage: ~10-25MB per run (3 runs ≈ 30-75MB total)
+#   Recommended SLURM: --time=00:30:00 --mem=16G --gres=gpu:1
+debug_001:
+  name: debug_quick_test
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
+  
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [1]                     # Ultra minimal particles for debugging
+    multi_view_type: ['average_views']
+    num_views: [2]                         # Ultra minimal views for debugging
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    lambda_repulsion: [100]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [50]                            # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 50     # Less frequent saves to reduce memory
+    metrics: false                         # Disable metrics to save memory
+    quantitative_metrics_interval: 50     # Less frequent metrics
+    losses_interval: 25                    # Less frequent for memory
+    efficiency_interval: 25               # Less frequent for memory
+
+# ============================================================================
+# DEBUG CONFIGURATION COMPLETE
+# ============================================================================
+# This debug config only contains one experiment (debug_quick_test) with:
+# - 3 runs total (svgd, rlsd, wo)
+# - 50 iterations each (~2-4 min per run)
+# - Minimal resources for quick validation
+# - Frequent saves/metrics for debugging
+#
+# TO RUN: sbatch scripts/run_ours_debug.sh debug_quick_test
+# RESULTS: Check logs/debug_001/ for the 3 test runs
+# ============================================================================
