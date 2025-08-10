@@ -72,7 +72,7 @@ def run_hyperparameter_tuning(base_opt):
                     print(f"\n[INFO] Running: {gradient_type} with lambda={repulsion_lambda}, seed={seed}")
 
                     opt.repulsion_enabled = True
-                    opt.repulsion_gradient_type = gradient_type
+                    opt.repulsion_type = gradient_type
                     opt.lambda_repulsion = repulsion_lambda
                     
                     # Set output directory and save path

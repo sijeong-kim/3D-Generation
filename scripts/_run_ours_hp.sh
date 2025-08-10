@@ -52,12 +52,12 @@ PROMPT="a photo of a hamburger"
 ITER=1500
 
 REPULSION_ENABLED=True
-REPULSION_GRADIENT_TYPE="svgd"
+REPULSION_TYPE="svgd"
 LAMBDA_REPULSION=600
 REPULSION_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 
-# TASK_NAME="${PROMPT// /_}_ours_${REPULSION_GRADIENT_TYPE}_${LAMBDA_REPULSION}_${SEED}"
+# TASK_NAME="${PROMPT// /_}_ours_${REPULSION_TYPE}_${LAMBDA_REPULSION}_${SEED}"
 # OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
 # mkdir -p ${OUTPUT_DIR}
@@ -105,7 +105,7 @@ for PROMPT in "${PROMPTS[@]}"; do
         seed=${SEED} \
         iter=${ITER} \
         repulsion_enabled=${REPULSION_ENABLED} \
-        repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
+        repulsion_type=${REPULSION_TYPE} \
         repulsion_tau=${REPULSION_TAU} \
         lambda_repulsion=${LAMBDA_REPULSION} \
         kernel_type=${KERNEL_TYPE}"
@@ -116,10 +116,10 @@ for PROMPT in "${PROMPTS[@]}"; do
 
 
     REPULSION_ENABLED=True
-    for REPULSION_GRADIENT_TYPE in "svgd" "rlsd"; do
+    for REPULSION_TYPE in "svgd" "rlsd"; do
         for LAMBDA_REPULSION in 500 550 600 650 700 750 800 850 900 950 1000 1050 1100 1150 1200 1250 1300 1350 1400 1450 1500; do
 
-            TASK_NAME="${PROMPT// /_}_ours_${REPULSION_GRADIENT_TYPE}_${LAMBDA_REPULSION}_${SEED}"
+            TASK_NAME="${PROMPT// /_}_ours_${REPULSION_TYPE}_${LAMBDA_REPULSION}_${SEED}"   
             OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
             CMD="python ${WORKING_DIR}/main_ours.py \
@@ -130,7 +130,7 @@ for PROMPT in "${PROMPTS[@]}"; do
                 seed=${SEED} \
                 iter=${ITER} \
                 repulsion_enabled=${REPULSION_ENABLED} \
-                repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
+                repulsion_type=${REPULSION_TYPE} \
                 repulsion_tau=${REPULSION_TAU} \
                 lambda_repulsion=${LAMBDA_REPULSION} \
                 kernel_type=${KERNEL_TYPE}"

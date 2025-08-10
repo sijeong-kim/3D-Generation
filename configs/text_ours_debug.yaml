@@ -45,13 +45,13 @@ debug_001:
 
   settings:
     visualize: true
-    save_iid: false
-    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 50     # Less frequent saves to reduce memory
-    metrics: false                         # Disable metrics to save memory
-    quantitative_metrics_interval: 50     # Less frequent metrics
-    losses_interval: 25                    # Less frequent for memory
-    efficiency_interval: 25               # Less frequent for memory
+    save_iid: true
+    save_rendered_images_interval: 25      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 25     # Less frequent saves to reduce memory
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 5                    # Less frequent for memory
+    efficiency_interval: 5               # Less frequent for memory
 
 # ============================================================================
 # DEBUG CONFIGURATION COMPLETE

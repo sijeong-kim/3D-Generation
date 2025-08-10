@@ -148,7 +148,7 @@ class StableDiffusion(nn.Module):
         as_latent=False,
         vers=None, hors=None,
         repulsion_enabled=False,
-        repulsion_gradient_type="svgd",
+        repulsion_type="svgd",
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -216,9 +216,9 @@ class StableDiffusion(nn.Module):
         target = (latents - grad).detach()
         
         if repulsion_enabled:
-            if repulsion_gradient_type == "svgd":
+            if repulsion_type == "svgd":
                 loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
-            elif repulsion_gradient_type == "rlsd":
+            elif repulsion_type == "rlsd":
                 loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
             return loss, sigma_t
         else:

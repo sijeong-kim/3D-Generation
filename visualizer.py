@@ -70,9 +70,12 @@ class GaussianVisualizer:
         if visualize is None:
             visualize = self.opt.visualize
             
+        # Initialize variables to None to avoid UnboundLocalError
+        multi_viewpoints_dir = None
+        save_paths = None
         
         if visualize:
-            if self.opt.num_particles > 1 or (step % self.opt.save_multi_viewpoints_interval == 0):
+            if (self.opt.num_particles > 1) or (step % self.opt.save_multi_viewpoints_interval == 0):
                 multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_all_particles')
                 os.makedirs(multi_viewpoints_dir, exist_ok=True)
             
@@ -127,12 +130,11 @@ class GaussianVisualizer:
             # Save combined image of all particles
             # TODO: refactor this to include legend and labels
             if (visualize and self.opt.num_particles > 1) or (step % self.opt.save_multi_viewpoints_interval == 0):
-                if multi_viewpoints_dir is not None:
-                    vutils.save_image(
-                        particle_images, # [N, 3, H, W]
-                            os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
-                            normalize=False
-                        )
+                vutils.save_image(
+                    particle_images, # [N, 3, H, W]
+                        os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
+                        normalize=False
+                    )
         
         multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0) # [V, N, 3, H, W]
         
