@@ -3,12 +3,11 @@ seed: 42
 num_particles: 4
 
 # repulsive loss
-repulsion_enabled: true # whether to use repulsive loss
-repulsion_gradient_type: "svgd" # "svgd" or "rlsd"
+repulsion_type: "svgd" # "svgd" or "rlsd" or "wo"
 lambda_repulsion: 100 # weight for repulsive loss
 repulsion_tau: 0 # tau for repulsive loss (0: median bandwidth heuristic)
 kernel_type: "rbf" # "rbf" or "laplacian" -- to be added
-feature_layer: 0 # 0-2: early, 3-7: mid, 8-11: late
+feature_layer: 6 # 0-2: early, 3-7: mid, 8-11: late
 
 # visualize
 visualize: True
@@ -20,11 +19,9 @@ save_multi_viewpoints_interval: 500 # for debugging
 metrics: True
 clip_metrics_type: openclip # openclip, hf_clip
 feature_extractor_model_name: facebook/dinov2-base
-
-# losses
+quantitative_metrics_interval: 1
 losses_interval: 1
 efficiency_interval: 1
-quantitative_metrics_interval: 1
 
 # multi-viewpoints (for metrics)
 num_views: 8
