@@ -230,7 +230,7 @@ class GUI:
             score_gradients, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
             
             # 2. RBF kernel computation
-            rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
+            rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
             
             # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
             # rbf_kernel: [N, N] where rbf_kernel[i,j] = k(xj, xi)
@@ -257,7 +257,7 @@ class GUI:
             sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1]
             
             # 2. RBF kernel gradient wrt features
-            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
+            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
             
             # 3. Attraction loss (SDS) + 1/D_latent
             attraction_loss = sds_loss # [1]

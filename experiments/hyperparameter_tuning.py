@@ -18,7 +18,7 @@ def run_hyperparameter_tuning(base_opt):
     # LAMBDAS = [1, 10, 100, 1000, 10000] # coarse grid
     LAMBDAS = [200, 300, 400, 500, 600, 700, 800] # fine grid
     # LAMBDAS=[350, 400, 450, 500, 550, 600, 650] # finer grid
-    GRADIENT_TYPES = ["svgd", "rlsd"] 
+    REPULSION_TYPES = ["svgd", "rlsd"] 
     
         
     # PROMPTS = ["a ripe strawberry", "a delicious hamburger", "a photo of a hamburger", 
@@ -40,7 +40,7 @@ def run_hyperparameter_tuning(base_opt):
     # Multiple seeds for statistical significance
     SEEDS = [42, 123, 456, 789, 999]  # 5 different seeds for each configuration
     
-    total_experiments = len(PROMPTS) * len(SEEDS) * (len(LAMBDAS) * len(GRADIENT_TYPES) + 1)
+    total_experiments = len(PROMPTS) * len(SEEDS) * (len(LAMBDAS) * len(REPULSION_TYPES) + 1)
     print("[INFO] Starting hyperparameter tuning...")
     print(f"[INFO] Will run {total_experiments} experiments total")
     print(f"[INFO] {len(SEEDS)} seeds per configuration for statistical significance")
@@ -52,7 +52,7 @@ def run_hyperparameter_tuning(base_opt):
     print(f"[INFO] SEEDS: {SEEDS}")
     print(f"[INFO] PROMPTS: {PROMPTS}")
     print(f"[INFO] LAMBDAS: {LAMBDAS}")
-    print(f"[INFO] GRADIENT_TYPES: {GRADIENT_TYPES}")
+    print(f"[INFO] REPULSION_TYPES: {REPULSION_TYPES}")
     print(f"--------------------------------\n")
     
     for seed_idx, seed in enumerate(SEEDS):
@@ -68,16 +68,16 @@ def run_hyperparameter_tuning(base_opt):
             
             # Experiments with repulsion enabled
             for repulsion_lambda in LAMBDAS:
-                for gradient_type in GRADIENT_TYPES:
-                    print(f"\n[INFO] Running: {gradient_type} with lambda={repulsion_lambda}, seed={seed}")
+                for repulsion_type in REPULSION_TYPES:
+                    print(f"\n[INFO] Running: {repulsion_type} with lambda={repulsion_lambda}, seed={seed}")
 
                     opt.repulsion_enabled = True
-                    opt.repulsion_type = gradient_type
+                    opt.repulsion_type = repulsion_type
                     opt.lambda_repulsion = repulsion_lambda
                     
                     # Set output directory and save path
-                    opt.outdir = job_dir + f"/{prompt_clean}_w_repulsion_{gradient_type}_{repulsion_lambda}_seed_{seed}"
-                    opt.save_path = f"{prompt_clean}_w_repulsion_{gradient_type}_{repulsion_lambda}_seed_{seed}"
+                    opt.outdir = job_dir + f"/{prompt_clean}_w_repulsion_{repulsion_type}_{repulsion_lambda}_seed_{seed}"
+                    opt.save_path = f"{prompt_clean}_w_repulsion_{repulsion_type}_{repulsion_lambda}_seed_{seed}"
                     
                     # Create output directory
                     os.makedirs(opt.outdir, exist_ok=True)
@@ -91,7 +91,7 @@ def run_hyperparameter_tuning(base_opt):
                     del gui
                     torch.cuda.empty_cache()
                         
-                    print(f"[INFO] Completed: {gradient_type} with lambda={repulsion_lambda}, seed={seed}")
+                    print(f"[INFO] Completed: {repulsion_type} with lambda={repulsion_lambda}, seed={seed}")
                     
             
             # Experiment without repulsion (baseline) - using the same seed

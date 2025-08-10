@@ -4,7 +4,7 @@
 # ===================
 # Total experiments: 3 runs (very fast)
 # Total estimated time: ~6-12 minutes
-# GPU memory required: ~3-5GB
+# GPU memory required: ~5-7GB
 # Storage needed: ~50-100MB total
 # 
 # PURPOSE: 
@@ -21,8 +21,8 @@
 #   Total combinations: 3 × 1 = 3 runs (very fast!)
 #   Time per run: ~2-4 min (50 iters)
 #   Total time: ~6-12 minutes
-#   GPU memory: ~3-5GB peak per run
-#   Storage: ~10-25MB per run (3 runs ≈ 30-75MB total)
+#   GPU memory: ~5-7GB peak per run  
+#   Storage: ~20-40MB per run (3 runs ≈ 60-120MB total)
 #   Recommended SLURM: --time=00:30:00 --mem=16G --gres=gpu:1
 debug_001:
   name: debug_quick_test
@@ -33,7 +33,7 @@ debug_001:
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [1]                     # Ultra minimal particles for debugging
+    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
     multi_view_type: ['average_views']
     num_views: [2]                         # Ultra minimal views for debugging
     repulsion_tau: [0]

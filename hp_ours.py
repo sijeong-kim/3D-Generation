@@ -216,16 +216,21 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
                 gui = GUI(opt)
                 gui.train(opt.iters)
                 
-                # Clean up GPU memory
+                # More aggressive memory cleanup
                 del gui
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()  # Wait for all operations to complete
                 
                 print(f"[INFO] Completed experiment {experiment_count}/{total_experiments}")
                 
             except Exception as e:
                 print(f"[ERROR] Experiment failed: {e}")
-                # Clean up GPU memory even on failure
+                # More aggressive memory cleanup on failure
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                # Force garbage collection
+                import gc
+                gc.collect()
                 continue
     
     print(f"\n[INFO] Hyperparameter tuning completed!")
