@@ -55,3 +55,71 @@ bash scripts/setup_venv.sh
 ### 🔗 Reference
 - DreamGaussian Paper
 
+
+
+### Directory Structure
+
+- Project Root Structure
+```bash
+
+/vol/bitbucket/sk2324/3D-Generation/
+├── logs/              # 👈 Main experiment results
+├── outputs/           # 👈 SLURM job outputs  
+├── configs/           # 👈 Configuration files
+├── scripts/           # 👈 SLURM batch scripts
+├── metrics/           # 👈 Empty (legacy)
+├── hp_ours.py         # 👈 Main hyperparameter script
+└── [other project files]
+```
+- Experiments Results (`logs/`)
+    - Debug Experiments (`run_ours_debug.sh`)
+    ```bash
+    logs/debug_001/                    # 3 runs total
+    ├── run_001_[hash]_s42/           # SVGD method
+    │   ├── metrics/                  # 👈 CSV files here
+    │   │   ├── quantitative_metrics.csv
+    │   │   ├── losses.csv
+    │   │   └── efficiency.csv
+    │   └── experiment_config.json
+    ├── run_002_[hash]_s42/           # RLSD method  
+    │   └── metrics/
+    └── run_003_[hash]_s42/           # Baseline (wo)
+        └── metrics/
+    ```
+    - Hyperparameter Tuning (`run_ours_hp.sh`)
+    ```bash
+    logs/exp_001/                     # Coarse search: 81 runs
+    ├── run_001_[hash]_s42/           # svgd, layer=2, lambda=1, seed=42
+    │   └── metrics/
+    ├── run_002_[hash]_s42/           # svgd, layer=2, lambda=100, seed=42
+    │   └── metrics/
+    ├── ...                           # 79 more combinations
+    └── run_081_[hash]_s456/          # wo, layer=10, lambda=10000, seed=456
+        └── metrics/
+
+    logs/exp_002/                     # Fine search: 35 runs
+    logs/exp_003/                     # Generalization: 15 runs  
+    logs/exp_004/                     # Efficiency: 36 runs
+    logs/exp_005/                     # Multi-view: 36 runs
+    ```
+- SLURM Job Outputs (`outputs/`)
+    ```bash
+    outputs/[job_id]/
+    ├── output.out                    # 👈 Job stdout
+    └── error.err                     # 👈 Job stderr/errors
+    ```
+
+- Configuration Files (`configs/`)
+    ```bash
+    configs/
+    ├── text_ours.yaml               # 👈 Base configuration
+    ├── text_ours_debug.yaml         # 👈 Debug: 3 quick tests
+    └── text_ours_hp.yaml            # 👈 HP: 203 full experiments
+    ```
+- execution scripts (`scripts/`)
+    ```bash
+    scripts/
+    ├── run_ours_debug.sh            # 👈 Debug: --mem=16G, 30min
+    └── run_ours_hp.sh               # 👈 HP: --mem=32G, 48hours
+    ```
+
