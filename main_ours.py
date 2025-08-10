@@ -227,47 +227,49 @@ class GUI:
         
         # --- SVGD loss computation (루프 밖, 모든 파티클 동시에) ---
         if self.opt.repulsion_type == 'svgd':
-            # 1. Score gradients from SD guidance
-            score_grad, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(
-                images, 
-                step_ratio=step_ratio if self.opt.anneal_timestep else None
-            )  # score_grad: [N, D_latent]
+            score_gradients, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
+            
+            # 2. RBF kernel computation
+            rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
+            
+            # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
+            # rbf_kernel: [N, N] where rbf_kernel[i,j] = k(xj, xi)
+            # score_gradients: [N] where score_gradients[j] = ∇_xj log p(xj)
+            # Multiply kernel matrix with score gradients: [N, N] * [N] -> [N] (sum over j for each i)
+            # 1/D_latent
+            attraction_per_particle = (rbf_kernel * score_gradients.unsqueeze(0)).sum(dim=1) # [N]
+            attraction_loss = attraction_per_particle.mean() # [1]
+            
+            # # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
+            # weighted_grad = rbf_kernel @ score_gradients  # [N, D_latent]
+            # attraction_loss = weighted_grad.norm(dim=1).mean()  # optional scalar for loss tracking
+            
+            # 4. Repulsion loss (same as before)
+            repulsion_loss = sigma_t * (rbf_kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            # [Question] should we divide by num_particles (mean)? in SVGD paper, they did divide by num_particles (mean)                              
 
-            # 2. Kernel & grad wrt xi (∑_j ∇_{xi} k(xi, xj))
-            K, G_wrt_xi = rbf_kernel_and_grad(
-                features, 
-                tau=self.opt.repulsion_tau, 
-                gradient_type='svgd'
-            )  # K:[N,N], G:[N,D_feature]
+            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
 
-            # 3. Attraction: (1/N) * sum_i sum_j K[j,i] * score_grad[j]
-            #    K[i,j] = k(xi, xj) -> transpose해서 K[j,i]
-            attraction_loss = (K.t().unsqueeze(-1) * score_grad.unsqueeze(0)).sum(dim=1).mean()
-
-            # 4. Repulsion: (1/N) * sum_i sum_j ∇_{x_j}k(x_j,x_i)
-            #    대칭커널이면 ∇_{x_j}k(x_j,x_i) = -∇_{x_i}k(x_i,x_j)
-            rep_vec = -G_wrt_xi                           # [N,D]
-            repulsion_loss = rep_vec.norm(dim=1).mean()        # 스칼라
-
-            # 5. Total loss
-            total_loss = (
-                self.opt.lambda_sd * attraction_loss 
-                - self.opt.lambda_repulsion * sigma_t * repulsion_loss
-            )
 
         elif self.opt.repulsion_type == 'rlsd':
-            # RLSD 방식 그대로 (기존 로직 유지)
-            sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(
-                images, 
-                step_ratio=step_ratio if self.opt.anneal_timestep else None
-            )
-            K, G_rlsd = rbf_kernel_and_grad(
-                features, tau=self.opt.repulsion_tau, gradient_type='rlsd'
-            )
-            attraction_loss = sds_loss
-            repulsion_loss = G_rlsd.norm(dim=1).mean()
-            total_loss = self.opt.lambda_sd * attraction_loss - self.opt.lambda_repulsion * sigma_t * repulsion_loss
-
+            sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1]
+            
+            # 2. RBF kernel gradient wrt features
+            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
+            
+            # 3. Attraction loss (SDS) + 1/D_latent
+            attraction_loss = sds_loss # [1]
+            
+            # 4. Repulsion loss (Repulsion)
+            repulsion_loss = sigma_t * (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            # repulsion_loss = sigma_t * torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
+            
+            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            
         elif self.opt.repulsion_type == 'wo':
             # baseline
             
@@ -275,7 +277,9 @@ class GUI:
                 images, step_ratio=step_ratio if self.opt.anneal_timestep else None
             )
             repulsion_loss = torch.tensor(0.0, device=images.device)
-            total_loss = self.opt.lambda_sd * attraction_loss
+            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
 
         else:
             raise ValueError(f"[ERROR] Invalid repulsion type: {self.opt.repulsion_type}")
@@ -318,10 +322,6 @@ class GUI:
                 # memory usage
                 memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
                 max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
-                
-                # scaled versions (match how total_loss is formed)
-                scaled_repulsion_loss = self.opt.lambda_repulsion * sigma_t * repulsion_loss
-                scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
 
                 # quantitative metrics (guard visualizer)
                 if self.visualizer is not None:
@@ -339,11 +339,11 @@ class GUI:
                     step=self.step,
                     diversity=diversity,
                     fidelity=fidelity,
-                    attraction_loss=attraction_loss,                 # unscaled
-                    repulsion_loss=repulsion_loss,                   # unscaled
+                    attraction_loss=attraction_loss,
+                    repulsion_loss=repulsion_loss,
                     sigma_t=sigma_t,
-                    scaled_repulsion_loss=scaled_repulsion_loss,     # includes lambda_rep * sigma_t
-                    scaled_attraction_loss=scaled_attraction_loss,   # includes lambda_sd
+                    scaled_repulsion_loss=scaled_repulsion_loss,
+                    scaled_attraction_loss=scaled_attraction_loss,
                     total_loss=total_loss,
                     time=t,
                     memory_allocated_mb=memory_allocated,
