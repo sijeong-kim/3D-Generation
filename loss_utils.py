@@ -2,7 +2,6 @@
 import torch
 import torch.nn.functional as F
 
-@torch.no_grad()
 def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd", device="cuda"):
     """
     Compute RBF kernel matrix and gradient sums used in SVGD-like updates.

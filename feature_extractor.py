@@ -88,7 +88,6 @@ class DINOv2MultiLayerFeatureExtractor:
         # }
         
 
-    @torch.no_grad()
     def extract_cls_from_layer(self, layer_idx, images):
         """Register hook to extract CLS token from specified layer."""
         cls_output = {}
@@ -97,7 +96,8 @@ class DINOv2MultiLayerFeatureExtractor:
             # Handle case where output might be a tuple (extract the tensor)
             if isinstance(output, tuple):
                 output = output[0]  # First element is usually the hidden states tensor
-            cls_output['value'] = output[:, 0, :].detach().to(self.device)
+            # no detach to allow gradient flow
+            cls_output['value'] = output[:, 0, :].to(self.device)
 
         # images: [B, 3, H, W] in [0, 1]
         # Fast processing: skip PIL conversion and process tensors directly
@@ -114,11 +114,10 @@ class DINOv2MultiLayerFeatureExtractor:
             inputs = self.processor(images=images, return_tensors="pt").to(self.device)
 
         handle = self.model.encoder.layer[layer_idx].register_forward_hook(hook_fn)
-        with torch.no_grad():
-            _ = self.model(**inputs)
+        _ = self.model(**inputs) # no detach to allow gradient flow
         handle.remove()
 
-        return F.normalize(cls_output['value'], dim=-1)
+        return F.normalize(cls_output['value'], dim=-1) # grad will flow back to the images
 
     @torch.no_grad()
     def extract_attention_from_layer(self, layer_idx, images):

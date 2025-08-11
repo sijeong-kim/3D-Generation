@@ -223,7 +223,7 @@ class StableDiffusion(nn.Module):
             return loss, sigma_t
         elif repulsion_type == "wo":
             loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
-            return loss, sigma_t
+            return loss
         else:
             raise ValueError(f"Invalid repulsion type: {repulsion_type}")
 
@@ -300,7 +300,7 @@ class StableDiffusion(nn.Module):
 
         # backpropagate the loss to the latents
         target = (latents - grad).detach() # [B, 4, 64, 64]
-        loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]
+        loss = 0.5 * F.mse_loss(latents.float(), target, reduction='mean') # [1]
         
         return loss
         
@@ -379,12 +379,12 @@ class StableDiffusion(nn.Module):
             noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
             noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
 
-            grad = w * (noise_pred - noise) # w(t) * (noise_pred - noise) # weighted score matching
+            grad = w * (noise_pred - noise).detach() # w(t) * (noise_pred - noise) # weighted score matching
             grad = torch.nan_to_num(grad) # avoid NaN
 
         # sds loss - use same formulation as baseline for consistency
-        target = (latents - grad).detach() # [B, 4, 64, 64]
-        sds_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]
+        target = (latents - grad) # [B, 4, 64, 64] - remove .detach() to allow gradient flow
+        sds_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='mean') # [1]
 
         return sds_loss, sigma_t
 
@@ -467,18 +467,19 @@ class StableDiffusion(nn.Module):
             grad = torch.nan_to_num(grad) # avoid NaN
 
         # Compute SDS loss per particle (not averaged) to get [N] shape gradients
-        target = (latents - grad).detach() # [B, 4, 64, 64]
-        sds_losses_per_particle = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
+        # target = (latents - grad).detach() # [B, 4, 64, 64] - remove .detach() to allow gradient flow
+        # sds_losses_per_particle = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
         
-        # These represent ∇_xj log p(xj) for each particle j
-        score_gradients = sds_losses_per_particle # [N]
+        # # These represent ∇_xj log p(xj) for each particle j
+        # score_gradients = sds_losses_per_particle # [N]
 
-        return score_gradients, sigma_t
+        # return score_gradients, sigma_t
+    
         
-        # # Flatten to vector ∇ log p(x_j)
-        # score_gradients = grad.view(batch_size, -1)  # [N, D_latent]
+        # Flatten to vector ∇ log p(x_j)
+        score_gradients = grad.view(batch_size, -1).detach()  # [N, D_latent]
 
-        # return score_gradients, sigma_t # [N, D_latent], [1]
+        return score_gradients, sigma_t # [N, D_latent], [1]
 
     # backup function
     def vector_score_gradients(

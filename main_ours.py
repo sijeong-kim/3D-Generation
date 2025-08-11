@@ -233,6 +233,8 @@ class GUI:
                 images, 
                 step_ratio=step_ratio if self.opt.anneal_timestep else None
             )  # score_grad: [N, D_latent]
+            
+            score_grad = score_grad.to(features.dtype) # [N, D_latent]
 
             # 2. Kernel & grad wrt xi (∑_j ∇_{xi} k(xi, xj))
             K, G_wrt_xi = rbf_kernel_and_grad(
@@ -243,16 +245,26 @@ class GUI:
 
             # 3. Attraction: (1/N) * sum_i sum_j K[j,i] * score_grad[j]
             #    K[i,j] = k(xi, xj) -> transpose해서 K[j,i]
-            attraction_loss = (K.t().unsqueeze(-1) * score_grad.unsqueeze(0)).sum(dim=1).mean()
+            # attraction_loss = (K.t().unsqueeze(-1) * score_grad.unsqueeze(0)).sum(dim=1).mean()
+            # attraction_loss = (K.t() @ score_grad).mean()
+            # attraction_loss = (K.t().mm(score_grad)).norm(dim=1).mean()
+            # attraction_loss = (K.t().mm(score_grad)).mean()
+            attraction_vector = (K.t().mm(score_grad)) / self.opt.num_particles # [N, D_latent]
+            attraction_loss = attraction_vector.norm(dim=1).mean() # [1] l2 norm of the attraction vector
 
             # 4. Repulsion: (1/N) * sum_i sum_j ∇_{x_j}k(x_j,x_i)
             #    대칭커널이면 ∇_{x_j}k(x_j,x_i) = -∇_{x_i}k(x_i,x_j)
-            rep_vec = -G_wrt_xi                           # [N,D]
-            repulsion_loss = rep_vec.norm(dim=1).mean()        # 스칼라
+            rep_vector = -G_wrt_xi / self.opt.num_particles # [N,D_feature]
+            repulsion_loss = rep_vector.norm(dim=1).mean() # [1] l2 norm of the repulsion vector
+            
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * sigma_t * repulsion_loss
             # 5. Total loss
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            
+            print("features.requires_grad:", features.requires_grad)  # True 여야 함
+            print("features.grad_fn:", features.grad_fn)              # None 이면 끊긴 것
+
 
         elif self.opt.repulsion_type == 'rlsd':
             sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(

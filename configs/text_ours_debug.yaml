@@ -38,7 +38,7 @@ debug_001:
     num_views: [2]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
-    lambda_repulsion: [100]                # Single value
+    lambda_repulsion: [1]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
     iters: [200]                            # Very short for debugging (~2-4 min per run)
