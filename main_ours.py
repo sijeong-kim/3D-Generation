@@ -18,7 +18,7 @@ from guidance.sd_utils import StableDiffusion
 
 from visualizer import GaussianVisualizer
 from metrics import MetricsCalculator
-from feature_extractor import DINOv2FeatureExtractor
+from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from loss_utils import rbf_kernel_and_grad
 
@@ -84,7 +84,7 @@ class GUI:
         # override if provide a checkpoint
         for i in range(self.opt.num_particles):
             # Set different seed for each particle during initialization
-            init_seed = self.seed + i * self.opt.iters
+            init_seed = self.seed + i * self.opt.iters # 42, 42 + 1500, 42 + 2 * 1500, 42 + 3 * 1500, 42 + 4 * 1500
             self.seeds.append(init_seed)
             self.seed_everything(init_seed)
             
@@ -95,7 +95,7 @@ class GUI:
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
                 
         # visualizer
-        if self.opt.visualize:
+        if self.opt.visualize or self.opt.metrics:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
@@ -137,11 +137,17 @@ class GUI:
         )
         
         # feature extractor
-        self.feature_extractor = DINOv2FeatureExtractor(self.opt.feature_extractor_model_name).eval().to(self.device)
+        # Use multi-layer extractor for specific layer extraction
+        # Supports: 'early' (25% depth), 'mid' (50% depth), 'last' (final layer)
+        print(f"[INFO] Using DINOv2 features from '{self.opt.feature_layer}' layer")
+        self.feature_extractor = DINOv2MultiLayerFeatureExtractor(
+            model_name=self.opt.feature_extractor_model_name, 
+            device=self.device
+        )
         
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, multi_view_type=self.opt.multi_view_type)
         else:
             self.metrics_calculator = None
 
@@ -165,7 +171,7 @@ class GUI:
         self.step += 1
         step_ratio = min(1, self.step / self.opt.iters)
 
-        total_loss = 0
+
 
         ### novel view (manual batch)
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
@@ -180,7 +186,7 @@ class GUI:
         for j in range(self.opt.num_particles):
             
             # set seed for each particle + iteration step for different viewpoints each iter
-            self.seed_everything(self.seeds[j] + self.step)
+            self.seed_everything(self.seeds[j] + self.step - 1) # 42 , 42 + 1, 42 + 2, 42 + 3, ..., 42 + 1499
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
 
@@ -206,57 +212,77 @@ class GUI:
             
             # Store output for each particle
             outputs.append(out)
-                
+            
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
-        features = self.feature_extractor(images) # [N, D_featture]
+        features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
 
-        for j in range(self.opt.num_particles):
 
-            if self.opt.repulsion_enabled:
-                
-                # score matching regulizers (sds_loss) - computed without gradients
-                if self.opt.repulsion_gradient_type == 'rlsd':  
-                    sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1]
-                    
-                    # 2. RBF kernel gradient wrt features
-                    rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_gradient_type) # [N, N], [N, D_feature] 
-                    
-                    # 3. Attraction loss (SDS) + 1/D_latent
-                    attraction_loss = sds_loss # [1]
-                    
-                    # 4. Repulsion loss (Repulsion)
-                    repulsion_loss = sigma_t * (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-                    # repulsion_loss = sigma_t * torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
-                    
-                elif self.opt.repulsion_gradient_type == 'svgd':
-                    score_gradients, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
-                    
-                    # 2. RBF kernel computation
-                    rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, gradient_type=self.opt.repulsion_gradient_type) # [N, N], [N, D_feature] 
-                    
-                    # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
-                    # rbf_kernel: [N, N] where rbf_kernel[i,j] = k(xj, xi)
-                    # score_gradients: [N] where score_gradients[j] = ∇_xj log p(xj)
-                    # Multiply kernel matrix with score gradients: [N, N] * [N] -> [N] (sum over j for each i)
-                    # 1/D_latent
-                    attraction_per_particle = (rbf_kernel * score_gradients.unsqueeze(0)).sum(dim=1) # [N]
-                    attraction_loss = attraction_per_particle.mean() # [1]
-                    
-                    # # 3. Attraction loss: 1/N * sum_j k(xj, xi) * ∇_xj log p(xj)
-                    # weighted_grad = rbf_kernel @ score_gradients  # [N, D_latent]
-                    # attraction_loss = weighted_grad.norm(dim=1).mean()  # optional scalar for loss tracking
-                    
-                    # 4. Repulsion loss (same as before)
-                    repulsion_loss = sigma_t * (rbf_kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-                    # [Question] should we divide by num_particles (mean)? in SVGD paper, they did divide by num_particles (mean)                              
-        
-                scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-                total_loss = self.opt.lambda_sd * attraction_loss - scaled_repulsion_loss
+        # --- before the branch, init for logging ---
+        total_loss = 0
+        attraction_loss = None
+        repulsion_loss = None
+        scaled_attraction_loss = None
+        scaled_repulsion_loss = None
 
-            else: # baseline
-                total_loss = self.opt.lambda_sd * self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
+        # --- SVGD loss computation (루프 밖, 모든 파티클 동시에) ---
+        if self.opt.repulsion_type == 'svgd':
+            # 1. Score gradients from SD guidance
+            score_grad, sigma_t = self.guidance_sd.train_step_for_svgd_repulsion(
+                images, 
+                step_ratio=step_ratio if self.opt.anneal_timestep else None
+            )  # score_grad: [N, D_latent]
+
+            # 2. Kernel & grad wrt xi (∑_j ∇_{xi} k(xi, xj))
+            K, G_wrt_xi = rbf_kernel_and_grad(
+                features, 
+                tau=self.opt.repulsion_tau, 
+                repulsion_type=self.opt.repulsion_type
+            )  # K:[N,N], G:[N,D_feature]   
+
+            # 3. Attraction: (1/N) * sum_i sum_j K[j,i] * score_grad[j]
+            #    K[i,j] = k(xi, xj) -> transpose해서 K[j,i]
+            attraction_loss = (K.t().unsqueeze(-1) * score_grad.unsqueeze(0)).sum(dim=1).mean()
+
+            # 4. Repulsion: (1/N) * sum_i sum_j ∇_{x_j}k(x_j,x_i)
+            #    대칭커널이면 ∇_{x_j}k(x_j,x_i) = -∇_{x_i}k(x_i,x_j)
+            rep_vec = -G_wrt_xi                           # [N,D]
+            repulsion_loss = rep_vec.norm(dim=1).mean()        # 스칼라
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            scaled_repulsion_loss = self.opt.lambda_repulsion * sigma_t * repulsion_loss
+            # 5. Total loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+
+        elif self.opt.repulsion_type == 'rlsd':
+            sds_loss, sigma_t = self.guidance_sd.train_step_for_rlsd_repulsion(
+                images, 
+                step_ratio=step_ratio if self.opt.anneal_timestep else None
+            )
+            K, G_rlsd = rbf_kernel_and_grad(
+                features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+            )
+            
+            attraction_loss = sds_loss
+            repulsion_loss = G_rlsd.norm(dim=1).mean()
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            scaled_repulsion_loss = self.opt.lambda_repulsion * sigma_t *  repulsion_loss
+            
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+
+        elif self.opt.repulsion_type == 'wo':
+            # baseline
+            attraction_loss = self.guidance_sd.train_step_for_baseline(
+                images, step_ratio=step_ratio if self.opt.anneal_timestep else None
+            )
+            repulsion_loss = torch.tensor(0.0, device=images.device)
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+            
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            
+        else:
+            raise ValueError(f"[ERROR] Invalid repulsion type: {self.opt.repulsion_type}")
 
         ### optimize step ### 
         
@@ -285,7 +311,7 @@ class GUI:
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
         
-        # log metrics and visualize
+        # --- logging & visualization ---
         with torch.no_grad():
             if self.opt.metrics and self.metrics_calculator is not None:
                 # time
@@ -296,36 +322,38 @@ class GUI:
                 # memory usage
                 memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
                 max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
-                
-                # losses
-                if self.opt.repulsion_enabled:
-                    attraction_loss_val = attraction_loss.item()
-                    repulsion_loss_val = repulsion_loss.item()
-                    scaled_repulsion_loss_val = repulsion_loss_val * self.opt.lambda_repulsion
+
+                # quantitative metrics (guard visualizer)
+                if self.visualizer is not None:
+                    multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(
+                        self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
+                    )  # [V, N, 3, H, W]
+                    representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type)
+                    fidelity = float(clip_similarities.mean().item())
+                    rep_features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, representative_images).to(self.device)  # [V, N, D]
+                    diversity = float(self.metrics_calculator.compute_rlsd_diversity(rep_features))
                 else:
-                    attraction_loss_val = 0
-                    repulsion_loss_val = 0
-                    scaled_repulsion_loss_val = 0
-                    
-                total_loss_val = total_loss.item()
-            
-                # quantitative metrics
-                multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
-                representative_images, clip_similarities = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images) # [V, N, 3, H, W]
+                    fidelity, diversity = 0.0, 0.0  # or skip logging these
 
-                fidelity = clip_similarities.mean().item()
-                features = self.feature_extractor(representative_images) # [V, N, D_featture]
-                diversity = self.metrics_calculator.compute_rlsd_diversity(features)
-
-                # log
-                self.metrics_calculator.log_metrics(step=self.step, diversity=diversity, fidelity=fidelity, attraction_loss=attraction_loss_val, repulsion_loss=repulsion_loss_val, scaled_repulsion_loss = scaled_repulsion_loss_val, total_loss=total_loss_val, time=t, memory_allocated_mb=memory_allocated, max_memory_allocated_mb=max_memory_allocated)
-
+                self.metrics_calculator.log_metrics(
+                    step=self.step,
+                    diversity=diversity,
+                    fidelity=fidelity,
+                    attraction_loss=attraction_loss,
+                    repulsion_loss=repulsion_loss,
+                    scaled_attraction_loss=scaled_attraction_loss,
+                    scaled_repulsion_loss=scaled_repulsion_loss,
+                    total_loss=total_loss,
+                    time=t,
+                    memory_allocated_mb=memory_allocated,
+                    max_memory_allocated_mb=max_memory_allocated,
+                )
+                
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
@@ -472,9 +500,9 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters:
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+        # # Multi-viewpoints for 30 fps video (save at the end of training)
+        # if self.step == self.opt.iters and self.visualizer is not None and self.opt.visualize:
+        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=False) # 360 / 120 for 30 fps
 
         # save model
         for j in range(self.opt.num_particles):

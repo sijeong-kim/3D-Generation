@@ -148,7 +148,7 @@ class StableDiffusion(nn.Module):
         as_latent=False,
         vers=None, hors=None,
         repulsion_enabled=False,
-        repulsion_gradient_type="svgd",
+        repulsion_type="svgd",
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -174,10 +174,10 @@ class StableDiffusion(nn.Module):
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
             
-            if repulsion_enabled:
+            if repulsion_type == "svgd" or repulsion_type == "rlsd":
                 sigma_t = torch.sqrt(w)
                 sigma_t = sigma_t.mean()
-
+    
             # predict the noise residual with unet, NO grad!
             # add noise
             noise = torch.randn_like(latents)
@@ -215,17 +215,19 @@ class StableDiffusion(nn.Module):
         
         target = (latents - grad).detach()
         
-        if repulsion_enabled:
-            if repulsion_gradient_type == "svgd":
-                loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
-            elif repulsion_gradient_type == "rlsd":
-                loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
+        if repulsion_type == "svgd":
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
+            return loss, sigma_t
+        elif repulsion_type == "rlsd":
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
+            return loss, sigma_t
+        elif repulsion_type == "wo":
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
             return loss, sigma_t
         else:
-            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
+            raise ValueError(f"Invalid repulsion type: {repulsion_type}")
 
-        return loss
-    
+
 
     def train_step_for_baseline(
         self,
@@ -478,6 +480,72 @@ class StableDiffusion(nn.Module):
 
         # return score_gradients, sigma_t # [N, D_latent], [1]
 
+    # backup function
+    def vector_score_gradients(
+        self, pred_rgb, step_ratio=None, guidance_scale=100, as_latent=False, vers=None, hors=None
+    ):
+        """
+        Returns:
+            grad_vectors: [N, 4, 64, 64]  where grad = w(t) * (noise_pred - noise)
+            sigma_t: scalar timestep weighting
+            latents: [N, 4, 64, 64]  (useful to build the attraction loss)
+        """
+        batch_size = pred_rgb.shape[0]
+        pred_rgb = pred_rgb.to(self.dtype)
+
+        # --- this part MUST keep grad so latents carry gradients back to the renderer ---
+        # 1) images -> latents
+        if as_latent:
+            latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
+        else:
+            pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
+            latents = self.encode_imgs(pred_rgb_512)
+
+         # 2) pick t & weights
+        if step_ratio is not None:
+            t_val = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
+            t = torch.full((batch_size,), t_val, dtype=torch.long, device=self.device)
+        else:
+            t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+
+        
+        w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
+        sigma_t = torch.sqrt(w).mean()
+
+        # --- prediction path: do NOT backprop through UNet/scheduler ---
+        with torch.no_grad():
+            # 3) add noise
+            noise = torch.randn_like(latents)
+            latents_noisy = self.scheduler.add_noise(latents, noise, t)
+
+            # 4) predict noise with CFG
+            latent_model_input = torch.cat([latents_noisy] * 2)
+            tt = torch.cat([t] * 2)
+
+            if hors is None:
+                embeddings = torch.cat([
+                    self.embeddings['pos'].expand(batch_size, -1, -1),
+                    self.embeddings['neg'].expand(batch_size, -1, -1)
+                ])
+            else:
+                def _get_dir_ind(h):
+                    if abs(h) < 60: return 'front'
+                    elif abs(h) < 120: return 'side'
+                    else: return 'back'
+                embeddings = torch.cat([
+                    self.embeddings[_get_dir_ind(h)] for h in hors
+                ] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+
+            noise_pred = self.unet(latent_model_input, tt, encoder_hidden_states=embeddings).sample
+            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
+
+            # 5) vector score in latent space
+            grad = w * (noise_pred - noise)            # [N, 4, 64, 64]
+            grad = torch.nan_to_num(grad)
+            
+            # 6) return
+            return grad, sigma_t, latents
 
 
     @torch.no_grad()

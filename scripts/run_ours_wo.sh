@@ -50,14 +50,9 @@ mkdir -p $MPLCONFIGDIR
 SEED=42
 PROMPT="a photo of a hamburger"
 ITER=1500
+REPULSION_TYPE="wo"
 
-REPULSION_ENABLED=False
-REPULSION_GRADIENT_TYPE="svgd"
-LAMBDA_REPULSION=1000
-REPULSION_TAU=0
-KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
-
-TASK_NAME="${PROMPT// /_}_ours_wo_${SEED}"
+TASK_NAME="${PROMPT// /_}_ours_${REPULSION_TYPE}_${SEED}"
 OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
 
 mkdir -p ${OUTPUT_DIR}
@@ -93,11 +88,7 @@ CMD="python ${WORKING_DIR}/main_ours.py \
     outdir=${OUTPUT_DIR} \
     seed=${SEED} \
     iter=${ITER} \
-    repulsion_enabled=${REPULSION_ENABLED} \
-    repulsion_gradient_type=${REPULSION_GRADIENT_TYPE} \
-    repulsion_tau=${REPULSION_TAU} \
-    lambda_repulsion=${LAMBDA_REPULSION} \
-    kernel_type=${KERNEL_TYPE}"
+    repulsion_type=${REPULSION_TYPE}"
 
 echo "[RUNNING COMMAND] $CMD"
 eval $CMD

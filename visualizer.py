@@ -47,7 +47,7 @@ class GaussianVisualizer:
 
     # TODO: refactor this function to include legend and labels
     @torch.no_grad()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N, 3, H, W]
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N,3, H, W]
         """
         Render images from specific viewpoints.
         
@@ -70,12 +70,15 @@ class GaussianVisualizer:
         if visualize is None:
             visualize = self.opt.visualize
             
-        # Create output directory
-        if visualize:
-            if self.opt.num_particles > 1:
+        # Initialize variables to None to avoid UnboundLocalError
+        multi_viewpoints_dir = None
+        save_paths = None
+        
+        if visualize and (step % self.opt.save_multi_viewpoints_interval == 0):
+            if (self.opt.num_particles > 1):
                 multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_all_particles')
                 os.makedirs(multi_viewpoints_dir, exist_ok=True)
-            
+                
             if save_iid:
                 save_paths = []
                 for particle_id in range(self.opt.num_particles):
@@ -113,12 +116,12 @@ class GaussianVisualizer:
                 
                 # Save individual particle images
                 # TODO: refactor this to include legend and labels
-                if visualize and save_iid:
+                if visualize and save_iid and (step % self.opt.save_multi_viewpoints_interval == 0):
                     vutils.save_image(
                         image,
                         os.path.join(save_paths[particle_id], f'view_{i:03d}.png'),  # Use 3-digit padding for proper ordering
                         normalize=False
-                    )
+                )
             
             # save all particles images in one image in parallel
             particle_images = torch.cat(particle_images, dim=0) # [N, 3, H, W]            
@@ -126,7 +129,7 @@ class GaussianVisualizer:
             
             # Save combined image of all particles
             # TODO: refactor this to include legend and labels
-            if visualize and self.opt.num_particles > 1:
+            if visualize and (self.opt.num_particles > 1) and (step % self.opt.save_multi_viewpoints_interval == 0):
                 vutils.save_image(
                     particle_images, # [N, 3, H, W]
                         os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
@@ -135,7 +138,7 @@ class GaussianVisualizer:
         
         multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0) # [V, N, 3, H, W]
         
-        return multi_viewpoint_images
+        return multi_viewpoint_images #  [V, N, 3, H, W]
 
     @torch.no_grad()
     def visualize_fixed_viewpoint(self, step, elevation, horizontal):

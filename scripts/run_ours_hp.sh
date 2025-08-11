@@ -1,11 +1,45 @@
 #!/bin/bash
-#SBATCH --job-name=ours_rlsd
-#SBATCH --partition=AMD7-A100-T
+#SBATCH --job-name=hp
+#SBATCH --partition=AMD7-A100-T 
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err
+
+# SLURM batch script for hyperparameter tuning
+# Usage: sbatch scripts/run_hp_slurm.sh <sweep_name> [prompts...]
+#
+# Examples:
+#   sbatch scripts/run_hp_slurm.sh lamdda_repulsion_coarse
+#   sbatch scripts/run_hp_slurm.sh lamdda_repulsion_coarse "a hamburger" "a cactus"
+#
+# Note: Seeds are now defined in the YAML configuration file
+
+# --------------------------------
+# Parse command line arguments
+# --------------------------------
+SWEEP_NAME="$1"
+shift  # Remove first argument
+
+# Parse remaining arguments (just prompts now)
+PROMPTS=()
+
+for arg in "$@"; do
+    PROMPTS+=("$arg")
+done
+
+# Set defaults if not provided
+if [ ${#PROMPTS[@]} -eq 0 ]; then
+    PROMPTS=("a photo of a hamburger")
+fi
+
+# Validate sweep name
+if [ -z "$SWEEP_NAME" ]; then
+    echo "[ERROR] Sweep name is required as first argument"
+    echo "Usage: sbatch $0 <sweep_name> [prompts...]"
+    exit 1
+fi
 
 # --------------------------------
 # Environment & Paths
@@ -23,9 +57,6 @@ source ${VENV_DIR}/bin/activate
 
 # Add .so Library Paths
 export LD_LIBRARY_PATH=${VENV_DIR}/lib/python3.12/site-packages/pymeshlab/lib:$LD_LIBRARY_PATH
-# export LD_LIBRARY_PATH=${VENV_DIR}/lib/python3.12/site-packages:$LD_LIBRARY_PATH
-
-# Ensure Python uses correct site-packages
 export PYTHONPATH=${VENV_DIR}/lib/python3.12/site-packages:$PYTHONPATH
 
 # --------------------------------
@@ -45,59 +76,47 @@ export MPLCONFIGDIR=${BASE_DIR}/.cache/matplotlib
 mkdir -p $MPLCONFIGDIR
 
 # --------------------------------
-# Run Parameters
-# --------------------------------
-SEED=42
-PROMPT="a photo of a hamburger"
-ITER=1500
-
-REPULSION_TYPE="rlsd"
-LAMBDA_REPULSION=0.01
-REPULSION_TAU=0
-KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
-
-TASK_NAME="${PROMPT// /_}_ours_${REPULSION_TYPE}_${LAMBDA_REPULSION}_${SEED}"
-OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
-
-mkdir -p ${OUTPUT_DIR}
-
-# --------------------------------
-# Diagnostic Info
+# Job Information
 # --------------------------------
 echo "========== SLURM JOB INFO =========="
 echo "Job ID        : ${SLURM_JOB_ID}"
 echo "Job Name      : ${SLURM_JOB_NAME}"
-echo "Prompt        : ${PROMPT}"
-echo "Task Name     : ${TASK_NAME}"
+echo "Sweep Name    : ${SWEEP_NAME}"
+echo "Prompts       : ${PROMPTS[*]}"
 echo "User          : ${USER}"
 echo "Run Host      : $(hostname)"
 echo "Working Dir   : $(pwd)"
 echo "CUDA Path     : ${CUDA_HOME}"
 echo "Date & Time   : $(date)"
-echo "PyTorch Ver   : $(python -c 'import torch; print(torch.__version__)')"
-echo "CUDA (PyTorch): $(python -c 'import torch; print(torch.version.cuda)')"
-echo "nvcc Version  : $(nvcc --version | grep release)"
-nvidia-smi
-echo "====================================="
-echo "Output will be saved to: ${OUTPUT_DIR}"
 echo "====================================="
 
+# Create job-specific output directory
+mkdir -p "${BASE_DIR}/outputs/${SLURM_JOB_ID}"
+
 # --------------------------------
-# Run Main Script
+# Run hyperparameter tuning
 # --------------------------------
-CMD="python ${WORKING_DIR}/main_ours.py \
+cd ${WORKING_DIR}
+
+echo ""
+echo "Starting hyperparameter tuning..."
+echo "Sweep: ${SWEEP_NAME}"
+echo ""
+
+CMD="python ${WORKING_DIR}/hp_ours.py \
     --config ${WORKING_DIR}/configs/text_ours.yaml \
-    prompt=\"${PROMPT}\" \
-    save_path=${PROMPT// /_} \
-    outdir=${OUTPUT_DIR} \
-    seed=${SEED} \
-    iter=${ITER} \
-    repulsion_type=${REPULSION_TYPE} \
-    repulsion_tau=${REPULSION_TAU} \
-    lambda_repulsion=${LAMBDA_REPULSION} \
-    kernel_type=${KERNEL_TYPE}"
+    --sweep_config ${WORKING_DIR}/configs/text_ours_hp.yaml \
+    --sweep_name ${SWEEP_NAME} \
+    --prompts ${PROMPTS[*]} \
+    --outdir=${BASE_DIR}/logs"
 
 echo "[RUNNING COMMAND] $CMD"
+echo ""
+
 eval $CMD
 
-echo "[INFO] Job completed successfully."
+echo ""
+echo "====================================="
+echo "Hyperparameter tuning completed!"
+echo "Results saved in: ${BASE_DIR}/logs"
+echo "====================================="

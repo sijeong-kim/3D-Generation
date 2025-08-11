@@ -10,6 +10,7 @@ save_iid: False # for visualization
 metrics: True
 clip_metrics_type: openclip # openclip, hf_clip
 feature_extractor_model_name: facebook/dinov2-base
+multi_view_type: best_views # best_views, average_views, cross_attention_views
 
 # losses
 losses_interval: 1
