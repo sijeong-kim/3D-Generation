@@ -262,8 +262,8 @@ class GUI:
             # 5. Total loss
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
             
-            print("features.requires_grad:", features.requires_grad)  # True 여야 함
-            print("features.grad_fn:", features.grad_fn)              # None 이면 끊긴 것
+            # print("features.requires_grad:", features.requires_grad)  # True if gradient is computed
+            # print("features.grad_fn:", features.grad_fn)              # grad_fn is None if no gradient is computed
 
 
         elif self.opt.repulsion_type == 'rlsd':
