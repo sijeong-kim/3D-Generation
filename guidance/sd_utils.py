@@ -148,7 +148,7 @@ class StableDiffusion(nn.Module):
         as_latent=False,
         vers=None, hors=None,
         repulsion_enabled=False,
-        repulsion_type="svgd",
+        repulsion_type="wo",
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -212,18 +212,20 @@ class StableDiffusion(nn.Module):
             # seems important to avoid NaN...
             # grad = grad.clamp(-1, 1)
 
-        
         target = (latents - grad).detach()
         
         if repulsion_type == "svgd":
-            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
-            return loss, sigma_t
+            # loss per particle [N]
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1)
+            return (loss, sigma_t) if repulsion_enabled else loss
         elif repulsion_type == "rlsd":
-            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
-            return loss, sigma_t
-        elif repulsion_type == "wo":
+            # scalar loss [1]
             loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
-            return loss, sigma_t
+            return (loss, sigma_t) if repulsion_enabled else loss
+        elif repulsion_type == "wo":
+            # baseline scalar loss [1]
+            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
+            return loss
         else:
             raise ValueError(f"Invalid repulsion type: {repulsion_type}")
 
