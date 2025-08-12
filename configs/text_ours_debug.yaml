@@ -29,59 +29,149 @@ debug_001:
   method: grid
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
-  
+
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
     multi_view_type: ['average_views']
-    num_views: [2]                         # Ultra minimal views for debugging
-    repulsion_tau: [0]
-    lambda_sd: [1.0]
-    lambda_repulsion: [1]                # Single value
-    feature_layer: [6]                     # Single layer
-    kernel_type: ['rbf']
-    iters: [200]                            # Very short for debugging (~2-4 min per run)
-
-  settings:
-    visualize: true
-    save_iid: true
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 100     # Less frequent saves to reduce memory
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 50     # Less frequent metrics
-    losses_interval: 25                    # Less frequent for memory
-    efficiency_interval: 25               # Less frequent for memory
-
-debug_002:
-  name: svgd
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['svgd']  # Test all 3 methods quickly
-  
-  fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
-    num_views: [2]                         # Ultra minimal views for debugging
+    num_views: [4]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
     lambda_repulsion: [100]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
-    iters: [200]                            # Very short for debugging (~2-4 min per run)
+    iters: [100]                                # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: true
+    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10           
+
+debug_002:
+  name: svgd
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd']  # Test svgd only
+  
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
+    multi_view_type: ['average_views']
+    num_views: [4]                         # Ultra minimal views for debugging
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    lambda_repulsion: [100]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [100]                                # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: true
+    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10           
+
+debug_003:
+  name: rlsd
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['rlsd']  # Test rlsd only
+  
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
+    multi_view_type: ['average_views']
+    num_views: [4]                         # Ultra minimal views for debugging
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    lambda_repulsion: [100]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [100]                                # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: true
+    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10               # Less frequent for memory
+
+
+debug_004:
+  name: svgd_rlsd
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd']  # Test rlsd only
+
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
+    multi_view_type: ['average_views']
+    num_views: [4]                         # Ultra minimal views for debugging
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    lambda_repulsion: [1.0]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [300]                                # Very short for debugging (~2-4 min per run)
 
   settings:
     visualize: true
     save_iid: true
     save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 100     # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
     metrics: true                         # Enable metrics to save memory
     quantitative_metrics_interval: 50     # Less frequent metrics
     losses_interval: 25                    # Less frequent for memory
     efficiency_interval: 25               # Less frequent for memory
 
+
+debug_005:
+  name: wo
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']  # Test rlsd only
+
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
+    multi_view_type: ['average_views']
+    num_views: [4]                         # Ultra minimal views for debugging
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    lambda_repulsion: [1.0]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [300]                                # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: true
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 50     # Less frequent metrics
+    losses_interval: 25                    # Less frequent for memory
+    efficiency_interval: 25               # Less frequent for memory
+
+# ==================
 # ============================================================================
 # DEBUG CONFIGURATION COMPLETE
 # ============================================================================
