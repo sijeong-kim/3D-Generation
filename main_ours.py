@@ -217,25 +217,10 @@ class GUI:
         
         features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
         
-        # score matching regulizers (sds_loss) - computed without gradients
-        if self.opt.repulsion_type == 'rlsd':  
-            sds_loss = self.guidance_sd.train_step_for_rlsd_repulsion(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1]
-            
-            # 2. RBF kernel gradient wrt features
-            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type) # [N, N], [N, D_feature] 
-            
-            # 3. Attraction loss (SDS) + 1/D_latent
-            attraction_loss = sds_loss # [1]
-            
-            # 4. Repulsion loss (Repulsion)
-            repulsion_loss = (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            # repulsion_loss = torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
-            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
-            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
-                    
-        elif self.opt.repulsion_type == 'svgd':
+        if self.opt.repulsion_type == 'svgd':
+            # 1. SDS loss (latent space)
             score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
+            score_gradients = score_gradients.detach()
             
             # 2. RBF kernel computation
             rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(
@@ -243,7 +228,7 @@ class GUI:
             )  # rbf_kernel:[N,N], rbf_kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
             
             # 3. Attraction loss (SVGD)
-            v = torch.einsum('ij,jchw->ichw', rbf_kernel, score_gradients.detach())  # [N,4,64,64]  
+            v = torch.einsum('ij,jchw->ichw', rbf_kernel, score_gradients)  # [N,4,64,64]  
             target = (latents - v).detach()
             attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
             
@@ -253,9 +238,31 @@ class GUI:
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            
+        elif self.opt.repulsion_type == 'rlsd': 
+            # 1. SDS loss (latent space)
+            score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
+            score_gradients = score_gradients.detach()
+
+            # 2. RBF kernel gradient wrt features
+            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(
+                features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+            ) # rbf_kernel:[N,N], rbf_kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j) / k(x_i,x_j)
+            
+            # 3. Attraction loss (SDS) + 1/D_latent
+            target = (latents - score_gradients).detach()
+            attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            
+            # 4. Repulsion loss (Repulsion)
+            repulsion_loss = (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            # repulsion_loss = torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
         else:
-            attraction_loss = self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
+            sds_loss = self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
             repulsion_loss = torch.tensor(0.0, device=images.device)
+            attraction_loss = sds_loss # [1]
             
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss

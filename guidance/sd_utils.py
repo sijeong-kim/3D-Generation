@@ -244,6 +244,8 @@ class StableDiffusion(nn.Module):
             pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
             # encode image into latents with vae, requires grad!
             latents = self.encode_imgs(pred_rgb_512)
+            
+        assert latents.shape[1:] == (4, 64, 64), f"latents.shape: {latents.shape}"
 
         with torch.no_grad():
             if step_ratio is not None:
