@@ -25,7 +25,7 @@
 #   Storage: ~20-40MB per run (3 runs ≈ 60-120MB total)
 #   Recommended SLURM: --time=00:30:00 --mem=16G --gres=gpu:1
 debug_001:
-  name: all_3_methods
+  name: svgd_rlsd_wo
   method: grid
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
@@ -33,25 +33,25 @@ debug_001:
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
+    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
     multi_view_type: ['average_views']
-    num_views: [4]                         # Ultra minimal views for debugging
+    num_views: [8]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
-    lambda_repulsion: [100]                # Single value
+    lambda_repulsion: [700]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
-    iters: [100]                                # Very short for debugging (~2-4 min per run)
+    iters: [1500]                                # Very short for debugging (~2-4 min per run)
 
   settings:
     visualize: true
     save_iid: true
-    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 500     # Less frequent saves to reduce memory
     metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10           
+    quantitative_metrics_interval: 50     # Less frequent metrics
+    losses_interval: 25                    # Less frequent for memory
+    efficiency_interval: 25           
 
 debug_002:
   name: svgd
