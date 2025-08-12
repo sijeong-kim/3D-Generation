@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=ours_svgd
-#SBATCH --partition=gpgpuB
+#SBATCH --partition=gpgpu
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=sk2324@ic.ac.uk
@@ -52,7 +52,7 @@ PROMPT="a photo of a hamburger"
 ITER=1500
 
 REPULSION_TYPE="svgd"
-LAMBDA_REPULSION=100
+LAMBDA_REPULSION=500
 REPULSION_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 

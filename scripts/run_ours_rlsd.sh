@@ -52,7 +52,7 @@ PROMPT="a photo of a hamburger"
 ITER=1500
 
 REPULSION_TYPE="rlsd"
-LAMBDA_REPULSION=0.01
+LAMBDA_REPULSION=500
 REPULSION_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 

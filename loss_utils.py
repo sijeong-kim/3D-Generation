@@ -10,7 +10,7 @@ def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
     Args:
         features: [N, D] tensor of feature vectors
         tau: kernel bandwidth
-        normalize: whether to normalize features
+        repulsion_type: "svgd" or "rlsd"
     
     Returns:
         K: [N, N] kernel matrix where K[i,j] = k(x_j, x_i)
@@ -37,14 +37,14 @@ def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
     # RBF kernel k(z_i, z_j) = exp(-||z_i - z_j||^2 / h)
     K = torch.exp(-sq_dists / h)  # [N, N]
     
-    if gradient_type == "svgd": # SVGD
+    if repulsion_type == "svgd": # SVGD
         # RBF kernel gradient ∇_{z_j} sum_j k(z_i, z_j) 
         # = ∇_{z_j} (sum_j exp(-||z_i - z_j||^2 / h)
         # = sum_j ((2/h) * (z_i - z_j) * k(z_i, z_j))
         K_grad = (2 / h) * K.unsqueeze(-1) * diffs  # [N, N, 1] *  [N, N, D_feature] / h # [N, N, D_feature]
         K_grad_sum_j = K_grad.sum(dim=1) # [N, D_feature] (sum over particles j)
         return K, K_grad_sum_j # [N, N], [N, D_feature]
-    elif gradient_type == "rlsd":   # smooth SVGD (RLSD)
+    elif repulsion_type == "rlsd":   # smooth SVGD (RLSD)
         # RBF kernel gradient ∇_{z_j} log( sum_j k(z_i, z_j) )
         # = ∇_{z_j} (sum_j k(z_i, z_j)) / (sum_j k(z_i, z_j))
         # = sum_j ((2/h) * (z_i - z_j) * k(z_i, z_j)) / (sum_j k(z_i, z_j))
@@ -63,8 +63,8 @@ if __name__ == "__main__":
     print(f"\nFeature norms - min: {torch.norm(features, dim=1).min():.4f}, max: {torch.norm(features, dim=1).max():.4f}")
     
     for tau in [0.0, 0.5, 1.0, 2.0]:
-        for gradient_type in ["svgd", "rlsd"]:
-            K, K_grad_sum_j = rbf_kernel_and_grad(features, tau=tau, gradient_type=gradient_type)
+        for repulsion_type in ["svgd", "rlsd"]:
+            K, K_grad_sum_j = rbf_kernel_and_grad(features, tau=tau, repulsion_type=repulsion_type)
             print(f"\nKernel matrix:")
             print(K)
             print(f"\nKernel gradient sum over j:")
