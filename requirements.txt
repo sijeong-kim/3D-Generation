@@ -28,6 +28,7 @@ accelerate
 transformers
 timm
 torchvision
+xformers
 
 # 3D mesh processing
 xatlas 
