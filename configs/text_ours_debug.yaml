@@ -34,7 +34,6 @@ debug_001:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
     num_views: [8]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
@@ -56,34 +55,34 @@ debug_001:
     efficiency_interval: 10           
 
 debug_002:
-  name: svgd
+  name: wo_metrics
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd']  # Test svgd only
-  
+    repulsion_type: ['wo', 'svgd']  # Test svgd only
+
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
-    num_views: [4]                         # Ultra minimal views for debugging
+    num_views: [8]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
-    lambda_repulsion: [100]                # Single value
+    lambda_repulsion: [1000]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
     iters: [100]                                # Very short for debugging (~2-4 min per run)
 
   settings:
-    visualize: true
-    save_iid: true
-    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    visualize: false
+    save_iid: false
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
+    visualize_graph: false # save graph for debugging
     visualize_graph_interval: 100
     metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
+    quantitative_metrics_interval: 1     # Less frequent metrics
     losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10           
+    efficiency_interval: 10       
 
 debug_003:
   name: rlsd
@@ -95,7 +94,6 @@ debug_003:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
     num_views: [4]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
@@ -126,7 +124,6 @@ debug_004:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
     num_views: [4]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
@@ -157,7 +154,6 @@ debug_005:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
     num_views: [4]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
@@ -189,7 +185,6 @@ debug_006:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
-    multi_view_type: ['average_views']
     num_views: [8]                         # Ultra minimal views for debugging
     repulsion_tau: [0]
     lambda_sd: [1.0]
@@ -222,7 +217,6 @@ debug_002:
     repulsion_type: ['svgd', 'rlsd', 'wo']
     lambda_repulsion: [700]
     num_particles: [4]
-    multi_view_type: ['average_views']
     num_views: [8]
     repulsion_tau: [0]
     lambda_sd: [1.0]
