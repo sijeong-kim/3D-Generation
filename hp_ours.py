@@ -238,7 +238,10 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
                 print(f"[INFO] Completed experiment {experiment_count}/{total_experiments}")
                 
             except Exception as e:
-                print(f"[ERROR] Experiment failed: {e}")
+                # Print full traceback with line numbers to stderr (captured by SLURM error.err)
+                import sys, traceback
+                print(f"[ERROR] Experiment failed: {e}", file=sys.stderr, flush=True)
+                traceback.print_exc(file=sys.stderr)
                 # More aggressive memory cleanup on failure
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()

@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=debug
-#SBATCH --partition=gpgpu
+#SBATCH --partition=AMD7-A100-T
 #SBATCH --gres=gpu:1
-#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=ALL
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err
