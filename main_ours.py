@@ -319,10 +319,14 @@ class GUI:
         # 2. Backward pass (Compute gradients)
         # Optionally visualize autograd graph before backward to avoid retaining graph twice
         if self.opt.visualize_graph and self.step % self.opt.visualize_graph_interval == 0:
-            graph_visualize_path = os.path.join(self.opt.outdir, f"visualizations", f"total_loss")
-            os.makedirs(graph_visualize_path, exist_ok=True)
-            params = {n: p for n, p in self.renderers[0].gaussians.named_parameters() if p.requires_grad}
-            make_dot(total_loss, params=params).render(os.path.join(graph_visualize_path, f"step_{self.step}"), format="png")
+            graph_visualize_path = os.path.join(self.opt.outdir, f"visualizations", f"loss_graph")
+            
+            with torch.no_grad():
+                os.makedirs(graph_visualize_path, exist_ok=True)
+                params = {n: p for n, p in self.renderers[0].gaussians.named_parameters() if p.requires_grad}
+                make_dot(total_loss, params=params).render(os.path.join(graph_visualize_path, f"total_loss_step_{self.step}"), format="png")
+                make_dot(attraction_loss, params=params).render(os.path.join(graph_visualize_path, f"attraction_loss_step_{self.step}"), format="png")
+                make_dot(repulsion_loss, params=params).render(os.path.join(graph_visualize_path, f"repulsion_loss_step_{self.step}"), format="png")
 
         total_loss.backward()
             
@@ -380,7 +384,7 @@ class GUI:
                         self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
                     )  # [V, N, 3, H, W]
                     # fidelity
-                    fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type)
+                    fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images, multi_view_type=self.opt.multi_view_type)
                     # compute inter- and intra-particle diversity
                     inter_particle_diversity_mean, inter_particle_diversity_std = self.metrics_calculator.compute_inter_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
                     intra_particle_diversity_mean, intra_particle_diversity_std = self.metrics_calculator.compute_intra_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
