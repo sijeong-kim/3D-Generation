@@ -22,6 +22,9 @@ from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from loss_utils import rbf_kernel_and_grad
 
+# from torch.autograd import grad
+from torchviz import make_dot
+
 class GUI:
     def __init__(self, opt):
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -95,7 +98,7 @@ class GUI:
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
                 
         # visualizer
-        if self.opt.visualize:
+        if self.opt.visualize or self.opt.metrics:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
@@ -146,7 +149,7 @@ class GUI:
         )
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, multi_view_type=self.opt.multi_view_type)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, multi_view_type=self.opt.multi_view_type, feature_extractor=self.feature_extractor)
         else:
             self.metrics_calculator = None
 
@@ -222,6 +225,12 @@ class GUI:
             score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
             score_gradients = score_gradients.detach()
             
+            # # keep graph from latents → decode → features
+            # latents = latents.detach().requires_grad_(True) 
+            # images = self.guidance_sd.decode_latents(latents) # [N, 3, H, W] in [0, 1]
+            # images = F.interpolate(images, size=render_resolution, mode="bilinear", align_corners=False)
+            # features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
+            
             # 2. RBF kernel computation
             rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(
                 features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
@@ -230,10 +239,14 @@ class GUI:
             # 3. Attraction loss (SVGD)
             v = torch.einsum('ij,jchw->ichw', rbf_kernel, score_gradients)  # [N,4,64,64]  
             target = (latents - v).detach()
-            attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            
+            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+            # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+            attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (same as before)
-            repulsion_loss = (rbf_kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = (rbf_kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
@@ -243,7 +256,7 @@ class GUI:
             # 1. SDS loss (latent space)
             score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
             score_gradients = score_gradients.detach()
-
+            
             # 2. RBF kernel gradient wrt features
             rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(
                 features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
@@ -251,29 +264,58 @@ class GUI:
             
             # 3. Attraction loss (SDS) + 1/D_latent
             target = (latents - score_gradients).detach()
-            attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            
+            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+            # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+            attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (Repulsion)
-            repulsion_loss = (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            # repulsion_loss = torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
+            repulsion_loss = (rbf_kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
         else:
-            sds_loss = self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
-            repulsion_loss = torch.tensor(0.0, device=images.device)
-            attraction_loss = sds_loss # [1]
+            # sds_loss = self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
             
+            # [TRIAL 1] try to use per-sample attraction loss
+            # sds_losses = []
+            # for j in range(self.opt.num_particles):
+            #     sds_j = self.guidance_sd.train_step_for_baseline(
+            #         images[j:j+1],  # per-particle
+            #         step_ratio=step_ratio if self.opt.anneal_timestep else None
+            #     )
+            #     sds_losses.append(sds_j) # [N]
+
+            # attraction_loss = torch.stack(sds_losses).mean() # [N] -> [1]
+            
+            # [TRIAL 2]
+            # batched UNet, per-sample SDS
+            score_gradients, latents = self.guidance_sd.train_step_gradient(
+                images, step_ratio=step_ratio if self.opt.anneal_timestep else None
+            )  # score_gradients, latents: [N, 4, 64, 64]
+
+            target = (latents - score_gradients).detach()
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+            attraction_loss = per_sample_attraction_loss.mean()
+
+            repulsion_loss = torch.tensor(0.0, device=images.device)
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
 
         ### optimize step ### 
         
         # 2. Backward pass (Compute gradients)
+        # Optionally visualize autograd graph before backward to avoid retaining graph twice
+        if self.opt.visualize_graph and self.step % self.opt.visualize_graph_interval == 0:
+            graph_visualize_path = os.path.join(self.opt.outdir, f"visualizations", f"total_loss")
+            os.makedirs(graph_visualize_path, exist_ok=True)
+            params = {n: p for n, p in self.renderers[0].gaussians.named_parameters() if p.requires_grad}
+            make_dot(total_loss, params=params).render(os.path.join(graph_visualize_path, f"step_{self.step}"), format="png")
+
         total_loss.backward()
-        
+            
         # 3. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
             self.optimizers[j].step()
@@ -327,18 +369,18 @@ class GUI:
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(
                         self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
                     )  # [V, N, 3, H, W]
-                    representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type)
-                    fidelity = float(clip_similarities.mean().item())
-                    rep_features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, representative_images).to(self.device)  # [V, N, D]
-                    diversity = float(self.metrics_calculator.compute_rlsd_diversity(rep_features))
+                    # fidelity
+                    fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type)
+                    # compute inter- and intra-particle diversity
+                    inter_particle_diversity_mean, inter_particle_diversity_std = self.metrics_calculator.compute_inter_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
+                    intra_particle_diversity_mean, intra_particle_diversity_std = self.metrics_calculator.compute_intra_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
                 else:
-                    fidelity, diversity = 0.0, 0.0  # or skip logging these
+                    fidelity_mean, fidelity_std, inter_particle_diversity_mean, inter_particle_diversity_std, intra_particle_diversity_mean, intra_particle_diversity_std = 0.0, 0.0, 0.0, 0.0, None, None
                     
                 # log
                 self.metrics_calculator.log_metrics(
                     step=self.step,
-                    diversity=diversity,
-                    fidelity=fidelity,
+
                     attraction_loss=attraction_loss_val,
                     repulsion_loss=repulsion_loss_val,
                     scaled_attraction_loss=scaled_attraction_loss_val,
@@ -347,13 +389,21 @@ class GUI:
                     time=t,
                     memory_allocated_mb=memory_allocated,
                     max_memory_allocated_mb=max_memory_allocated,
+                    
+                    inter_particle_diversity_mean=inter_particle_diversity_mean,
+                    intra_particle_diversity_mean=intra_particle_diversity_mean,
+                    inter_particle_diversity_std=inter_particle_diversity_std,
+                    intra_particle_diversity_std=intra_particle_diversity_std,
+                    fidelity_mean=fidelity_mean,
+                    fidelity_std=fidelity_std,
                 )
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
+                # if self.step % self.opt.save_multi_viewpoints_interval == 0 and self.step >= 1000 and self.step <= 1300: # save at least 1000 steps
+                #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=True, save_iid=False)
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
@@ -500,14 +550,15 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters:
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+        # # Multi-viewpoints for 30 fps video (save at the end of training)
+        # if self.opt.visualize and self.visualizer is not None and self.step == self.opt.iters:
+        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
 
         # save model
-        for j in range(self.opt.num_particles):
-            self.save_model(mode='model', particle_id=j)
-            self.save_model(mode='geo+tex', particle_id=j)
+        if self.opt.save_model:
+            for j in range(self.opt.num_particles):
+                self.save_model(mode='model', particle_id=j)
+                self.save_model(mode='geo+tex', particle_id=j)
         
 
 if __name__ == "__main__":
