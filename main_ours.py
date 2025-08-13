@@ -149,7 +149,7 @@ class GUI:
         )
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, multi_view_type=self.opt.multi_view_type, feature_extractor=self.feature_extractor)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
         else:
             self.metrics_calculator = None
 
@@ -384,7 +384,7 @@ class GUI:
                         self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
                     )  # [V, N, 3, H, W]
                     # fidelity
-                    fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images, multi_view_type=self.opt.multi_view_type)
+                    fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
                     # compute inter- and intra-particle diversity
                     inter_particle_diversity_mean, inter_particle_diversity_std = self.metrics_calculator.compute_inter_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
                     intra_particle_diversity_mean, intra_particle_diversity_std = self.metrics_calculator.compute_intra_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
