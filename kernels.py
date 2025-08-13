@@ -1,9 +1,94 @@
-# loss_utils.py
+# kernel_utils.py
 import torch
 import torch.nn.functional as F
 
-@torch.no_grad()
 def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
+    """
+    Compute RBF kernel matrix and its gradients.
+    
+    Args:
+        features: [N, D] tensor of feature vectors
+        tau: kernel bandwidth
+        normalize: whether to normalize features
+    
+    Returns:
+        K: [N, N] kernel matrix where K[i,j] = k(x_j, x_i)
+        K_grad: [N,  D_feature] kernel gradients where K_grad[i,j] = ∇_{x_j} (∑ over j k(x_j, x_i)) or ∇_{x_j} log(∑ over j k(x_j, x_i))
+    """
+    N, D_feature = features.shape
+    
+    # features: [N, D]
+    z_i = features.unsqueeze(1)           # [N,1,D]
+    z_j = features.unsqueeze(0)           # [1,N,D]
+    sq = (z_i - z_j).pow(2).sum(-1)       # [N,N]
+
+    h = (tau**2 if tau > 0 else (sq[~torch.eye(N, dtype=torch.bool, device=features.device)].median()
+        / torch.log(torch.tensor(N+1.0, device=features.device)))).clamp_min(1e-6)
+
+    K = torch.exp(-sq / h)                # [N,N]
+    
+    if repulsion_type == "svgd":
+        S = K.sum()                       # scalar
+    elif repulsion_type == "rlsd":
+        s_i = torch.log(K.sum(dim=1) + 1e-9)  # [N]
+        S = s_i.sum()                         # scalar
+
+    # Autograd gradient wrt features (keeps graph)
+    repulsion_grad = torch.autograd.grad(S, features, create_graph=True)[0]  # [N,D]
+    
+    return K, repulsion_grad
+
+    # # Repulsion loss (same form you used)
+    # repulsion_loss = (repulsion_grad * features).sum(dim=1).mean()
+
+
+def cosine_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
+    """
+    Compute cosine-similarity-based kernel matrix and its gradients.
+
+    Args:
+        features: [N, D] tensor of feature vectors
+        tau: temperature (>0). smaller -> sharper kernel
+        repulsion_type: "svgd" or "rlsd"
+
+    Returns:
+        K: [N, N] kernel matrix where K[i,j] = exp(cos(x_i, x_j) / tau)
+        repulsion_grad: [N, D] = ∇_{features} S
+                         (S = sum_ij K_ij for 'svgd';
+                          S = sum_i log sum_j K_ij for 'rlsd')
+    """
+    assert tau is not None and tau > 0, "tau must be > 0 for cosine kernel"
+    N, D = features.shape
+    eps = 1e-9
+
+    # 1) 코사인 유사도 행렬 C = \hat z \hat z^T
+    z = features
+    z_norm = z / (z.norm(dim=1, keepdim=True) + eps)   # [N, D]
+    C = (z_norm @ z_norm.t()).clamp(-1 + 1e-7, 1 - 1e-7)  # [N, N]
+
+    # 2) 항상 양수/PSD로 만들기 위해 exponentiated cosine kernel 사용
+    #    K[i,j] = exp( cos(x_i, x_j) / tau )
+    inv_tau = 1.0 / torch.clamp(torch.tensor(tau, dtype=z.dtype, device=z.device), min=1e-6)
+    K = torch.exp(C * inv_tau)
+
+    # 3) 스칼라 S 구성 (RBF 버전과 동일한 목적식 구조)
+    if repulsion_type == "svgd":
+        S = K.sum()
+    elif repulsion_type == "rlsd":
+        # log(sum_j K_ij) = logsumexp_j( C_ij / tau )
+        s_i = torch.logsumexp(C * inv_tau, dim=1)  # [N]
+        S = s_i.sum()
+    else:
+        raise ValueError("repulsion_type must be 'svgd' or 'rlsd'")
+
+    # 4) 특징에 대한 그래디언트 (autograd)
+    repulsion_grad = torch.autograd.grad(S, features, create_graph=True)[0]
+    return K, repulsion_grad
+
+
+
+@torch.no_grad()
+def rbf_kernel_and_grad_old(features, tau=0.5, repulsion_type="svgd"):
     """
     Compute RBF kernel matrix and its gradients.
     
@@ -98,7 +183,7 @@ if __name__ == "__main__":
 
 
 ########################################################
-# # loss_utils.py
+# # kernel_utils.py
 # import torch
 # import torch.nn.functional as F
 
@@ -135,7 +220,7 @@ if __name__ == "__main__":
 
 
 ########################
-# # loss_utils.py
+# # kernel_utils.py
 # import torch
 # import torch.nn.functional as F
 

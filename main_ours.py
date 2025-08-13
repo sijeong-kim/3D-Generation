@@ -20,7 +20,7 @@ from visualizer import GaussianVisualizer
 from metrics import MetricsCalculator
 from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
-from loss_utils import rbf_kernel_and_grad
+from kernel_utils import rbf_kernel_and_grad, cosine_kernel_and_grad
 
 # from torch.autograd import grad
 from torchviz import make_dot
@@ -232,12 +232,17 @@ class GUI:
             # features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
             
             # 2. RBF kernel computation
-            rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(
-                features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-            )  # rbf_kernel:[N,N], rbf_kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
+            if self.opt.kernel_type == 'rbf':
+                kernel, kernel_grad = rbf_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_grad = cosine_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
             
             # 3. Attraction loss (SVGD)
-            v = torch.einsum('ij,jchw->ichw', rbf_kernel, score_gradients)  # [N,4,64,64]  
+            v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
             target = (latents - v).detach()
             
             # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
@@ -246,7 +251,7 @@ class GUI:
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (same as before)
-            repulsion_loss = (rbf_kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
@@ -258,9 +263,14 @@ class GUI:
             score_gradients = score_gradients.detach()
             
             # 2. RBF kernel gradient wrt features
-            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(
-                features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-            ) # rbf_kernel:[N,N], rbf_kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j) / k(x_i,x_j)
+            if self.opt.kernel_type == 'rbf':
+                kernel, kernel_log_grad = rbf_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                ) # kernel:[N,N], kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}log(k(x_i,x_j))
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_log_grad = cosine_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                ) # kernel:[N,N], kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}log(k(x_i,x_j))
             
             # 3. Attraction loss (SDS) + 1/D_latent
             target = (latents - score_gradients).detach()
@@ -271,7 +281,7 @@ class GUI:
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (Repulsion)
-            repulsion_loss = (rbf_kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
