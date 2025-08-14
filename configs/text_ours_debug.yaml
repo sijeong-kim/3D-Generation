@@ -94,15 +94,14 @@ debug_003:
   sweep_parameters:
     repulsion_type: ['svgd']  # Test svgd only
     repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
-    lambda_sd: [0.01]                      # 0.01~0.1 (increase after being stable)
     grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
-
+    lambda_sd: [0.1]                      # 0.01~0.1 (increase after being stable)
+    lambda_repulsion: [1000]               # Single value
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
     num_views: [8]                         # Ultra minimal views for debugging
-    lambda_repulsion: [1000]               # Single value
     kernel_type: ['cosine']
     repulsion_scale: [1.0]                   # scale for repulsive loss
     feature_layer: [6]                     # Single layer
@@ -123,20 +122,21 @@ debug_003:
 
 
 debug_004:
-  name: cosine_kernel_visualize
+  name: cosine_kernel_viz
   method: grid
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd', 'wo']
     repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
-    lambda_sd: [0.01]                      # 0.01~0.1 (increase after being stable)
+    lambda_sd: [1]                      # 0.01~0.1 (increase after being stable)
     grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
+    lambda_repulsion: [1000]               # Single value
+
 
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
     num_views: [8]                         # Ultra minimal views for debugging
-    lambda_repulsion: [1000]               # Single value
     repulsion_scale: [1.0]                   # scale for repulsive loss
     feature_layer: [11]                     # Single layer
     kernel_type: ['cosine']

@@ -40,7 +40,7 @@ class GUI:
         self.need_update = True  # update buffer_image
 
         # models
-        self.device = torch.device("cuda")
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.bg_remover = None
 
         self.guidance_sd = None
@@ -117,7 +117,7 @@ class GUI:
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.benchmark = False
 
     def prepare_train(self):
 
@@ -260,14 +260,13 @@ class GUI:
                 score_gradients32 = torch.clamp(score_gradients32, -self.opt.grad_clip, self.opt.grad_clip)
 
                 # (4) 필요시 1/N 평균화(행정규화면 이미 sum=1이지만, 추가 완충 효과)
-                N = features.shape[0]
-                v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32) / N
+                # N = features.shape[0]
+                # v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32) / N
+                v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32)
                 
                 latents32 = latents.float()
                 target = (latents32 - v).detach()
-                per_sample_attraction_loss = 0.5 * F.mse_loss(
-                    latents32, target, reduction='none'
-                ).view(self.opt.num_particles, -1).sum(dim=1)
+                per_sample_attraction_loss = 0.5 * F.mse_loss(latents32, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)
                 attraction_loss = per_sample_attraction_loss.mean()
 
             elif self.opt.kernel_type == 'rbf':
