@@ -140,8 +140,8 @@ debug_004:
     repulsion_scale: [1.0]                   # scale for repulsive loss
     feature_layer: [11]                     # Single layer
     kernel_type: ['cosine']
-    iters: [1500]                                # Very short for debugging (~2-4 min per run)
-
+    iters: [1200]                              
+    
   settings:
     visualize: true
     save_iid: false

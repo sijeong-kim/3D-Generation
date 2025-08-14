@@ -13,7 +13,7 @@ imageio-ffmpeg
 omegaconf
 
 # Deep learning dependencies
-torch>=2.0.0
+# torch>=2.0.0
 einops
 plyfile
 pygltflib
@@ -27,8 +27,8 @@ diffusers
 accelerate
 transformers
 timm
-torchvision
-xformers
+# torchvision
+# xformers
 
 # 3D mesh processing
 xatlas 
@@ -46,3 +46,5 @@ lpips
 # Development tools
 notebook
 ipykernel
+
+trimesh
