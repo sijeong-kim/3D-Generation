@@ -155,38 +155,78 @@ debug_004:
     efficiency_interval: 10       
          # Less frequent for memory
 
+
+
 debug_005:
-  name: wo
+  name: rbf_kernel_viz
   method: grid
   sweep_parameters:
-    repulsion_type: ['wo']  # Test rlsd only
+    repulsion_type: ['svgd', 'rlsd', 'wo']
+    repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
+    lambda_sd: [1]                      # 0.01~0.1 (increase after being stable)
+    grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
+    lambda_repulsion: [1000]               # Single value
+
 
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [4]                         # Ultra minimal views for debugging
-    repulsion_tau: [0]
-    lambda_sd: [1.0]
-    lambda_repulsion: [1.0]                # Single value
-    feature_layer: [6]                     # Single layer
+    num_views: [8]                         # Ultra minimal views for debugging
+    repulsion_scale: [1.0]                   # scale for repulsive loss
+    feature_layer: [11]                     # Single layer
     kernel_type: ['rbf']
-    iters: [500]                                # Very short for debugging (~2-4 min per run)
-
+    iters: [1200]                              
+    
   settings:
     visualize: true
-    save_iid: true
+    save_iid: false
     save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 1000     # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
     visualize_graph: false # save graph for debugging
     visualize_graph_interval: 100
     metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 50     # Less frequent metrics
-    losses_interval: 25                    # Less frequent for memory
-    efficiency_interval: 25               # Less frequent for memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10       
+         # Less frequent for memory
 
 
 debug_006:
+  name: rbf_cosine_kernel_viz
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd', 'wo']
+    repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
+    lambda_sd: [1]                      # 0.01~0.1 (increase after being stable)
+    grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
+    lambda_repulsion: [1000]               # Single value
+
+
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
+    num_views: [8]                         # Ultra minimal views for debugging
+    repulsion_scale: [1.0]                   # scale for repulsive loss
+    feature_layer: [11]                     # Single layer
+    kernel_type: ['rbf', 'cosine']
+    iters: [1200]                              
+    
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
+    visualize_graph: false # save graph for debugging
+    visualize_graph_interval: 100
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10       
+    # Less frequent for memory
+
+debug_007:
   name: svgd_rlsd_wo_graph_viz
   method: grid
   sweep_parameters:
@@ -216,7 +256,7 @@ debug_006:
     losses_interval: 25                    # Less frequent for memory
     efficiency_interval: 25         
 
-debug_002:
+debug_008:
   name: save_features_from_different_layers
   method: grid
   sweep_parameters:
