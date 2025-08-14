@@ -20,7 +20,10 @@ from visualizer import GaussianVisualizer
 from metrics import MetricsCalculator
 from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
-from loss_utils import rbf_kernel_and_grad
+from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
+
+# from torch.autograd import grad
+from torchviz import make_dot
 
 class GUI:
     def __init__(self, opt):
@@ -37,7 +40,7 @@ class GUI:
         self.need_update = True  # update buffer_image
 
         # models
-        self.device = torch.device("cuda")
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.bg_remover = None
 
         self.guidance_sd = None
@@ -95,7 +98,7 @@ class GUI:
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
                 
         # visualizer
-        if self.opt.visualize:
+        if self.opt.visualize or self.opt.metrics:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
@@ -114,7 +117,7 @@ class GUI:
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.benchmark = False
 
     def prepare_train(self):
 
@@ -146,7 +149,7 @@ class GUI:
         )
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, multi_view_type=self.opt.multi_view_type)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
         else:
             self.metrics_calculator = None
 
@@ -222,58 +225,136 @@ class GUI:
             score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
             score_gradients = score_gradients.detach()
             
+            # # keep graph from latents → decode → features
+            # latents = latents.detach().requires_grad_(True) 
+            # images = self.guidance_sd.decode_latents(latents) # [N, 3, H, W] in [0, 1]
+            # images = F.interpolate(images, size=render_resolution, mode="bilinear", align_corners=False)
+            # features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
+            
             # 2. RBF kernel computation
-            rbf_kernel, rbf_kernel_grad = rbf_kernel_and_grad(
-                features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-            )  # rbf_kernel:[N,N], rbf_kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
+            if self.opt.kernel_type == 'rbf':
+                kernel, kernel_grad = rbf_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_grad = cosine_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
             
-            # 3. Attraction loss (SVGD)
-            v = torch.einsum('ij,jchw->ichw', rbf_kernel, score_gradients)  # [N,4,64,64]  
-            target = (latents - v).detach()
-            attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
             
+            #########################################################
+            # Stablize (SVGD)
+            
+            if self.opt.kernel_type == 'cosine':
+                eps = 1e-6
+                # (1) 행 정규화 (row-stochastic). softmax 써도 됨.
+                kernel_norm = kernel / (kernel.sum(dim=1, keepdim=True) + eps)
+                # 대안: K_norm = torch.softmax(K / max(self.opt.repulsion_tau, 1e-6), dim=1)
+
+                # (2) v = Σ_j w_ij * φ(x_j). 커널에는 grad 안 흐르게 detach 권장 (SVGD 구현 관행)
+                #    그리고 모든 계산은 float32에서!
+                score_gradients32 = score_gradients.float()
+                kernel_norm32 = kernel_norm.detach().float()
+
+                # (3) 스코어 그라드 클리핑/정규화 (폭주 방지)
+                score_gradients32 = torch.clamp(score_gradients32, -self.opt.grad_clip, self.opt.grad_clip)
+
+                # (4) 필요시 1/N 평균화(행정규화면 이미 sum=1이지만, 추가 완충 효과)
+                # N = features.shape[0]
+                # v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32) / N
+                v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32)
+                
+                latents32 = latents.float()
+                target = (latents32 - v).detach()
+                per_sample_attraction_loss = 0.5 * F.mse_loss(latents32, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)
+                attraction_loss = per_sample_attraction_loss.mean()
+
+            elif self.opt.kernel_type == 'rbf':
+                # 3. Attraction loss (SVGD)
+                v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
+                target = (latents - v).detach()
+                
+                # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+                # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+                per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+                attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
+                
+            #########################################################
             # 4. Repulsion loss (same as before)
-            repulsion_loss = (rbf_kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = self.opt.repulsion_scale * (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
             
+            if self.opt.kernel_type == 'cosine':
+                if self.step % 10 == 0:
+                    print(
+                        "||grad||:", score_gradients32.flatten(1).norm(dim=1).mean().item(),
+                        "sum(K_row):", kernel_norm32.sum(dim=1).mean().item(),
+                        "||v||:", v.flatten(1).norm(dim=1).mean().item(),
+                        "latents range:", latents32.min().item(), latents32.max().item()
+                    )
+            
         elif self.opt.repulsion_type == 'rlsd': 
             # 1. SDS loss (latent space)
             score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
             score_gradients = score_gradients.detach()
-
+            
             # 2. RBF kernel gradient wrt features
-            rbf_kernel, rbf_kernel_log_grad = rbf_kernel_and_grad(
-                features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-            ) # rbf_kernel:[N,N], rbf_kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j) / k(x_i,x_j)
+            if self.opt.kernel_type == 'rbf':
+                kernel, kernel_log_grad = rbf_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                ) # kernel:[N,N], kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}log(k(x_i,x_j))
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_log_grad = cosine_kernel_and_grad(
+                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
+                ) # kernel:[N,N], kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}log(k(x_i,x_j))
             
             # 3. Attraction loss (SDS) + 1/D_latent
             target = (latents - score_gradients).detach()
-            attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            
+            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+            # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+            attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (Repulsion)
-            repulsion_loss = (rbf_kernel_log_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            # repulsion_loss = torch.einsum('nd,nd->n', rbf_kernel_log_grad, features).mean()
+            repulsion_loss = self.opt.repulsion_scale * (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             total_loss = scaled_attraction_loss - scaled_repulsion_loss
         else:
-            sds_loss = self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
+            # batched UNet, per-sample SDS
+            score_gradients, latents = self.guidance_sd.train_step_gradient(
+                images, step_ratio=step_ratio if self.opt.anneal_timestep else None
+            )  # score_gradients, latents: [N, 4, 64, 64]
+
+            target = (latents - score_gradients).detach()
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+            attraction_loss = per_sample_attraction_loss.mean()
+
             repulsion_loss = torch.tensor(0.0, device=images.device)
-            attraction_loss = sds_loss # [1]
-            
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss
 
         ### optimize step ### 
         
         # 2. Backward pass (Compute gradients)
+        # Optionally visualize autograd graph before backward to avoid retaining graph twice
+        if self.opt.visualize_graph and self.step % self.opt.visualize_graph_interval == 0:
+            graph_visualize_path = os.path.join(self.opt.outdir, f"visualizations", f"loss_graph")
+            
+            with torch.no_grad():
+                os.makedirs(graph_visualize_path, exist_ok=True)
+                params = {n: p for n, p in self.renderers[0].gaussians.named_parameters() if p.requires_grad}
+                make_dot(total_loss, params=params).render(os.path.join(graph_visualize_path, f"total_loss_step_{self.step}"), format="png")
+                make_dot(attraction_loss, params=params).render(os.path.join(graph_visualize_path, f"attraction_loss_step_{self.step}"), format="png")
+                make_dot(repulsion_loss, params=params).render(os.path.join(graph_visualize_path, f"repulsion_loss_step_{self.step}"), format="png")
+
         total_loss.backward()
-        
+            
         # 3. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
             self.optimizers[j].step()
@@ -327,33 +408,58 @@ class GUI:
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(
                         self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
                     )  # [V, N, 3, H, W]
-                    representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, multi_view_type=self.opt.multi_view_type)
-                    fidelity = float(clip_similarities.mean().item())
-                    rep_features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, representative_images).to(self.device)  # [V, N, D]
-                    diversity = float(self.metrics_calculator.compute_rlsd_diversity(rep_features))
+                    # fidelity
+                    fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
+                    # compute inter-particle diversity 
+                    inter_particle_diversity_mean, inter_particle_diversity_std = self.metrics_calculator.compute_inter_particle_diversity_in_multi_viewpoints_stats(multi_view_images)
+                    # Compute cross-view consistency
+                    cross_view_consistency_mean, cross_view_consistency_std = self.metrics_calculator.compute_cross_view_consistency_stats(multi_view_images)
+                    if self.opt.enable_lpips:
+                        # LPIPS (inter-sample and cross-view consistency)
+                        lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std = self.metrics_calculator.compute_lpips_inter_and_consistency(multi_view_images)
                 else:
-                    fidelity, diversity = 0.0, 0.0  # or skip logging these
+                    fidelity_mean, fidelity_std, inter_particle_diversity_mean, inter_particle_diversity_std, cross_view_consistency_mean, cross_view_consistency_std = None, None, None, None, None, None
+                    lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std = None, None, None, None
                     
                 # log
                 self.metrics_calculator.log_metrics(
+                    # efficiency
                     step=self.step,
-                    diversity=diversity,
-                    fidelity=fidelity,
-                    attraction_loss=attraction_loss_val,
-                    repulsion_loss=repulsion_loss_val,
-                    scaled_attraction_loss=scaled_attraction_loss_val,
-                    scaled_repulsion_loss=scaled_repulsion_loss_val,
-                    total_loss=total_loss_val,
-                    time=t,
-                    memory_allocated_mb=memory_allocated,
-                    max_memory_allocated_mb=max_memory_allocated,
+                    efficiency= {
+                        "time": t,
+                        "memory_allocated_mb": memory_allocated,
+                        "max_memory_allocated_mb": max_memory_allocated,
+                    },
+                    # losses
+                    losses= {
+                        "attraction_loss": attraction_loss_val,
+                        "repulsion_loss": repulsion_loss_val,
+                        "scaled_attraction_loss": scaled_attraction_loss_val,
+                        "scaled_repulsion_loss": scaled_repulsion_loss_val,
+                        "total_loss": total_loss_val,
+                    },
+                    # metrics
+                    metrics= {
+                        "fidelity_mean": fidelity_mean,
+                        "fidelity_std": fidelity_std,
+                        "inter_particle_diversity_mean": inter_particle_diversity_mean,
+                        "inter_particle_diversity_std": inter_particle_diversity_std,
+                        "cross_view_consistency_mean": cross_view_consistency_mean,
+                        "cross_view_consistency_std": cross_view_consistency_std,
+                        # LPIPS
+                        "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
+                        "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
+                        "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
+                        "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
+                    }
                 )
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.step % self.opt.save_rendered_images_interval == 0:
                     self.visualizer.save_rendered_images(self.step, images)
-                    # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
+                # if self.step % self.opt.save_multi_viewpoints_interval == 0 and self.step >= 1000 and self.step <= 1300: # save at least 1000 steps
+                #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=True, save_iid=False)
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
@@ -500,15 +606,15 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters:
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+        # # Multi-viewpoints for 30 fps video (save at the end of training)
+        # if self.opt.visualize and self.visualizer is not None and self.step == self.opt.iters:
+        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
 
         # save model
-        for j in range(self.opt.num_particles):
-            self.save_model(mode='model', particle_id=j)
-            self.save_model(mode='geo+tex', particle_id=j)
-        
+        if self.opt.save_model:
+            for j in range(self.opt.num_particles):
+                self.save_model(mode='model', particle_id=j)
+                self.save_model(mode='geo+tex', particle_id=j)
 
 if __name__ == "__main__":
     import argparse

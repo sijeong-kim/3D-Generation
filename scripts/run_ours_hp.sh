@@ -2,7 +2,7 @@
 #SBATCH --job-name=hp
 #SBATCH --partition=AMD7-A100-T 
 #SBATCH --gres=gpu:1
-#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-type=ALL
 #SBATCH --mail-user=sk2324@ic.ac.uk
 #SBATCH --output=outputs/%j/output.out
 #SBATCH --error=outputs/%j/error.err

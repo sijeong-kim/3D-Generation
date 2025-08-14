@@ -34,8 +34,8 @@ exp_001:
   method: grid
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd', 'wo']  # Main ablation
-    feature_layer: [2, 6, 10]              # Architecture ablation
-    lambda_repulsion: [1, 100, 10000]      # Wide range (log scale)
+    feature_layer: [3, 6, 11]              # Architecture ablation
+    lambda_repulsion: [1, 100, 1000, 10000]      # Wide range (log scale)
   
   fixed_parameters:
     seed: [42, 123, 456]                   # Multiple seeds for statistical significance
@@ -46,17 +46,17 @@ exp_001:
     repulsion_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
-    iters: [1200]                          # ~25-35 min per run
+    iters: [1500]                          # ~25-35 min per run
 
   settings:
     visualize: true
     save_iid: false
-    save_rendered_images_interval: 200
-    save_multi_viewpoints_interval: 500
+    save_rendered_images_interval: 100
+    save_multi_viewpoints_interval: 100
     metrics: true
-    quantitative_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10
+    quantitative_metrics_interval: 25
+    losses_interval: 25
+    efficiency_interval: 25
 
 # Stage 2: Fine-grained search around best coarse results
 # COST ESTIMATE:
@@ -73,10 +73,10 @@ exp_002:
     # Focus on best performing method from exp_001
     repulsion_type: ['svgd']  # Assume SVGD performed best
     feature_layer: [6]        # Assume layer 6 performed best
-    lambda_repulsion: [50, 75, 100, 125, 150, 200, 250]  # Fine-grained around best value
+    lambda_repulsion: [500, 700, 900, 1000, 1100, 1200, 1300, 1400, 1500]  # Fine-grained around best value
   
   fixed_parameters:
-    seed: [42, 123, 456, 789, 999]  # More seeds for final evaluation
+    seed: [42]  # More seeds for final evaluation
     prompts: ["a photo of a hamburger"]
     num_particles: [4]
     multi_view_type: ['average_views']
@@ -95,6 +95,45 @@ exp_002:
     quantitative_metrics_interval: 25
     losses_interval: 10
     efficiency_interval: 10
+
+# Stage 6: Visaulize features from different layers
+# COST ESTIMATE:
+#   Total combinations: 3 × 4 × 3 = 36 runs
+#   Time per run: ~30-45 min (1500 iters)
+#   Total time: ~18-27 hours
+#   GPU memory: ~8-15GB peak (varies with num_views)
+#   Storage: ~3-5GB per run (36 runs ≈ 108-180GB total)
+#   Recommended SLURM: --time=30:00:00 --mem=16G --gres=gpu:1
+exp_002:
+  name: visualize_features_from_different_layers
+  method: grid
+  sweep_parameters:
+    feature_layer: [3, 6, 11]
+  
+  fixed_parameters:
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    repulsion_type: ['svgd', 'rlsd', 'wo']
+    lambda_repulsion: [700]
+    num_particles: [8]
+    multi_view_type: ['average_views']
+    num_views: [8]
+    repulsion_tau: [0]
+    lambda_sd: [1.0]
+    kernel_type: ['rbf']
+    iters: [1500]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rep_features: true # save features from different layers
+    save_rep_features_interval: 100
+    save_rendered_images_interval: 100
+    save_multi_viewpoints_interval: 100
+    metrics: true
+    quantitative_metrics_interval: 25
+    losses_interval: 25
+    efficiency_interval: 25
 
 # Stage 3: Multi-prompt generalization test
 # COST ESTIMATE:
@@ -190,7 +229,7 @@ exp_005:
   name: multi_view_consistency_analysis
   method: grid
   sweep_parameters:
-    multi_view_type: ['best_views', 'average_views', 'cross_attention_views']  # CLIP fidelity strategies
+    multi_view_type: ['average_views']  # CLIP fidelity strategies
     num_views: [4, 8, 16, 32]              # Multi-view consistency analysis
   
   fixed_parameters:
@@ -215,12 +254,3 @@ exp_005:
     quantitative_metrics_interval: 25      # Frequent metrics for consistency analysis
     losses_interval: 10
     efficiency_interval: 10
-
-# Stage 6: REMOVED - CLIP model comparison not needed
-# REASONING: OpenCLIP is the established SOTA standard for 3D generation (2024)
-# - All major papers use OpenCLIP ViT-G/14 or ViT-bigG-14
-# - HuggingFace CLIP is legacy and not competitive
-# - Main metrics.py only supports OpenCLIP anyway
-# - Focus computational resources on more important experiments
-#
-# COST SAVINGS: 6 runs saved, ~3-4.5 hours saved, ~18-24GB storage saved

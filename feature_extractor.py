@@ -88,7 +88,7 @@ class DINOv2MultiLayerFeatureExtractor:
         # }
         
 
-    def extract_cls_from_layer(self, layer_idx, images):
+    def extract_cls_from_layer(self, layer_idx, images): # [B, 3, H, W] in [0, 1]
         """Register hook to extract CLS token from specified layer."""
         cls_output = {}
 
@@ -117,8 +117,9 @@ class DINOv2MultiLayerFeatureExtractor:
         _ = self.model(**inputs) # no detach to allow gradient flow
         handle.remove()
 
-        return F.normalize(cls_output['value'], dim=-1) # grad will flow back to the images
+        return F.normalize(cls_output['value'], dim=-1) # grad will flow back to the images # [B, D_latent] = [B, 768]
 
+        
     @torch.no_grad()
     def extract_attention_from_layer(self, layer_idx, images):
         """Register hook to extract attention maps from specified layer."""
@@ -159,7 +160,7 @@ class DINOv2MultiLayerFeatureExtractor:
             _ = self.model(**inputs, output_attentions=True)
         handle.remove()
 
-        return attention_output.get('value', None)
+        return attention_output.get('value', None) # 
     
 
 def run_tsne_and_plot(features_list, labels, layer_ids, save_path="tsne_feature_layers.png"):

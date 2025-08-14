@@ -40,6 +40,7 @@ psutil
 seaborn
 torchmetrics[image]
 torch-fidelity
+torchviz
 lpips
 
 # Development tools

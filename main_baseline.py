@@ -261,14 +261,13 @@ class GUI:
             
                 # quantitative metrics
                 multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
-                representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, self.opt.multi_view_type) # [V, N, 3, H, W]
-
+                representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, self.opt.multi_view_type)
                 fidelity = clip_similarities.mean().item()
                 features = self.feature_extractor(representative_images) # [V, N, D_featture]
                 diversity = self.metrics_calculator.compute_rlsd_diversity(features)
 
                 # log
-                self.metrics_calculator.log_metrics(step=self.step, diversity=diversity, fidelity=fidelity, attraction_loss=attraction_loss_val, repulsion_loss=repulsion_loss_val, scaled_repulsion_loss = scaled_repulsion_loss_val, total_loss=total_loss_val, time=t, memory_allocated_mb=memory_allocated, max_memory_allocated_mb=max_memory_allocated)
+                self.metrics_calculator.log_metrics(step=self.step, diversity=diversity, fidelity=fidelity, attraction_loss=attraction_loss_val, repulsion_loss=repulsion_loss_val, scaled_repulsion_loss = scaled_repulsion_loss_val, total_loss=total_loss_val, time=t, memory_allocated_mb=memory_allocated, max_memory_allocated_mb=max_memory_allocated, diversity_intra=diversity_intra)
 
             # visualize
             if self.opt.visualize and self.visualizer is not None:
