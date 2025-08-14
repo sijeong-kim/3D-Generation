@@ -323,7 +323,7 @@ class GUI:
             repulsion_loss = self.opt.repulsion_scale * (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
         else:
             # batched UNet, per-sample SDS
             score_gradients, latents = self.guidance_sd.train_step_gradient(
