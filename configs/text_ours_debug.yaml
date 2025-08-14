@@ -89,25 +89,61 @@ debug_002:
 
 
 debug_003:
-  name: svgd_rlsd_cosine_kernel
+  name: svgd_cosine_kernel
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd']  # Test rlsd only
+    repulsion_type: ['svgd']  # Test svgd only
+    repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
+    lambda_sd: [0.01]                      # 0.01~0.1 (increase after being stable)
+    grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
 
   fixed_parameters:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
     num_views: [8]                         # Ultra minimal views for debugging
-    repulsion_tau: [0.1]
-    lambda_sd: [1.0]
-    lambda_repulsion: [1000]                # Single value
-    feature_layer: [6]                     # Single layer
+    lambda_repulsion: [1000]               # Single value
     kernel_type: ['cosine']
+    repulsion_scale: [1.0]                   # scale for repulsive loss
+    feature_layer: [6]                     # Single layer
     iters: [200]                                # Very short for debugging (~2-4 min per run)
 
   settings:
     visualize: false
+    save_iid: false
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
+    visualize_graph: false # save graph for debugging
+    visualize_graph_interval: 100
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10       
+         # Less frequent for memory
+
+
+debug_004:
+  name: cosine_kernel_visualize
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd', 'wo']
+    repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
+    lambda_sd: [0.01]                      # 0.01~0.1 (increase after being stable)
+    grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
+
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
+    num_views: [8]                         # Ultra minimal views for debugging
+    lambda_repulsion: [1000]               # Single value
+    repulsion_scale: [1.0]                   # scale for repulsive loss
+    feature_layer: [11]                     # Single layer
+    kernel_type: ['cosine']
+    iters: [1500]                                # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
     save_iid: false
     save_rendered_images_interval: 100      # Less frequent saves to reduce memory
     save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory

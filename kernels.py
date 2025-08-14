@@ -55,7 +55,7 @@ def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
     return K, grad_attractive # grad_attractive = ∇A
 
 
-def cosine_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
+def cosine_kernel_and_grad(features, tau=5, repulsion_type="svgd"): # tau = 2.0~5.0 soft, 0.1~0.5 sharp
     """
     Compute a cosine-similarity kernel matrix and its gradient w.r.t. the features.
 

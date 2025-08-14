@@ -241,21 +241,61 @@ class GUI:
                     features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
                 )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
             
-            # 3. Attraction loss (SVGD)
-            v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
-            target = (latents - v).detach()
             
-            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
-            # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
-            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
-            attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
+            #########################################################
+            # Stablize (SVGD)
             
+            if self.opt.kernel_type == 'cosine':
+                eps = 1e-6
+                # (1) 행 정규화 (row-stochastic). softmax 써도 됨.
+                kernel_norm = kernel / (kernel.sum(dim=1, keepdim=True) + eps)
+                # 대안: K_norm = torch.softmax(K / max(self.opt.repulsion_tau, 1e-6), dim=1)
+
+                # (2) v = Σ_j w_ij * φ(x_j). 커널에는 grad 안 흐르게 detach 권장 (SVGD 구현 관행)
+                #    그리고 모든 계산은 float32에서!
+                score_gradients32 = score_gradients.float()
+                kernel_norm32 = kernel_norm.detach().float()
+
+                # (3) 스코어 그라드 클리핑/정규화 (폭주 방지)
+                score_gradients32 = torch.clamp(score_gradients32, -self.opt.grad_clip, self.opt.grad_clip)
+
+                # (4) 필요시 1/N 평균화(행정규화면 이미 sum=1이지만, 추가 완충 효과)
+                N = features.shape[0]
+                v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32) / N
+                
+                latents32 = latents.float()
+                target = (latents32 - v).detach()
+                per_sample_attraction_loss = 0.5 * F.mse_loss(
+                    latents32, target, reduction='none'
+                ).view(self.opt.num_particles, -1).sum(dim=1)
+                attraction_loss = per_sample_attraction_loss.mean()
+
+            elif self.opt.kernel_type == 'rbf':
+                # 3. Attraction loss (SVGD)
+                v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
+                target = (latents - v).detach()
+                
+                # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+                # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
+                per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+                attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
+                
+            #########################################################
             # 4. Repulsion loss (same as before)
             repulsion_loss = self.opt.repulsion_scale * (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
             total_loss = scaled_attraction_loss + scaled_repulsion_loss
+            
+            if self.opt.kernel_type == 'cosine':
+                if self.step % 10 == 0:
+                    print(
+                        "||grad||:", score_gradients32.flatten(1).norm(dim=1).mean().item(),
+                        "sum(K_row):", kernel_norm32.sum(dim=1).mean().item(),
+                        "||v||:", v.flatten(1).norm(dim=1).mean().item(),
+                        "latents range:", latents32.min().item(), latents32.max().item()
+                    )
             
         elif self.opt.repulsion_type == 'rlsd': 
             # 1. SDS loss (latent space)
