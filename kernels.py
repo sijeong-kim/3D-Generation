@@ -2,6 +2,10 @@
 import torch
 import torch.nn.functional as F
 
+def mask_diagonal_(K: torch.Tensor) -> torch.Tensor:
+    K.fill_diagonal_(0.0)
+    return K
+
 def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
     """
     Compute RBF kernel matrix and its gradients.
@@ -40,6 +44,7 @@ def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
             h = (m2 / torch.clamp(logN, min=1e-6)).clamp_min(1e-6)
 
     K = torch.exp(-sq / h)                # [N,N]
+    K = K.fill_diagonal_(0.0)
     
     if repulsion_type == "svgd":
         S = K.sum()                       # scalar
@@ -50,9 +55,9 @@ def rbf_kernel_and_grad(features, tau=0.5, repulsion_type="svgd"):
         raise ValueError("repulsion_type must be 'svgd' or 'rlsd'")
 
     # Autograd gradient wrt features (keeps graph)
-    grad_attractive = torch.autograd.grad(S, features, create_graph=True)[0]  # [N,D]
+    grad_similarity = torch.autograd.grad(S, features, create_graph=True)[0]  # [N,D]
     
-    return K, grad_attractive # grad_attractive = ∇A
+    return K, grad_similarity # grad_similarity = ∇S
 
 
 def cosine_kernel_and_grad(features, tau=5, repulsion_type="svgd"): # tau = 2.0~5.0 soft, 0.1~0.5 sharp
@@ -83,6 +88,7 @@ def cosine_kernel_and_grad(features, tau=5, repulsion_type="svgd"): # tau = 2.0~
     #    K[i,j] = exp( cos(x_i, x_j) / tau )
     inv_tau = 1.0 / torch.clamp(torch.tensor(tau, dtype=z.dtype, device=z.device), min=1e-6)
     K = torch.exp(C * inv_tau)
+    K = K.fill_diagonal_(0.0)
 
     # 3) Build the scalar objective S (same structure as the RBF version)
     if repulsion_type == "svgd":
@@ -95,8 +101,8 @@ def cosine_kernel_and_grad(features, tau=5, repulsion_type="svgd"): # tau = 2.0~
         raise ValueError("repulsion_type must be 'svgd' or 'rlsd'")
 
     # 4) Gradient w.r.t. the features (autograd)
-    grad_attractive = torch.autograd.grad(S, features, create_graph=True)[0]
-    return K, grad_attractive # grad_attractive = ∇A
+    grad_similarity = torch.autograd.grad(S, features, create_graph=True)[0]
+    return K, grad_similarity # grad_similarity = ∇S
 
 
 
