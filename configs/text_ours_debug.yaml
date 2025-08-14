@@ -40,10 +40,11 @@ debug_001:
     lambda_repulsion: [1000]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
+    repulsion_tau: [0.5]
     iters: [200]                                # Very short for debugging (~2-4 min per run)
 
   settings:
-    visualize: true
+    visualize: false
     save_iid: false
     save_rendered_images_interval: 100      # Less frequent saves to reduce memory
     save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
@@ -54,11 +55,12 @@ debug_001:
     losses_interval: 10                    # Less frequent for memory
     efficiency_interval: 10           
 
+
 debug_002:
   name: wo_metrics
   method: grid
   sweep_parameters:
-    repulsion_type: ['wo', 'svgd']  # Test svgd only
+    repulsion_type: ['wo', 'svgd', 'rlsd']  
 
   fixed_parameters:
     seed: [42]                             # Single seed for speed
@@ -83,39 +85,11 @@ debug_002:
     quantitative_metrics_interval: 1     # Less frequent metrics
     losses_interval: 10                    # Less frequent for memory
     efficiency_interval: 10       
+         # Less frequent for memory
+
 
 debug_003:
-  name: rlsd
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['rlsd']  # Test rlsd only
-  
-  fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [4]                         # Ultra minimal views for debugging
-    repulsion_tau: [0]
-    lambda_sd: [1.0]
-    lambda_repulsion: [100]                # Single value
-    feature_layer: [6]                     # Single layer
-    kernel_type: ['rbf']
-    iters: [100]                                # Very short for debugging (~2-4 min per run)
-
-  settings:
-    visualize: true
-    save_iid: true
-    save_rendered_images_interval: 50      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10               # Less frequent for memory
-
-
-debug_004:
-  name: svgd_rlsd
+  name: svgd_rlsd_cosine_kernel
   method: grid
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd']  # Test rlsd only
@@ -124,25 +98,26 @@ debug_004:
     seed: [42]                             # Single seed for speed
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [4]                         # Ultra minimal views for debugging
-    repulsion_tau: [0]
+    num_views: [8]                         # Ultra minimal views for debugging
+    repulsion_tau: [0.1]
     lambda_sd: [1.0]
-    lambda_repulsion: [1.0]                # Single value
+    lambda_repulsion: [1000]                # Single value
     feature_layer: [6]                     # Single layer
-    kernel_type: ['rbf']
-    iters: [300]                                # Very short for debugging (~2-4 min per run)
+    kernel_type: ['cosine']
+    iters: [200]                                # Very short for debugging (~2-4 min per run)
 
   settings:
-    visualize: true
-    save_iid: true
+    visualize: false
+    save_iid: false
     save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 300     # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
+    visualize_graph: false # save graph for debugging
     visualize_graph_interval: 100
     metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 50     # Less frequent metrics
-    losses_interval: 25                    # Less frequent for memory
-    efficiency_interval: 25               # Less frequent for memory
-
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10       
+         # Less frequent for memory
 
 debug_005:
   name: wo
