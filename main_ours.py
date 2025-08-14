@@ -285,7 +285,7 @@ class GUI:
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
             
             if self.opt.kernel_type == 'cosine':
                 if self.step % 10 == 0:
