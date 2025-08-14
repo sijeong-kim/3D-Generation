@@ -20,7 +20,7 @@ from visualizer import GaussianVisualizer
 from metrics import MetricsCalculator
 from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
-from kernel_utils import rbf_kernel_and_grad, cosine_kernel_and_grad
+from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 
 # from torch.autograd import grad
 from torchviz import make_dot
@@ -251,11 +251,11 @@ class GUI:
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (same as before)
-            repulsion_loss = (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = self.opt.repulsion_scale * (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss
             
         elif self.opt.repulsion_type == 'rlsd': 
             # 1. SDS loss (latent space)
@@ -281,25 +281,11 @@ class GUI:
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (Repulsion)
-            repulsion_loss = (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = self.opt.repulsion_scale * (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss
         else:
-            # sds_loss = self.guidance_sd.train_step_for_baseline(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [1] -> [1]
-            
-            # [TRIAL 1] try to use per-sample attraction loss
-            # sds_losses = []
-            # for j in range(self.opt.num_particles):
-            #     sds_j = self.guidance_sd.train_step_for_baseline(
-            #         images[j:j+1],  # per-particle
-            #         step_ratio=step_ratio if self.opt.anneal_timestep else None
-            #     )
-            #     sds_losses.append(sds_j) # [N]
-
-            # attraction_loss = torch.stack(sds_losses).mean() # [N] -> [1]
-            
-            # [TRIAL 2]
             # batched UNet, per-sample SDS
             score_gradients, latents = self.guidance_sd.train_step_gradient(
                 images, step_ratio=step_ratio if self.opt.anneal_timestep else None
@@ -312,7 +298,7 @@ class GUI:
             repulsion_loss = torch.tensor(0.0, device=images.device)
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss
 
         ### optimize step ### 
         
@@ -385,31 +371,48 @@ class GUI:
                     )  # [V, N, 3, H, W]
                     # fidelity
                     fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
-                    # compute inter- and intra-particle diversity
-                    inter_particle_diversity_mean, inter_particle_diversity_std = self.metrics_calculator.compute_inter_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
-                    intra_particle_diversity_mean, intra_particle_diversity_std = self.metrics_calculator.compute_intra_particle_diversity_in_multi_viewpoints_stats(multi_view_images, self.step)
+                    # compute inter-particle diversity 
+                    inter_particle_diversity_mean, inter_particle_diversity_std = self.metrics_calculator.compute_inter_particle_diversity_in_multi_viewpoints_stats(multi_view_images)
+                    # Compute cross-view consistency
+                    cross_view_consistency_mean, cross_view_consistency_std = self.metrics_calculator.compute_cross_view_consistency_stats(multi_view_images)
+                    if self.opt.enable_lpips:
+                        # LPIPS (inter-sample and cross-view consistency)
+                        lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std = self.metrics_calculator.compute_lpips_inter_and_consistency(multi_view_images)
                 else:
-                    fidelity_mean, fidelity_std, inter_particle_diversity_mean, inter_particle_diversity_std, intra_particle_diversity_mean, intra_particle_diversity_std = 0.0, 0.0, 0.0, 0.0, None, None
+                    fidelity_mean, fidelity_std, inter_particle_diversity_mean, inter_particle_diversity_std, cross_view_consistency_mean, cross_view_consistency_std = None, None, None, None, None, None
+                    lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std = None, None, None, None
                     
                 # log
                 self.metrics_calculator.log_metrics(
+                    # efficiency
                     step=self.step,
-
-                    attraction_loss=attraction_loss_val,
-                    repulsion_loss=repulsion_loss_val,
-                    scaled_attraction_loss=scaled_attraction_loss_val,
-                    scaled_repulsion_loss=scaled_repulsion_loss_val,
-                    total_loss=total_loss_val,
-                    time=t,
-                    memory_allocated_mb=memory_allocated,
-                    max_memory_allocated_mb=max_memory_allocated,
-                    
-                    inter_particle_diversity_mean=inter_particle_diversity_mean,
-                    intra_particle_diversity_mean=intra_particle_diversity_mean,
-                    inter_particle_diversity_std=inter_particle_diversity_std,
-                    intra_particle_diversity_std=intra_particle_diversity_std,
-                    fidelity_mean=fidelity_mean,
-                    fidelity_std=fidelity_std,
+                    efficiency= {
+                        "time": t,
+                        "memory_allocated_mb": memory_allocated,
+                        "max_memory_allocated_mb": max_memory_allocated,
+                    },
+                    # losses
+                    losses= {
+                        "attraction_loss": attraction_loss_val,
+                        "repulsion_loss": repulsion_loss_val,
+                        "scaled_attraction_loss": scaled_attraction_loss_val,
+                        "scaled_repulsion_loss": scaled_repulsion_loss_val,
+                        "total_loss": total_loss_val,
+                    },
+                    # metrics
+                    metrics= {
+                        "fidelity_mean": fidelity_mean,
+                        "fidelity_std": fidelity_std,
+                        "inter_particle_diversity_mean": inter_particle_diversity_mean,
+                        "inter_particle_diversity_std": inter_particle_diversity_std,
+                        "cross_view_consistency_mean": cross_view_consistency_mean,
+                        "cross_view_consistency_std": cross_view_consistency_std,
+                        # LPIPS
+                        "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
+                        "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
+                        "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
+                        "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
+                    }
                 )
             # visualize
             if self.opt.visualize and self.visualizer is not None:
@@ -573,7 +576,6 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.save_model(mode='model', particle_id=j)
                 self.save_model(mode='geo+tex', particle_id=j)
-        
 
 if __name__ == "__main__":
     import argparse
