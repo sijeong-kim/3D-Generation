@@ -214,13 +214,32 @@ class MetricsModel:
             raise RuntimeError("DINO model not available; install timm or enable hub load.")
         if images_dino.ndim != 4 or images_dino.shape[1] != 3:
             raise ValueError("images_dino must be [B,3,H,W]")
+
         use_amp = _autocast_enabled(self.device) and self.precision == "fp16"
         with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=use_amp):
             feats = self.dino_model.forward_features(images_dino.to(self.device))
+            # --- convert to [B, D] ---
             if isinstance(feats, dict):
-                # Common keys in timm models
-                feats = feats.get("x_norm_clstoken", feats.get("pooler_output", next(iter(feats.values()))))
-        return F.normalize(feats.float(), dim=1)
+                # timm common keys
+                for k in ("x_norm_clstoken", "cls_token", "pooler_output", "last_hidden_state"):
+                    if k in feats and isinstance(feats[k], torch.Tensor):
+                        feats = feats[k]
+                        break
+                # fallback to first tensor in dict
+                if isinstance(feats, dict):
+                    feats = next(v for v in feats.values() if isinstance(v, torch.Tensor))
+
+            if feats.ndim == 3:
+                # [B, T, D] token sequence → if CLS, take first token, else mean
+                feats = feats[:, 0] if feats.shape[1] >= 1 else feats.mean(dim=1)
+            elif feats.ndim == 4:
+                # [B, C, H, W] feature map → GAP
+                feats = feats.mean(dim=(2, 3))
+
+        # final L2 normalization (float32)
+        feats = F.normalize(feats.float(), dim=-1)
+        return feats  # [B, D]
+
 
     # ------------------------ Utilities ------------------------
     def get_or_cache_text_features(self, prompt: str) -> Tensor:
@@ -283,7 +302,7 @@ class MetricsCalculator:
         self.prompt = prompt
 
         # Feature normalization is already handled in MetricsModel.encode_*
-        self.features_normalized = True
+        self.features_normalized = False
 
         # (Optional) training-time CLIP; keep if other parts of your pipeline use it
         if _get("init_train_clip", True):
@@ -353,6 +372,18 @@ class MetricsCalculator:
 
         # Explicit units: time in milliseconds, memory in megabytes
         self.efficiency_writer.writerow(["step", "time_ms", "memory_allocated_MB", "max_memory_allocated_MB"])  # noqa: N806
+
+        self._warned_metrics = set()  # already warned metric names
+
+        # expected range specs (adjust as needed)
+        self._metric_ranges = {
+            "inter_particle_diversity": (0.0, 2.0),            # 1 - mean_cos (normal [0,2])
+            "cross_view_consistency": (-1.0, 1.0),             # mean cosine
+            "fidelity": (-1.0, 1.0),                           # CLIP cosine
+            "lpips": (0.0, 2.0),                               # safe range
+            "time_ms": (0.0, float("inf")),
+            "memory_MB": (0.0, float("inf")),
+        }
 
     # ------------------------ lifecycle ------------------------
     def close(self) -> None:
@@ -495,6 +526,7 @@ class MetricsCalculator:
             multi_view_features = F.normalize(multi_view_features, dim=2)
 
         sim_matrix = torch.bmm(multi_view_features, multi_view_features.transpose(1, 2))  # [V, N, N]
+        sim_matrix = sim_matrix.clamp(-1, 1) # clamp to [-1, 1]
 
         total_sum = sim_matrix.sum(dim=(1, 2))
         diag_sum = sim_matrix.diagonal(dim1=1, dim2=2).sum(dim=1)
@@ -541,6 +573,7 @@ class MetricsCalculator:
         # [N, V, D]
         features_nv = features.permute(1, 0, 2).contiguous()
         sims_nv = torch.bmm(features_nv, features_nv.transpose(1, 2))  # [N, V, V]
+        sims_nv = sims_nv.clamp(-1, 1) # clamp to [-1, 1] to avoid nan
 
         total_sum = sims_nv.sum(dim=(1, 2))         # [N]
         diag_sum = sims_nv.diagonal(dim1=1, dim2=2).sum(dim=1)  # [N]
