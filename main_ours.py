@@ -281,11 +281,11 @@ class GUI:
                 
             #########################################################
             # 4. Repulsion loss (same as before)
-            repulsion_loss = self.opt.repulsion_scale * (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = -self.opt.repulsion_scale * (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
             
             if self.opt.kernel_type == 'cosine':
                 if self.step % 10 == 0:
@@ -320,10 +320,10 @@ class GUI:
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
             
             # 4. Repulsion loss (Repulsion)
-            repulsion_loss = self.opt.repulsion_scale * (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
+            repulsion_loss = -self.opt.repulsion_scale * (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
         else:
             # batched UNet, per-sample SDS
             score_gradients, latents = self.guidance_sd.train_step_gradient(
@@ -337,7 +337,7 @@ class GUI:
             repulsion_loss = torch.tensor(0.0, device=images.device)
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss
+            total_loss = scaled_attraction_loss - scaled_repulsion_loss
 
         ### optimize step ### 
         
