@@ -20,6 +20,7 @@ pygltflib
 
 # GUI dependencies
 dearpygui
+trimesh
 
 # Stable Diffusion related
 huggingface_hub
@@ -27,6 +28,7 @@ diffusers
 accelerate
 transformers
 timm
+
 # torchvision
 # xformers
 
@@ -46,5 +48,5 @@ lpips
 # Development tools
 notebook
 ipykernel
+pytest
 
-trimesh

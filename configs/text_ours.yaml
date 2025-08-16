@@ -6,11 +6,11 @@ feature_layer: 6 # 0-2: early, 3-7: mid, 8-11: late
 grad_clip: 5.0 # clip gradient
 
 # repulsive loss
-repulsion_type: "svgd" # "svgd" or "rlsd" or "wo"
 lambda_repulsion: 500 # weight for repulsive loss
-repulsion_tau: 0 # tau for repulsive loss (0: median bandwidth heuristic)
+repulsion_type: "svgd" # "svgd" or "rlsd" or "wo"
 kernel_type: "rbf" # "rbf" or "cosine"
-repulsion_scale: 1.0 # scale for repulsive loss
+kernel_tau: 0.5 # tau for kernel (0: median bandwidth heuristic)
+kernel_eps: 1e-12 # eps for kernel
 
 # visualize
 visualize: True

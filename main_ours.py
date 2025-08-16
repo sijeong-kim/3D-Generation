@@ -22,7 +22,6 @@ from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 
-# from torch.autograd import grad
 from torchviz import make_dot
 
 class GUI:
@@ -32,8 +31,6 @@ class GUI:
         self.H = opt.H
         self.cam = OrbitCamera(opt.W, opt.H, r=opt.radius, fovy=opt.fovy)
 
-        self.mode = "image"
-        # self.seed = "random"
         self.seed = opt.seed
 
         self.buffer_image = np.ones((self.W, self.H, 3), dtype=np.float32)
@@ -44,10 +41,8 @@ class GUI:
         self.bg_remover = None
 
         self.guidance_sd = None
-        self.guidance_zero123 = None
 
         self.enable_sd = False
-        self.enable_zero123 = False
 
         # renderer
         # self.renderer = Renderer(sh_degree=self.opt.sh_degree)
@@ -220,124 +215,85 @@ class GUI:
         
         features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
         
+        # batched UNet, per-sample SDS
+        score_gradients, latents = self.guidance_sd.train_step_gradient(
+            images, step_ratio=step_ratio if self.opt.anneal_timestep else None
+        )  # score_gradients, latents: [N, 4, 64, 64]
+        score_gradients = score_gradients.detach().float()
+        latents = latents.detach().float()
+        
         if self.opt.repulsion_type == 'svgd':
-            # 1. SDS loss (latent space)
-            score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
-            score_gradients = score_gradients.detach()
-            
-            # # keep graph from latents → decode → features
-            # latents = latents.detach().requires_grad_(True) 
-            # images = self.guidance_sd.decode_latents(latents) # [N, 3, H, W] in [0, 1]
-            # images = F.interpolate(images, size=render_resolution, mode="bilinear", align_corners=False)
-            # features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
-            
-            # 2. RBF kernel computation
+            # 2. RBF kernel computation (sum_j ∇_{x_i}k(x_i,x_j))
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
-                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-                )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
+                    features, repulsion_type=self.opt.repulsion_type, tau=self.opt.kernel_tau
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
             elif self.opt.kernel_type == 'cosine':
                 kernel, kernel_grad = cosine_kernel_and_grad(
-                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-                )  # kernel:[N,N], kernel_grad:[N, D_feature] = sum_j ∇_{x_i}k(x_i,x_j)
+                    features, repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+            else:
+                raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
             
-            
-            #########################################################
-            # Stablize (SVGD)
-            
-            if self.opt.kernel_type == 'cosine':
-                eps = 1e-6
-                # (1) 행 정규화 (row-stochastic). softmax 써도 됨.
-                kernel_norm = kernel / (kernel.sum(dim=1, keepdim=True) + eps)
-                # 대안: K_norm = torch.softmax(K / max(self.opt.repulsion_tau, 1e-6), dim=1)
+            kernel = kernel.detach().float()
+            kernel_grad = kernel_grad.detach().float()
 
-                # (2) v = Σ_j w_ij * φ(x_j). 커널에는 grad 안 흐르게 detach 권장 (SVGD 구현 관행)
-                #    그리고 모든 계산은 float32에서!
-                score_gradients32 = score_gradients.float()
-                kernel_norm32 = kernel_norm.detach().float()
-
-                # (3) 스코어 그라드 클리핑/정규화 (폭주 방지)
-                score_gradients32 = torch.clamp(score_gradients32, -self.opt.grad_clip, self.opt.grad_clip)
-
-                # (4) 필요시 1/N 평균화(행정규화면 이미 sum=1이지만, 추가 완충 효과)
-                # N = features.shape[0]
-                # v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32) / N
-                v = torch.einsum('ij,jchw->ichw', kernel_norm32, score_gradients32)
+            # 3. Attraction loss (SVGD)
+            v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
+            target = (latents - v).detach()
                 
-                latents32 = latents.float()
-                target = (latents32 - v).detach()
-                per_sample_attraction_loss = 0.5 * F.mse_loss(latents32, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)
-                attraction_loss = per_sample_attraction_loss.mean()
-
-            elif self.opt.kernel_type == 'rbf':
-                # 3. Attraction loss (SVGD)
-                v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
-                target = (latents - v).detach()
+            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+            attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
                 
-                # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
-                # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
-                per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
-                attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
-                
-            #########################################################
-            # 4. Repulsion loss (same as before)
-            repulsion_loss = -self.opt.repulsion_scale * (kernel_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            
+            # 4. Repulsion loss
+            repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss # [1]
             
-            if self.opt.kernel_type == 'cosine':
-                if self.step % 10 == 0:
-                    print(
-                        "||grad||:", score_gradients32.flatten(1).norm(dim=1).mean().item(),
-                        "sum(K_row):", kernel_norm32.sum(dim=1).mean().item(),
-                        "||v||:", v.flatten(1).norm(dim=1).mean().item(),
-                        "latents range:", latents32.min().item(), latents32.max().item()
-                    )
-            
-        elif self.opt.repulsion_type == 'rlsd': 
-            # 1. SDS loss (latent space)
-            score_gradients, latents = self.guidance_sd.train_step_gradient(images, step_ratio=step_ratio if self.opt.anneal_timestep else None) # [N, D_latent], [1]
-            score_gradients = score_gradients.detach()
-            
-            # 2. RBF kernel gradient wrt features
+        elif self.opt.repulsion_type == 'rlsd':
+            # 2. RBF kernel computation (sum_j log(1 + ∇_{x_i}k(x_i,x_j)))
             if self.opt.kernel_type == 'rbf':
-                kernel, kernel_log_grad = rbf_kernel_and_grad(
-                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-                ) # kernel:[N,N], kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}log(k(x_i,x_j))
-            elif self.opt.kernel_type == 'cosine':
-                kernel, kernel_log_grad = cosine_kernel_and_grad(
-                    features, tau=self.opt.repulsion_tau, repulsion_type=self.opt.repulsion_type
-                ) # kernel:[N,N], kernel_log_grad:[N, D_feature] = sum_j ∇_{x_i}log(k(x_i,x_j))
+                kernel, kernel_grad = rbf_kernel_and_grad(
+                    features, repulsion_type=self.opt.repulsion_type, tau=self.opt.kernel_tau
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
             
-            # 3. Attraction loss (SDS) + 1/D_latent
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_grad = cosine_kernel_and_grad(
+                    features, repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+            else:
+                raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
+
+            kernel = kernel.detach().float()
+            kernel_grad = kernel_grad.detach().float()
+            
+            # 3. Attraction loss (SDS)
             target = (latents - score_gradients).detach()
             
             # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
-            # attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]  # [1]
-            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
-            
-            # 4. Repulsion loss (Repulsion)
-            repulsion_loss = -self.opt.repulsion_scale * (kernel_log_grad.detach() * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+                
+            # 4. Repulsion loss
+            repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
-        else:
-            # batched UNet, per-sample SDS
-            score_gradients, latents = self.guidance_sd.train_step_gradient(
-                images, step_ratio=step_ratio if self.opt.anneal_timestep else None
-            )  # score_gradients, latents: [N, 4, 64, 64]
+            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss # [1]
+
+        elif self.opt.repulsion_type == 'wo':
 
             target = (latents - score_gradients).detach()
-            per_sample_attraction_loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+            per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
             attraction_loss = per_sample_attraction_loss.mean()
 
             repulsion_loss = torch.tensor(0.0, device=images.device)
             scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
             scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss - scaled_repulsion_loss
+            total_loss = scaled_attraction_loss + scaled_repulsion_loss
+        else:
+            raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
 
         ### optimize step ### 
         

@@ -1,7 +1,7 @@
 export WORKING_DIR=/workspace/3D-Generation
 export BASE_DIR=${WORKING_DIR}
 
-export SWEEP_NAME=cosine_kernel_viz
+export SWEEP_NAME=kernel_viz
 export PROMPTS=("a photo of a hamburger")
 
 CMD="python ${WORKING_DIR}/hp_ours.py \
@@ -14,4 +14,5 @@ CMD="python ${WORKING_DIR}/hp_ours.py \
 echo "[RUNNING COMMAND] $CMD"
 echo ""
 
-eval $CMD
+# Run the command and save output to file in real time
+eval $CMD 2>&1 | tee ${BASE_DIR}/logs/output.out

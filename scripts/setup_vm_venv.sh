@@ -45,26 +45,19 @@ echo "[Step 4] Building diff-gaussian-rasterization (setup.py install)..."
 if [ ! -d "diff-gaussian-rasterization" ]; then
     git clone --recursive https://github.com/ashawkey/diff-gaussian-rasterization
 fi
-cd diff-gaussian-rasterization
-python setup.py install
-cd ..
+cd diff-gaussian-rasterization; python setup.py install; cd ..
 
 echo "[Step 4] Building simple-knn (setup.py install)..."
 if [ ! -d "simple-knn" ]; then
     git clone https://github.com/camenduru/simple-knn
 fi
-cd simple-knn
-python setup.py install
-cd ..
+cd simple-knn; python setup.py install; cd ..
 
 # -----------------------------
 # 5. Install External Libraries (via GitHub)
 # -----------------------------
 echo "[Step 5] Installing external libraries (git)..."
-pip install git+https://github.com/NVlabs/nvdiffrast/
-pip install git+https://github.com/ashawkey/kiuikit
-pip install git+https://github.com/bytedance/MVDream
-pip install git+https://github.com/bytedance/ImageDream/#subdirectory=extern/ImageDream
+pip install git+https://github.com/NVlabs/nvdiffrast/ git+https://github.com/ashawkey/kiuikit git+https://github.com/bytedance/MVDream git+https://github.com/bytedance/ImageDream/#subdirectory=extern/ImageDream
 
 # -----------------------------
 # Setup Complete
