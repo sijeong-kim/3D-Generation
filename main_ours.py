@@ -1,3 +1,4 @@
+# main_ours.py
 import os
 import cv2
 import time
@@ -142,6 +143,21 @@ class GUI:
             model_name=self.opt.feature_extractor_model_name, 
             device=self.device
         )
+        
+        # Make sure the feature layer is an integer and convert str to int if necessary
+        n_layers = len(self.feature_extractor.model.encoder.layer)
+        fl = self.opt.feature_layer
+        if isinstance(fl, str):
+            fl = fl.lower()
+            if fl == 'early':
+                self.opt.feature_layer = max(0, int(0.25 * n_layers) - 1)
+            elif fl == 'mid':
+                self.opt.feature_layer = max(0, int(0.50 * n_layers) - 1)
+            elif fl in ['last', 'final']:
+                self.opt.feature_layer = n_layers - 1
+            else:
+                raise ValueError(f"Unknown feature_layer '{self.opt.feature_layer}' — use early|mid|last or an integer")
+            
         # metrics
         if self.opt.metrics:
             self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
@@ -205,7 +221,7 @@ class GUI:
 
             cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
 
-            bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+            bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device=self.device)
             out = self.renderers[j].render(cur_cam, bg_color=bg_color)
 
             image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
