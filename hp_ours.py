@@ -185,14 +185,13 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
             param_string = "_".join(param_parts) if param_parts else "default"
             run_name = f"run_{experiment_count:03d}_{param_string}_s{seed}"
             
-            # New directory structure: sweep_name/job_id/run_sweep_parameters/
+            # New directory structure: sweep_name/run_sweep_parameters/
             sweep_dir = os.path.join(job_dir, sweep_name)
-            job_dir_full = os.path.join(sweep_dir, str(job_id))
-            run_dir = os.path.join(job_dir_full, run_name)
+            run_dir = os.path.join(sweep_dir, run_name)
             
             # Set output directory and save path
             opt.outdir = run_dir
-            opt.save_path = os.path.join(sweep_name, str(job_id), run_name)
+            opt.save_path = os.path.join(sweep_name, run_name)
             
             # Save parameter details to a config file for reference
             param_config = {
@@ -208,7 +207,6 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
                 'settings': selected_experiment['settings'],
                 'directory_structure': {
                     'sweep_dir': sweep_name,
-                    'job_dir': str(job_id),
                     'run_dir': run_name,
                     'full_path': opt.save_path
                 }
@@ -222,7 +220,7 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
             with open(config_file, 'w') as f:
                 json.dump(param_config, f, indent=2)
             
-            print(f"[INFO] Experiment directory: {sweep_name}/{job_id}/{run_name}")
+            print(f"[INFO] Experiment directory: {sweep_name}/{run_name}")
             print(f"[INFO] Full parameters saved to: experiment_config.json")
             
             # Run experiment
@@ -252,7 +250,7 @@ def run_hyperparameter_sweeping(base_opt, sweep_name: str = None, yaml_path: str
     
     print(f"\n[INFO] Hyperparameter tuning completed!")
     print(f"[INFO] Ran {experiment_count} experiments")
-    print(f"[INFO] Results saved in {job_dir}/{sweep_name}/ organized by job ID and run parameters")
+    print(f"[INFO] Results saved in {job_dir}/{sweep_name}/ organized by run parameters")
 
 
 if __name__ == "__main__":
