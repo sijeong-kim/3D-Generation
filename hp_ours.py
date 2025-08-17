@@ -30,7 +30,7 @@ def parse_yaml_sweeps(yaml_file_path: str) -> Dict[str, Dict]:
     # Parse each experiment configuration
     for exp_key, exp_config in config_data.items():
         # Skip non-experiment entries (comments, etc.)
-        if not isinstance(exp_config, dict) or not (exp_key.startswith('exp_') or exp_key.startswith('debug_')):
+        if not isinstance(exp_config, dict) or not (exp_key.startswith('exp') or exp_key.startswith('debug_')):
             continue
             
         if 'name' not in exp_config:

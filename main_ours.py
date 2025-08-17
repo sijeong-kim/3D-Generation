@@ -431,6 +431,7 @@ class GUI:
                         "scaled_attraction_loss": scaled_attraction_loss_val,
                         "scaled_repulsion_loss": scaled_repulsion_loss_val,
                         "total_loss": total_loss_val,
+                        "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
                     },
                     # metrics
                     metrics= {

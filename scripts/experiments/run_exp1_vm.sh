@@ -16,6 +16,9 @@ CMD="python ${WORKING_DIR}/hp_ours.py \
 echo "[RUNNING COMMAND] $CMD"
 echo ""
 
+# Create output directory
+mkdir -p ${BASE_DIR}/exp/${SWEEP_NAME}
+
 # Run the command and save output to file in real time
 eval $CMD 2>&1 | tee ${BASE_DIR}/exp/${SWEEP_NAME}/output.out
 
@@ -40,6 +43,9 @@ CMD="python ${WORKING_DIR}/hp_ours.py \
 
 echo "[RUNNING COMMAND] $CMD"
 echo ""
+
+# Create output directory
+mkdir -p ${BASE_DIR}/exp/${SWEEP_NAME}
 
 # Run the command and save output to file in real time
 eval $CMD 2>&1 | tee ${BASE_DIR}/exp/${SWEEP_NAME}/output.out

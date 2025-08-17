@@ -714,6 +714,7 @@ class MetricsCalculator:
 
         self.losses_writer.writerow([
             "step", "attraction_loss", "repulsion_loss", "scaled_attraction_loss", "scaled_repulsion_loss", "total_loss",
+            "scaled_repulsion_loss_ratio",
         ])
 
         # Explicit units: time in milliseconds, memory in megabytes
@@ -782,6 +783,7 @@ class MetricsCalculator:
             losses.get("attraction_loss", ""), losses.get("repulsion_loss", ""),
             losses.get("scaled_attraction_loss", ""), losses.get("scaled_repulsion_loss", ""),
             losses.get("total_loss", ""),
+            losses.get("scaled_repulsion_loss_ratio", ""),
         ])
 
     @torch.no_grad()

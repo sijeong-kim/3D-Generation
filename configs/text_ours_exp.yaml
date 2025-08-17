@@ -14,7 +14,7 @@ exp1_repulsion_lambda_sweep:
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['rbf', 'cosine']
-    lambda_repulsion: [800, 1200]
+    lambda_repulsion: [1000]
 
   fixed_parameters:
     seed: [42]
@@ -36,8 +36,13 @@ exp1_repulsion_lambda_sweep:
     visualize: True
     save_iid: False
     save_rendered_images: True
-    save_rendered_images_interval: 1000
-    save_multi_viewpoints: False
+    save_rendered_images_interval: 1500
+    save_multi_viewpoints: True
+    save_multi_viewpoints_interval: 1500
+
+    eval_W: 256
+    eval_H: 256
+    
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
@@ -45,7 +50,6 @@ exp1_repulsion_lambda_sweep:
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
-
 
 exp1_wo_method:
   name: exp1_wo_method
@@ -71,15 +75,20 @@ exp1_wo_method:
     invert_bg_prob: [0.0] # always white background
     
   settings:
-    # visualize 
+    # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: False
-    save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    save_rendered_images: True
+    save_rendered_images_interval: 1500
+    save_multi_viewpoints: True
+    save_multi_viewpoints_interval: 1500
+
+    eval_W: 256
+    eval_H: 256
+    
     # metrics
     metrics: True
-    quantitative_metrics_interval: 10
+    quantitative_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
