@@ -128,7 +128,7 @@ debug_003:
     losses_interval: 10                    # Less frequent for memory
     efficiency_interval: 10     
 
-debug_003:
+debug_004:
   name: sigma_weight_viz
   method: grid
   sweep_parameters:
@@ -172,7 +172,6 @@ debug_003:
     losses_interval: 10                    # Less frequent for memory
     efficiency_interval: 10     
 
- 
 
 debug_005:
   name: graph_viz
@@ -203,6 +202,83 @@ debug_005:
     quantitative_metrics_interval: 50     # Less frequent metrics
     losses_interval: 25                    # Less frequent for memory
     efficiency_interval: 25         
+
+
+debug_006:
+  name: graph_viz
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
+
+  fixed_parameters:
+    seed: [42]                             # Single seed for speed
+    prompts: ["a photo of a hamburger"]    # Simple prompt
+    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
+    num_views: [8]                         # Ultra minimal views for debugging
+    kernel_tau: [0.5]
+    lambda_sd: [1.0]
+    lambda_repulsion: [700]                # Single value
+    feature_layer: [6]                     # Single layer
+    kernel_type: ['rbf']
+    iters: [500]                                # Very short for debugging (~2-4 min per run)
+
+  settings:
+    visualize: true
+    save_iid: true
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 1000     # Less frequent saves to reduce memory
+    visualize_graph: true # save graph for debugging
+    visualize_graph_interval: 100
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 50     # Less frequent metrics
+    losses_interval: 25                    # Less frequent for memory
+    efficiency_interval: 25         
+
+
+debug_007:
+  name: loss_ratio_record
+  method: grid
+  sweep_parameters:
+    prompts: ["a photo of a hamburger", "chair", "vintage car"]
+    repulsion_type: ['svgd', 'rlsd', 'wo'] 
+    kernel_type: ['rbf', 'cosine']
+
+  fixed_parameters:
+    lambda_repulsion: [1000]
+    seed: [42]                             
+    num_particles: [8]                     
+    num_views: [8]                         
+    iters: [200]                          
+
+    # sds loss
+    lambda_sd: [1.0]
+
+    # feature extractor
+    feature_layer: [6]                     
+    use_sigma_weight: [True]
+    use_cosine_decay: [True]
+    rep_cosine_warmup: [0.0]
+    rep_sigma_power: [1.0]
+
+    # kernel
+    kernel_tau: [0.5]
+    kernel_eps: [1e-12]
+    iters: [1000]
+    
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
+    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
+    visualize_graph: false # save graph for debugging
+    visualize_graph_interval: 100
+    metrics: true                         # Enable metrics to save memory
+    quantitative_metrics_interval: 10     # Less frequent metrics
+    losses_interval: 10                    # Less frequent for memory
+    efficiency_interval: 10     
+
+
 
 
 # ==================

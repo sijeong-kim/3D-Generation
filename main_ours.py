@@ -401,9 +401,7 @@ class GUI:
             
                 # quantitative metrics
                 if self.opt.metrics and self.metrics_calculator is not None and self.visualizer is not None:
-                    multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(
-                        self.step, num_views=self.opt.num_views, visualize=False, save_iid=False
-                    )  # [V, N, 3, H, W]
+                    multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step)  # [V, N, 3, H, W]
                     # fidelity
                     fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
                     # compute inter-particle diversity 
@@ -452,10 +450,8 @@ class GUI:
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
-                if self.step % self.opt.save_rendered_images_interval == 0:
+                if self.opt.save_rendered_images and (self.step % self.opt.save_rendered_images_interval == 0):
                     self.visualizer.save_rendered_images(self.step, images)
-                # if self.step % self.opt.save_multi_viewpoints_interval == 0 and self.step >= 1000 and self.step <= 1300: # save at least 1000 steps
-                #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=True, save_iid=False)
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):

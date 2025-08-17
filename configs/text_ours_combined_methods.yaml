@@ -1,0 +1,191 @@
+# Combined Methods Configuration
+# This config combines repulsion_type and kernel_type to create 5 distinct methods:
+# 1. wo (without repulsion)
+# 2. svgd+rbf (SVGD with RBF kernel)
+# 3. svgd+cosine (SVGD with cosine kernel)
+# 4. rlsd+rbf (RLSD with RBF kernel)
+# 5. rlsd+cosine (RLSD with cosine kernel)
+
+########################################################
+# Method 1: wo (without repulsion)
+exp_wo:
+  name: wo_method
+  method: grid
+  sweep_parameters: {}
+
+  fixed_parameters:
+    repulsion_type: ['wo']
+    kernel_type: ['rbf']  # Not used for wo but needed for compatibility
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [4]
+    num_views: [8]
+    lambda_repulsion: [0]  # No repulsion for wo method
+    lambda_sd: [1.0]
+    feature_layer: [6]
+    kernel_tau: [0.5]
+    iters: [1000]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    save_multi_viewpoints_interval: 2000
+    visualize_graph: false
+    metrics: true
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10
+
+# Method 2: svgd+rbf
+exp_svgd_rbf:
+  name: svgd_rbf_method
+  method: grid
+  sweep_parameters: {}
+
+  fixed_parameters:
+    repulsion_type: ['svgd']
+    kernel_type: ['rbf']
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [4]
+    num_views: [8]
+    lambda_repulsion: [1000]
+    lambda_sd: [1.0]
+    feature_layer: [6]
+    kernel_tau: [0.5]
+    iters: [1000]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images: False
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    save_multi_viewpoints_interval: 2000
+    metrics: true
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10
+
+# Method 3: svgd+cosine
+exp_svgd_cosine:
+  name: svgd_cosine_method
+  method: grid
+  sweep_parameters: {}
+
+  fixed_parameters:
+    repulsion_type: ['svgd']
+    kernel_type: ['cosine']
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [4]
+    num_views: [8]
+    lambda_repulsion: [1000]
+    lambda_sd: [1.0]
+    feature_layer: [6]
+    kernel_tau: [0.5]
+    iters: [1000]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    save_multi_viewpoints_interval: 2000
+    metrics: true
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10
+
+# Method 4: rlsd+rbf
+exp_rlsd_rbf:
+  name: rlsd_rbf_method
+  method: grid
+  sweep_parameters: {}
+
+  fixed_parameters:
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [4]
+    num_views: [8]
+    lambda_repulsion: [1000]
+    lambda_sd: [1.0]
+    feature_layer: [6]
+    kernel_tau: [0.5]
+    iters: [1000]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    save_multi_viewpoints_interval: 2000
+    metrics: true
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10
+
+# Method 5: rlsd+cosine
+exp_rlsd_cosine:
+  name: rlsd_cosine_method
+  method: grid
+  sweep_parameters: {}
+
+  fixed_parameters:
+    repulsion_type: ['rlsd']
+    kernel_type: ['cosine']
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [4]
+    num_views: [8]
+    lambda_repulsion: [1000]
+    lambda_sd: [1.0]
+    feature_layer: [6]
+    kernel_tau: [0.5]
+    iters: [1000]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    save_multi_viewpoints_interval: 2000
+    metrics: true
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10
+
+# Combined experiment: Run all 5 methods in one sweep
+exp_all_methods:
+  name: all_methods_comparison
+  method: grid
+  sweep_parameters:
+    # This creates all 5 method combinations
+    repulsion_type: ['wo', 'svgd', 'svgd', 'rlsd', 'rlsd']
+    kernel_type: ['rbf', 'rbf', 'cosine', 'rbf', 'cosine']
+    lambda_repulsion: [0, 500, 500, 500, 500]  # 0 for wo, 500 for others
+
+  fixed_parameters:
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [4]
+    num_views: [8]
+    lambda_sd: [1.0]
+    feature_layer: [6]
+    kernel_tau: [0.5]
+    iters: [500]
+
+  settings:
+    visualize: true
+    save_iid: false
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    save_multi_viewpoints_interval: 2000
+    metrics: true
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10

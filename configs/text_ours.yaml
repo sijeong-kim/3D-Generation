@@ -3,7 +3,6 @@ seed: 42
 num_particles: 4
 feature_extractor_model_name: facebook/dinov2-base
 feature_layer: 6 # 0-2: early, 3-7: mid, 8-11: late
-grad_clip: 5.0 # clip gradient
 
 # repulsive loss
 lambda_repulsion: 500 # weight for repulsive loss
@@ -20,13 +19,15 @@ rep_cosine_warmup: 0.0 # 0.0: no warmup, 0.1: warmup
 
 # visualize
 visualize: True
+save_rendered_images: False # for visualization
 save_rendered_images_interval: 100 # for debugging
 save_iid: False # for visualization
+save_multi_viewpoints: False # for visualization
 save_multi_viewpoints_interval: 500 # for debugging
 visualize_graph: False # save graph for debugging
 visualize_graph_interval: 100 # for debugging
-save_rep_features: False # save features from different layers
-save_rep_features_interval: 100 # save features from different layers
+# save_rep_features: False # save features from different layers
+# save_rep_features_interval: 100 # save features from different layers
 
 # metrics
 metrics: True

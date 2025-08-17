@@ -1,0 +1,164 @@
+# EXPERIMENT CONFIGURATION - Full parameter sweep experiments
+#
+# This configuration allows you to set prompts in the YAML file.
+# The prompts' keys are abbreviations that can be used for naming files,
+# and their values are the actual prompts for text-to-3D generation.
+#
+# USAGE:
+# sbatch scripts/run_ours_exp.sh exp_repulsion_lambda_sweep
+
+# Experiment 1: Repulsion lambda sweep with multiple prompts
+exp1_repulsion_lambda_sweep:
+  name: exp1_repulsion_lambda_sweep
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd']
+    kernel_type: ['rbf', 'cosine']
+    lambda_repulsion: [800, 1200]
+
+  fixed_parameters:
+    seed: [42]
+    prompts: ["a photo of a hamburger", "a photo of an ice cream", "a small saguaro cactus planted in a clay pot", "a photo of a tulip"]
+    num_particles: [8]
+    feature_extractor_model_name: ["facebook/dinov2-base"]
+    feature_layer: [6]
+    
+    kernel_tau: [0.5] # only for rbf
+    iters: [1500]
+    use_sigma_weight: [True]
+    rep_sigma_power: [0.5]
+    use_cosine_decay: [True]
+    rep_cosine_warmup: [0.2]
+    invert_bg_prob: [0.0] # always white background
+    
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 1000
+    save_multi_viewpoints: False
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+
+exp1_wo_method:
+  name: exp1_wo_method
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']
+    kernel_type: ['rbf']
+    lambda_repulsion: [0]
+
+  fixed_parameters:
+    seed: [42]
+    prompts: ["a photo of a hamburger", "a photo of an ice cream", "a small saguaro cactus planted in a clay pot", "a photo of a tulip"]
+    num_particles: [8]
+    feature_extractor_model_name: ["facebook/dinov2-base"]
+    feature_layer: [6]
+    
+    kernel_tau: [0.5] # only for rbf
+    iters: [1500]
+    use_sigma_weight: [False]
+    rep_sigma_power: [1.0]
+    use_cosine_decay: [False]
+    rep_cosine_warmup: [0.0]
+    invert_bg_prob: [0.0] # always white background
+    
+  settings:
+    # visualize 
+    visualize: True
+    save_iid: False
+    save_rendered_images: False
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+# Experiment 2: Kernel type comparison with custom prompts
+exp2_kernel_comparison:
+  name: exp2_kernel_comparison
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd']
+    kernel_type: ['rbf', 'cosine']
+    lambda_repulsion: [1000]
+
+  fixed_parameters:
+    seed: [42]
+    prompts: ["a photo of a hamburger", "a vintage car", "a wooden chair"]
+    num_particles: [8]
+    feature_extractor_model_name: ["facebook/dinov2-base"]
+    feature_layer: [6]
+    
+    kernel_tau: [0.5] # only for rbf
+    iters: [1000]
+    use_sigma_weight: [True]
+    rep_sigma_power: [0.5]
+    use_cosine_decay: [True]
+    rep_cosine_warmup: [0.2]
+    invert_bg_prob: [0.0] # always white background
+    
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: False
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+# Experiment 3: Single prompt test with different parameters
+exp3_single_prompt_test:
+  name: exp3_single_prompt_test
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd', 'wo']
+    kernel_type: ['rbf', 'cosine']
+    lambda_repulsion: [500, 1000, 1500]
+
+  fixed_parameters:
+    seed: [42]
+    prompts: ["a photo of a hamburger"]
+    num_particles: [8]
+    feature_extractor_model_name: ["facebook/dinov2-base"]
+    feature_layer: [6]
+    
+    kernel_tau: [0.5] # only for rbf
+    iters: [1000]
+    use_sigma_weight: [True]
+    rep_sigma_power: [0.5]
+    use_cosine_decay: [True]
+    rep_cosine_warmup: [0.2]
+    invert_bg_prob: [0.0] # always white background
+    
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: False
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 10
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
