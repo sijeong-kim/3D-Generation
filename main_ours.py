@@ -164,13 +164,17 @@ class GUI:
                 ender = torch.cuda.Event(enable_timing=True)
                 starter.record()
                 
-        # 1. Forward pass
+        #########################################################
+        # Forward pass
+        #########################################################
+
+        # 0. Update step
         self.step += 1
         step_ratio = min(1, self.step / self.opt.iters)
 
         total_loss = 0
 
-        ### novel view (manual batch)
+        # 1. Render images (novel view)
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
         images = []
         outputs = []
@@ -209,13 +213,15 @@ class GUI:
             
             # Store output for each particle
             outputs.append(out)
-                
+        
+
+        
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
         features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device) # [N, D_feature]
         
-        # batched UNet, per-sample SDS
+        # 2. SDS gradient (latent space)
         score_gradients, latents = self.guidance_sd.train_step_gradient(
             images, step_ratio=step_ratio if self.opt.anneal_timestep else None
         )  # score_gradients, latents: [N, 4, 64, 64]
@@ -223,14 +229,18 @@ class GUI:
         latents = latents.detach().float()
         
         if self.opt.repulsion_type == 'svgd':
-            # 2. RBF kernel computation (sum_j ∇_{x_i}k(x_i,x_j))
+            
+            # 3. RBF kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
-                    features, repulsion_type=self.opt.repulsion_type, tau=self.opt.kernel_tau
+                    features, 
+                    repulsion_type=self.opt.repulsion_type, 
+                    tau=self.opt.kernel_tau
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             elif self.opt.kernel_type == 'cosine':
                 kernel, kernel_grad = cosine_kernel_and_grad(
-                    features, repulsion_type=self.opt.repulsion_type
+                    features, 
+                    repulsion_type=self.opt.repulsion_type
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
@@ -238,30 +248,29 @@ class GUI:
             kernel = kernel.detach().float()
             kernel_grad = kernel_grad.detach().float()
 
-            # 3. Attraction loss (SVGD)
+            # 4. Attraction loss (latent space)
             v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
             target = (latents - v).detach()
-                
             # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
             per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
                 
-            # 4. Repulsion loss
+            # 5. Repulsion loss
             repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss # [1]
             
         elif self.opt.repulsion_type == 'rlsd':
-            # 2. RBF kernel computation (sum_j log(1 + ∇_{x_i}k(x_i,x_j)))
+            # 3. RBF kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
-                    features, repulsion_type=self.opt.repulsion_type, tau=self.opt.kernel_tau
+                    features, 
+                    repulsion_type=self.opt.repulsion_type, 
+                    tau=self.opt.kernel_tau
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             
             elif self.opt.kernel_type == 'cosine':
                 kernel, kernel_grad = cosine_kernel_and_grad(
-                    features, repulsion_type=self.opt.repulsion_type
+                    features,
+                    repulsion_type=self.opt.repulsion_type
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
@@ -269,35 +278,35 @@ class GUI:
             kernel = kernel.detach().float()
             kernel_grad = kernel_grad.detach().float()
             
-            # 3. Attraction loss (SDS)
+            # 4. Attraction loss (latent space)
             target = (latents - score_gradients).detach()
-            
             # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
             per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
             attraction_loss = per_sample_attraction_loss.mean() # [N] -> [1]
                 
-            # 4. Repulsion loss
+            # 5. Repulsion loss
             repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss 
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss # [1]
 
         elif self.opt.repulsion_type == 'wo':
-
+            # SDS loss == attraction loss
             target = (latents - score_gradients).detach()
             per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
             attraction_loss = per_sample_attraction_loss.mean()
-
+            # No repulsion loss for WO
             repulsion_loss = torch.tensor(0.0, device=images.device)
-            scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
-            scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-            total_loss = scaled_attraction_loss + scaled_repulsion_loss
         else:
             raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
-
-        ### optimize step ### 
         
-        # 2. Backward pass (Compute gradients)
+        # 6. Scale losses
+        scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+        scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+        total_loss = scaled_attraction_loss + scaled_repulsion_loss
+        
+        #########################################################
+        # Backward pass
+        #########################################################
+        
+        # 1. Compute gradients
         # Optionally visualize autograd graph before backward to avoid retaining graph twice
         if self.opt.visualize_graph and self.step % self.opt.visualize_graph_interval == 0:
             graph_visualize_path = os.path.join(self.opt.outdir, f"visualizations", f"loss_graph")
@@ -311,11 +320,13 @@ class GUI:
 
         total_loss.backward()
             
-        # 3. Optimize step (Update parameters)
+        # 2. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
             self.optimizers[j].step()
-
-        # densify and prune (after backward pass so gradients are available)
+            
+        #########################################################
+        # Densify and prune (after backward pass so gradients are available)
+        #########################################################
         for j in range(self.opt.num_particles):
             if self.step >= self.opt.density_start_iter and self.step <= self.opt.density_end_iter:
                 viewspace_point_tensor, visibility_filter, radii = outputs[j]["viewspace_points"], outputs[j]["visibility_filter"], outputs[j]["radii"]
@@ -328,12 +339,15 @@ class GUI:
                 if self.step % self.opt.opacity_reset_interval == 0:
                         self.renderers[j].gaussians.reset_opacity()
                         
-        
-        # 4. Zero gradients (Prepare for next iteration)
+        #########################################################
+        # Zero gradients (Prepare for next iteration)
+        #########################################################
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
         
-        # log metrics and visualize
+        #########################################################
+        # Log metrics and visualize
+        #########################################################
         with torch.no_grad():
             if self.opt.metrics and self.metrics_calculator is not None:
                 # time
