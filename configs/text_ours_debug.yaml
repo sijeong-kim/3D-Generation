@@ -35,12 +35,11 @@ debug_001:
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
     num_views: [8]                         # Ultra minimal views for debugging
-    repulsion_tau: [0]
+    kernel_tau: [0.5]
     lambda_sd: [1.0]
     lambda_repulsion: [1]                # Single value
     feature_layer: [6]                     # Single layer
     kernel_type: ['rbf']
-    repulsion_tau: [0.5]
     iters: [500]                                # Very short for debugging (~2-4 min per run)
 
   settings:
@@ -72,7 +71,7 @@ debug_002:
     feature_layer: [11]                     # Single layer
     kernel_type: ['cosine']
     iters: [500]           
-    repulsion_tau: [5.0]                   # 2.0~5.0 soft, 0.1~0.5 sharp
+    kernel_tau: [0.5]                   # 2.0~5.0 soft, 0.1~0.5 sharp
     lambda_sd: [1.0]                      # 0.01~0.1 (increase after being stable)
     grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
 
@@ -111,7 +110,7 @@ debug_003:
     feature_layer: [11]                     # Single layer
     
     # repulsive loss
-    repulsion_tau: [0.5]
+    kernel_tau: [0.5]
 
     # kernel
     kernel_tau: [0.5]
@@ -141,7 +140,7 @@ debug_005:
     prompts: ["a photo of a hamburger"]    # Simple prompt
     num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
     num_views: [8]                         # Ultra minimal views for debugging
-    repulsion_tau: [0]
+    kernel_tau: [0.5]
     lambda_sd: [1.0]
     lambda_repulsion: [700]                # Single value
     feature_layer: [6]                     # Single layer

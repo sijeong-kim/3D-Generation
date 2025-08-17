@@ -54,7 +54,7 @@ ITER=1500
 REPULSION_ENABLED=True
 REPULSION_TYPE="svgd"
 LAMBDA_REPULSION=600
-REPULSION_TAU=0
+KERNEL_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 
 # TASK_NAME="${PROMPT// /_}_ours_${REPULSION_TYPE}_${LAMBDA_REPULSION}_${SEED}"
@@ -106,7 +106,7 @@ for PROMPT in "${PROMPTS[@]}"; do
         iter=${ITER} \
         repulsion_enabled=${REPULSION_ENABLED} \
         repulsion_type=${REPULSION_TYPE} \
-        repulsion_tau=${REPULSION_TAU} \
+        kernel_tau=${KERNEL_TAU} \
         lambda_repulsion=${LAMBDA_REPULSION} \
         kernel_type=${KERNEL_TYPE}"
 
@@ -131,7 +131,7 @@ for PROMPT in "${PROMPTS[@]}"; do
                 iter=${ITER} \
                 repulsion_enabled=${REPULSION_ENABLED} \
                 repulsion_type=${REPULSION_TYPE} \
-                repulsion_tau=${REPULSION_TAU} \
+                kernel_tau=${KERNEL_TAU} \
                 lambda_repulsion=${LAMBDA_REPULSION} \
                 kernel_type=${KERNEL_TYPE}"
 

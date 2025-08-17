@@ -225,8 +225,12 @@ class GUI:
         score_gradients, latents = self.guidance_sd.train_step_gradient(
             images, step_ratio=step_ratio if self.opt.anneal_timestep else None
         )  # score_gradients, latents: [N, 4, 64, 64]
-        score_gradients = score_gradients.detach().float()
-        latents = latents.detach().float()
+        score_gradients = score_gradients.detach()
+        
+        # Ensure consistent dtype across all tensors
+        target_dtype = score_gradients.dtype
+        features = features.to(target_dtype)
+        latents = latents.to(target_dtype)
         
         if self.opt.repulsion_type == 'svgd':
             
@@ -245,8 +249,8 @@ class GUI:
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
             
-            kernel = kernel.detach().float()
-            kernel_grad = kernel_grad.detach().float()
+            kernel = kernel.detach().to(target_dtype)
+            kernel_grad = kernel_grad.detach().to(target_dtype)
 
             # 4. Attraction loss (latent space)
             v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
@@ -275,8 +279,8 @@ class GUI:
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
 
-            kernel = kernel.detach().float()
-            kernel_grad = kernel_grad.detach().float()
+            kernel = kernel.detach().to(target_dtype)
+            kernel_grad = kernel_grad.detach().to(target_dtype)
             
             # 4. Attraction loss (latent space)
             target = (latents - score_gradients).detach()
@@ -293,7 +297,7 @@ class GUI:
             per_sample_attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
             attraction_loss = per_sample_attraction_loss.mean()
             # No repulsion loss for WO
-            repulsion_loss = torch.tensor(0.0, device=images.device)
+            repulsion_loss = torch.tensor(0.0, device=images.device, dtype=target_dtype)
         else:
             raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
         

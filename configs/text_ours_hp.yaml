@@ -43,7 +43,7 @@ exp_001:
     num_particles: [4]                     # Keep fixed for fair comparison
     multi_view_type: ['average_views']
     num_views: [8]
-    repulsion_tau: [0]
+    kernel_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
     iters: [1500]                          # ~25-35 min per run
@@ -81,7 +81,7 @@ exp_002:
     num_particles: [4]
     multi_view_type: ['average_views']
     num_views: [8]
-    repulsion_tau: [0]
+    kernel_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
     iters: [1500]                    # ~30-45 min per run (longer training)
@@ -118,7 +118,7 @@ exp_002:
     num_particles: [8]
     multi_view_type: ['average_views']
     num_views: [8]
-    repulsion_tau: [0]
+    kernel_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
     iters: [1500]
@@ -164,7 +164,7 @@ exp_003:
     num_particles: [4]
     multi_view_type: ['average_views']
     num_views: [8]
-    repulsion_tau: [0]
+    kernel_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
     iters: [1500]             # ~30-45 min per run
@@ -203,7 +203,7 @@ exp_004:
     lambda_repulsion: [100]
     multi_view_type: ['average_views']
     num_views: [8]
-    repulsion_tau: [0]
+    kernel_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
 
@@ -240,7 +240,7 @@ exp_005:
     feature_layer: [6]                     # Best layer from exp_001  
     lambda_repulsion: [100]                # Best lambda from exp_002
     num_particles: [4]                     # Standard particle count
-    repulsion_tau: [0]
+    kernel_tau: [0]
     lambda_sd: [1.0]
     kernel_type: ['rbf']
     iters: [1500]                          # ~30-45 min per run

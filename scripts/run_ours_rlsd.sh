@@ -53,7 +53,7 @@ ITER=1500
 
 REPULSION_TYPE="rlsd"
 LAMBDA_REPULSION=500
-REPULSION_TAU=0
+KERNEL_TAU=0
 KERNEL_TYPE="rbf" # "rbf" or "laplacian" -- to be added
 
 TASK_NAME="${PROMPT// /_}_ours_${REPULSION_TYPE}_${LAMBDA_REPULSION}_${SEED}"
@@ -93,7 +93,7 @@ CMD="python ${WORKING_DIR}/main_ours.py \
     seed=${SEED} \
     iter=${ITER} \
     repulsion_type=${REPULSION_TYPE} \
-    repulsion_tau=${REPULSION_TAU} \
+    kernel_tau=${KERNEL_TAU} \
     lambda_repulsion=${LAMBDA_REPULSION} \
     kernel_type=${KERNEL_TYPE}"
 
