@@ -1,7 +1,7 @@
 export WORKING_DIR=/workspace/3D-Generation
 export BASE_DIR=${WORKING_DIR}
 
-export SWEEP_NAME=kernel_viz
+export SWEEP_NAME=sigma_weight_viz
 export PROMPTS=("a photo of a hamburger")
 
 CMD="python ${WORKING_DIR}/hp_ours.py \

@@ -229,9 +229,7 @@ class StableDiffusion(nn.Module):
         guidance_scale=100,
         as_latent=False,
         vers=None, hors=None,
-        repulsion_enabled=False,
-        repulsion_type="wo",
-        kernel = None,
+        return_sigma=False,
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -259,9 +257,9 @@ class StableDiffusion(nn.Module):
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
             
-            if repulsion_enabled:
+            if return_sigma:
                 sigma_t = torch.sqrt(w)
-                sigma_t = sigma_t.mean()
+                sigma_t = sigma_t.view(batch_size)
 
             # predict the noise residual with unet, NO grad!
             # add noise
@@ -303,8 +301,10 @@ class StableDiffusion(nn.Module):
         #     loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
         # elif repulsion_type == "rlsd" or repulsion_type == "wo":
         #     loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
-
-        return grad, latents
+        if return_sigma:
+            return grad.detach().to(torch.float32), latents.to(torch.float32), sigma_t.detach().to(torch.float32)
+        else:
+            return grad.detach().to(torch.float32), latents.to(torch.float32)
     
     
 
