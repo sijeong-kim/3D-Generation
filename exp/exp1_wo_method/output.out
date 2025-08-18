@@ -1,6 +1,0 @@
-[INFO] Base config loaded from /workspace/3D-Generation/configs/text_ours.yaml
-[INFO] Sweep config: /workspace/3D-Generation/configs/text_ours_exp.yaml
-[INFO] Requested sweep: exp1_wo_method
-[INFO] Prompts: ['a photo of a hamburger']
-[INFO] Loading experiment configurations from /workspace/3D-Generation/configs/text_ours_exp.yaml
-[ERROR] No experiments found in /workspace/3D-Generation/configs/text_ours_exp.yaml
