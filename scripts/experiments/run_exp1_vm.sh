@@ -34,7 +34,7 @@ echo "====================================="
 # Experiment 1: Repulsion lambda sweep with multiple prompts
 ########################################################
 
-export SWEEP_NAME=exp1_lambda_rep
+export SWEEP_NAME=exp1_lambda
 
 CMD="python ${WORKING_DIR}/hp_ours.py \
     --config ${WORKING_DIR}/configs/text_ours.yaml \

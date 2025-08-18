@@ -326,13 +326,13 @@ class GaussianVisualizer:
             
             # Create camera object with current pose and parameters
             # used ref_size (256) instead of W, H (800) to decrease memory usage
-            W = getattr(self.opt, 'eval_W', self.opt.W) 
-            H = getattr(self.opt, 'eval_H', self.opt.H)
+            eval_W = getattr(self.opt, 'eval_W', self.opt.W) 
+            eval_H = getattr(self.opt, 'eval_H', self.opt.H)
             
             camera = MiniCam(
                 pose,
-                W,
-                H,
+                eval_W,
+                eval_H,
                 self.cam.fovy,
                 self.cam.fovx,
                 self.cam.near,

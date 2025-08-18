@@ -13,7 +13,7 @@ exp0_baseline:
   sweep_parameters:
     repulsion_type: ['wo']
     seed: [42]
-    prompt: 
+    prompts_dict: 
       hamburger: ["a photo of a hamburger"]
       icecream: ["a photo of an ice cream"]
       saguaro: ["a small saguaro cactus planted in a clay pot"]
@@ -47,8 +47,8 @@ exp0_baseline:
 
 # Experiment 1: Repulsion lambda sweep with multiple prompts
 
-exp1_lambda_rep:
-  name: exp1_lambda_rep
+exp1_lambda:
+  name: exp1_lambda
   method: grid
   sweep_parameters:
     seed: [42]
@@ -94,57 +94,124 @@ exp1_lambda_rep:
     enable_lpips: False # disable lpips for faster training
 
 # Experiment 2: Kernel type comparison with custom prompts
-exp2_kernel_comparison:
-  name: exp2_kernel_comparison
+exp2_kernel:
+  name: exp2_kernel
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd']
-    kernel_type: ['rbf', 'cosine']
-    lambda_repulsion: [1000]
-
-  fixed_parameters:
     seed: [42]
-    prompts: ["a photo of a hamburger", "a vintage car", "a wooden chair"]
-    num_particles: [8]
-    feature_extractor_model_name: ["facebook/dinov2-base"]
-    feature_layer: [6]
+    prompts_dict: 
+      hamburger: ["a photo of a hamburger"]
+      icecream: ["a photo of an ice cream"]
+      saguaro: ["a small saguaro cactus planted in a clay pot"]
+      tulip: ["a photo of a tulip"]
+    repulsion_type: ['rlsd', 'svgd']
+    kernel_type: ['rbf', 'cosine']
     
-    kernel_tau: [0.5] # only for rbf
-    iters: [1000]
-    use_sigma_weight: [True]
-    rep_sigma_power: [0.5]
-    use_cosine_decay: [True]
-    rep_cosine_warmup: [0.2]
-    invert_bg_prob: [0.0] # always white background
-    
+  fixed_parameters:
+    lambda_repulsion: 
+      rlsd_rbf: 1000
+      rlsd_cosine: 1000
+      svgd_rbf: 1000
+      svgd_cosine: 1000
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+
+    feature_layer: 6
+    kernel_tau: 0.5 # only for rbf
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
   settings:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: False
-    save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    save_rendered_images: True
+    save_rendered_images_interval: 1500
+    save_multi_viewpoints: True
+    save_multi_viewpoints_interval: 1500
+
+    eval_W: 256
+    eval_H: 256
+    
     # metrics
     metrics: True
-    quantitative_metrics_interval: 10
+    quantitative_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
 
-# # Experiment 3: Single prompt test with different parameters
-# exp3_single_prompt_test:
-#   name: exp3_single_prompt_test
-#   method: grid
-#   sweep_parameters:
-#     repulsion_type: ['svgd', 'rlsd', 'wo']
-#     kernel_type: ['rbf', 'cosine']
-#     lambda_repulsion: [500, 1000, 1500]
+exp2_kernel:
+  name: exp2_kernel
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd']
+    kernel_type: ['rbf', 'cosine']
+    prompts_dict: 
+      hamburger: ["a photo of a hamburger"]
+      icecream: ["a photo of an ice cream"]
+      saguaro: ["a small saguaro cactus planted in a clay pot"]
+      tulip: ["a photo of a tulip"]
 
-#   fixed_parameters:
-#     seed: [42]
-#     prompts: ["a photo of a hamburger"]
-#     num_particles: [8]
+  fixed_parameters:
+    lambda_repulsion: 
+      rlsd_rbf: 1000
+      rlsd_cosine: 1000
+      svgd_rbf: 1000
+      svgd_cosine: 1000
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+
+    feature_layer: 6
+    kernel_tau: 0.5 # only for rbf
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 1500
+    save_multi_viewpoints: True
+    save_multi_viewpoints_interval: 1500
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+# Experiment 3: Single prompt test with different parameters
+exp3_tau:
+  name: exp3_tau
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd', 'rlsd']
+    
+    kernel_tau: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+
+  fixed_parameters:
+    seed: 42
+    prompts_dict: 
+      hamburger: ["a photo of a hamburger"]
+      icecream: ["a photo of an ice cream"]
+      saguaro: ["a small saguaro cactus planted in a clay pot"]
+      tulip: ["a photo of a tulip"]
+    num_particles: [8]
 #     feature_extractor_model_name: ["facebook/dinov2-base"]
 #     feature_layer: [6]
     

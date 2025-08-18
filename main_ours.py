@@ -138,26 +138,28 @@ class GUI:
         # feature extractor
         # Use multi-layer extractor for specific layer extraction
         # Supports: 'early' (25% depth), 'mid' (50% depth), 'last' (final layer)
-        print(f"[INFO] Using DINOv2 features from '{self.opt.feature_layer}' layer")
-        self.feature_extractor = DINOv2MultiLayerFeatureExtractor(
-            model_name=self.opt.feature_extractor_model_name, 
-            device=self.device
-        )
         
-        # Make sure the feature layer is an integer and convert str to int if necessary
-        n_layers = len(self.feature_extractor.model.encoder.layer)
-        fl = self.opt.feature_layer
-        if isinstance(fl, str):
-            fl = fl.lower()
-            if fl == 'early':
-                self.opt.feature_layer = max(0, int(0.25 * n_layers) - 1)
-            elif fl == 'mid':
-                self.opt.feature_layer = max(0, int(0.50 * n_layers) - 1)
-            elif fl in ['last', 'final']:
-                self.opt.feature_layer = n_layers - 1
-            else:
-                raise ValueError(f"Unknown feature_layer '{self.opt.feature_layer}' — use early|mid|last or an integer")
+        if self.opt.repulsion_type != 'wo':
+            print(f"[INFO] Using DINOv2 features from '{self.opt.feature_layer}' layer")
+            self.feature_extractor = DINOv2MultiLayerFeatureExtractor(
+                model_name=self.opt.feature_extractor_model_name, 
+                device=self.device
+            )
             
+            # Make sure the feature layer is an integer and convert str to int if necessary
+            n_layers = len(self.feature_extractor.model.encoder.layer)
+            fl = self.opt.feature_layer
+            if isinstance(fl, str):
+                fl = fl.lower()
+                if fl == 'early':
+                    self.opt.feature_layer = max(0, int(0.25 * n_layers) - 1)
+                elif fl == 'mid':
+                    self.opt.feature_layer = max(0, int(0.50 * n_layers) - 1)
+                elif fl in ['last', 'final']:
+                    self.opt.feature_layer = n_layers - 1
+                else:
+                    raise ValueError(f"Unknown feature_layer '{self.opt.feature_layer}' — use early|mid|last or an integer")
+                
         # metrics
         if self.opt.metrics:
             self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
@@ -235,7 +237,7 @@ class GUI:
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
-        features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
+        
         
         # 2. SDS gradient (latent space)
         if self.opt.use_sigma_weight:
@@ -262,6 +264,7 @@ class GUI:
         w_rep = w_sigma * w_cos
             
         if self.opt.repulsion_type == 'svgd':
+            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
             
             # 3. RBF kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
@@ -294,6 +297,9 @@ class GUI:
             repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
             
         elif self.opt.repulsion_type == 'rlsd':
+            
+            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
+            
             # 3. RBF kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
@@ -382,7 +388,7 @@ class GUI:
         # Log metrics and visualize
         #########################################################
         with torch.no_grad():
-            if self.opt.metrics and self.metrics_calculator is not None:
+            if self.step % self.opt.metrics_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
                 # time
                 ender.record()
                 torch.cuda.synchronize()

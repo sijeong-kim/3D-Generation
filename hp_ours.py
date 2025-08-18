@@ -95,9 +95,6 @@ def run_single_experiment(
     print("-" * 80)
     
     # TODO✅:check cmd
-    import code
-    code.interact(local=dict(globals(), **locals()))
-    
     try:
         # Run the experiment
         result = subprocess.run(cmd, capture_output=True, text=True, cwd=os.getcwd())
