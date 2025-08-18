@@ -11,8 +11,6 @@ exp0_baseline:
   name: exp0_baseline
   method: grid
   sweep_parameters:
-    repulsion_type: ['wo']
-
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -20,6 +18,7 @@ exp0_baseline:
       tulip: "a photo of a tulip"
   # fixed parameters
   fixed_parameters:
+    repulsion_type: 'wo'
     seed: 42
     num_particles: 8
     feature_layer: 6
@@ -31,9 +30,9 @@ exp0_baseline:
     visualize: True
     save_iid: False
     save_rendered_images: True
-    save_rendered_images_interval: 200
+    save_rendered_images_interval: 100
     save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 1000
+    save_multi_viewpoints_interval: 500
 
     eval_W: 256
     eval_H: 256

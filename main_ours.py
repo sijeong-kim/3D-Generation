@@ -175,7 +175,7 @@ class GUI:
             self.guidance_sd.get_text_embeds([self.prompt], [self.negative_prompt])
 
     def train_step(self):
-        
+        self.step += 1
         
         with torch.no_grad():
             if self.step % self.opt.efficiency_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
@@ -188,7 +188,7 @@ class GUI:
         #########################################################
 
         # 0. Update step
-        self.step += 1
+
         step_ratio = min(1, self.step / self.opt.iters)
 
         total_loss = 0
