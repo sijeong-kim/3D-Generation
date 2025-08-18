@@ -22,22 +22,45 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def generate_parameter_combinations(sweep_params: Dict[str, List]) -> List[Dict[str, Any]]:
+def generate_parameter_combinations_and_sweep_params_dict(sweep_params: Dict[str, List]) -> List[Dict[str, Any]]:
     """Generate all combinations of sweep parameters."""
+
+    # prompts_dict = sweep_params['prompts_dict']
+    
+    sweep_params_dict = {}
+    for key, value in sweep_params.items():
+        if isinstance(value, dict):
+            sweep_params_dict[key] = value
+            
     keys = list(sweep_params.keys())
     values = list(sweep_params.values())
-    prompts_dict = sweep_params['prompts_dict']
-    
+            
     combinations = []
     for combination in itertools.product(*values):
         param_dict = dict(zip(keys, combination))
         combinations.append(param_dict)
     
-    return combinations, prompts_dict
+    return combinations, sweep_params_dict
+    # combinations: [{'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}]
+    # sweep_params_dict: {'prompt': {'hamburger': 'a photo of a hamburger', 'icecream': 'a photo of an ice cream', 'saguaro': 'a small saguaro cactus planted in a clay pot', 'tulip': 'a photo of a tulip'}}
 
+def generate_fixed_param_dict(fixed_params: Dict[str, List]) -> Dict[str, Any]:
+    """Generate fixed parameters."""
 
-def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], 
-                  setting_params: Dict[str, Any], sweep_params: Dict[str, Any]) -> Dict[str, Any]:
+    fixed_params_dict = {}
+    for key, value in fixed_params.items():
+        if isinstance(value, dict):
+            fixed_params_dict[key] = value
+            
+    # remove the key from fixed_params
+    for key in fixed_params_dict.keys():
+        fixed_params.pop(key)
+    
+    return fixed_params,fixed_params_dict
+    # fixed_params_dict: {'lambda_repulsion': {'rlsd_rbf': 1000, 'rlsd_cosine': 1000, 'svgd_rbf': 1000, 'svgd_cosine': 1000}}
+
+def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fixed_params_dict: Dict[str, Any],
+                  setting_params: Dict[str, Any], sweep_params: Dict[str, Any], sweep_params_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Merge base config with fixed and sweep parameters."""
     # Start with base config
     merged_config = base_config.copy()
@@ -50,6 +73,20 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any],
     
     # Override with sweep parameters
     merged_config.update(sweep_params)
+    
+    # TODO✅ Update config with prompt
+    for key, value in sweep_params_dict.items():
+        merged_config[key] = value[sweep_params[key]] # merged_config['prompt'] = a photo of a hamburger
+    
+    
+    # TODO✅ set lambda_repulsion for each method-kernel combination
+    if 'lambda_repulsion' in fixed_params_dict and \
+        'repulsion_type' in sweep_params and \
+        'kernel_type' in sweep_params:
+        method_kernel_key = sweep_params['repulsion_type'] + "_" + sweep_params['kernel_type']
+        method_kernel_value = fixed_params_dict['lambda_repulsion'][method_kernel_key]
+        merged_config['lambda_repulsion'] = method_kernel_value
+        print(f"Method kernel (key, value): ({method_kernel_key}, {method_kernel_value})")
     
     return merged_config
 
@@ -156,15 +193,20 @@ def main():
     setting_params = exp_config.get('settings', {}) # visualize: True
     
     # Generate all parameter combinations
-    param_combinations, prompts_dict = generate_parameter_combinations(sweep_params)
-    # param_combinations[0]: {'seed': 42, 'prompts_dict': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}
-    # prompts_dict: {'hamburger': ['a photo of a hamburger'], 'icecream': ['a photo of an ice cream'], 'saguaro': ['a small saguaro cactus planted in a clay pot'], 'tulip': ['a photo of a tulip']}
+    sweep_params_combinations, sweep_params_dict = generate_parameter_combinations_and_sweep_params_dict(sweep_params)
+    # param_combinations[0]: {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}
+    # sweep_params_dict: {'prompt': {'hamburger': ['a photo of a hamburger'], 'icecream': ['a photo of an ice cream'], 'saguaro': ['a small saguaro cactus planted in a clay pot'], 'tulip': ['a photo of a tulip']}}
+    
+    fixed_params, fixed_params_dict = generate_fixed_param_dict(fixed_params)
+
     
     print(f"Experiment: {args.sweep_name}")
-    print(f"Parameter combinations: {len(param_combinations)}")
-    print(f"Total experiments: {len(param_combinations)}")
+    print(f"Parameter combinations: {len(sweep_params_combinations)}")
+    print(f"Total experiments: {len(sweep_params_combinations)}")
     print(f"Sweep parameters: {list(sweep_params.keys())}")
+    print(f"Sweep parameters dict: {sweep_params_dict.keys()}")
     print(f"Fixed parameters: {list(fixed_params.keys())}")
+    print(f"Fixed parameters dict: {fixed_params_dict.keys()}")
     print(f"Setting parameters: {list(setting_params.keys())}")
     print("=" * 80)
     
@@ -175,10 +217,12 @@ def main():
     # Save experiment summary
     summary = {
         'experiment_name': args.sweep_name,
-        'parameter_combinations': len(param_combinations),
-        'total_experiments': len(param_combinations),
+        'parameter_combinations': len(sweep_params_combinations),
+        'total_experiments': len(sweep_params_combinations),
         'sweep_parameters': list(sweep_params.keys()),
         'fixed_parameters': list(fixed_params.keys()),
+        'sweep_parameters_dict': list(sweep_params_dict.keys()),
+        'fixed_parameters_dict': list(fixed_params_dict.keys()),
         'setting_parameters': list(setting_params.keys()),
         'start_time': datetime.datetime.now().isoformat(),
         'combinations': []
@@ -189,40 +233,36 @@ def main():
     failed_runs = 0
     
     # Run experiments for each prompt and parameter combination
-    total_experiments = len(param_combinations)
-    experiment_count = 0
+    total_experiments = len(sweep_params_combinations)
+
     
-    for i, params in enumerate(param_combinations):
-        experiment_count += 1
-        print(f"\n[{experiment_count}/{total_experiments}] Processing combination...")
+    for i, sweep_params in enumerate(sweep_params_combinations):
+        # params: {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}
+        print(f"\n[{i+1}/{total_experiments}] Processing combination...")
         
         # Merge configurations
-        merged_config = merge_configs(base_config, fixed_params, setting_params, params)
-        
-        
-        # TODO✅ Update config with prompt
-        prompt_key = params['prompts_dict'] # hamburger
-        prompt_value = prompts_dict[prompt_key][0] # a photo of a hamburger
-        merged_config['prompt'] = prompt_value
-        del merged_config['prompts_dict']
+        merged_config = merge_configs(base_config, fixed_params, fixed_params_dict, setting_params, sweep_params, sweep_params_dict)
         
         # Create output directory name
-        output_dir_name = "_".join(str(v) for v in params.values())
+        # output_dir_name = "_".join(str(v) for v in sweep_params.values())
+        output_dir_name = "_".join(f"{str(sweep_params[k])}" for k in sorted(sweep_params, key=lambda k: k))
         output_dir = os.path.join(base_output_dir, output_dir_name)
         
+
         # Record combination
         combination_info = {
-            'experiment_id': experiment_count,
-            'parameters': params,
+            'experiment_id': i+1,
+            'parameters': sweep_params,
             'output_dir': output_dir,
-            'prompt': prompt_value,
+            'prompt': merged_config['prompt'],
             'status': 'pending'
         }
+        
         summary['combinations'].append(combination_info)
         
         if args.dry_run:
             print(f"DRY RUN - Would run: {output_dir}")
-            print(f"  Parameters: {params}")
+            print(f"  Parameters: {sweep_params}")
             continue
         
         

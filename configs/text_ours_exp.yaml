@@ -12,14 +12,15 @@ exp0_baseline:
   method: grid
   sweep_parameters:
     repulsion_type: ['wo']
-    seed: [42]
-    prompts_dict: 
-      hamburger: ["a photo of a hamburger"]
-      icecream: ["a photo of an ice cream"]
-      saguaro: ["a small saguaro cactus planted in a clay pot"]
-      tulip: ["a photo of a tulip"]
+
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
   # fixed parameters
   fixed_parameters:
+    seed: 42
     num_particles: 8
     feature_layer: 6
     iters: 1500
@@ -30,9 +31,9 @@ exp0_baseline:
     visualize: True
     save_iid: False
     save_rendered_images: True
-    save_rendered_images_interval: 1500
+    save_rendered_images_interval: 200
     save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 1500
+    save_multi_viewpoints_interval: 1000
 
     eval_W: 256
     eval_H: 256
@@ -47,21 +48,21 @@ exp0_baseline:
 
 # Experiment 1: Repulsion lambda sweep with multiple prompts
 
-exp1_lambda:
-  name: exp1_lambda
+exp1_1_lambda:
+  name: exp1_1_lambda
   method: grid
   sweep_parameters:
-    seed: [42]
-    prompts_dict: 
-      hamburger: ["a photo of a hamburger"]
-      icecream: ["a photo of an ice cream"]
-      saguaro: ["a small saguaro cactus planted in a clay pot"]
-      tulip: ["a photo of a tulip"]
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      # saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
     lambda_repulsion: [600, 800, 1000, 1200, 1400]
     
   fixed_parameters:
+    seed: 42
     num_particles: 8
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 6
@@ -78,9 +79,60 @@ exp1_lambda:
     visualize: True
     save_iid: False
     save_rendered_images: True
-    save_rendered_images_interval: 1500
+    save_rendered_images_interval: 200
     save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 1500
+    save_multi_viewpoints_interval: 1000
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+exp1_2_all_prompts_with_win_lambda:
+  name: exp1_2_all_prompts_with_win_lambda
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+    repulsion_type: ['rlsd', 'svgd']
+    kernel_type: ['cosine', 'rbf']
+    
+  fixed_parameters:
+    seed: 42
+    lambda_repulsion: 
+      rlsd_rbf: 1000
+      rlsd_cosine: 1200
+      svgd_rbf: 1400
+      svgd_cosine: 1200
+
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 6
+    kernel_tau: 0.5 # only for rbf
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 200
+    save_multi_viewpoints: True
+    save_multi_viewpoints_interval: 1000
 
     eval_W: 256
     eval_H: 256
@@ -99,22 +151,24 @@ exp2_kernel:
   method: grid
   sweep_parameters:
     seed: [42]
-    prompts_dict: 
-      hamburger: ["a photo of a hamburger"]
-      icecream: ["a photo of an ice cream"]
-      saguaro: ["a small saguaro cactus planted in a clay pot"]
-      tulip: ["a photo of a tulip"]
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['rbf', 'cosine']
+
     
   fixed_parameters:
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+
     lambda_repulsion: 
       rlsd_rbf: 1000
       rlsd_cosine: 1000
       svgd_rbf: 1000
       svgd_cosine: 1000
-    num_particles: 8
-    feature_extractor_model_name: "facebook/dinov2-base"
 
     feature_layer: 6
     kernel_tau: 0.5 # only for rbf
@@ -151,11 +205,11 @@ exp2_kernel:
   sweep_parameters:
     repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['rbf', 'cosine']
-    prompts_dict: 
-      hamburger: ["a photo of a hamburger"]
-      icecream: ["a photo of an ice cream"]
-      saguaro: ["a small saguaro cactus planted in a clay pot"]
-      tulip: ["a photo of a tulip"]
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
 
   fixed_parameters:
     lambda_repulsion: 
@@ -206,11 +260,11 @@ exp3_tau:
 
   fixed_parameters:
     seed: 42
-    prompts_dict: 
-      hamburger: ["a photo of a hamburger"]
-      icecream: ["a photo of an ice cream"]
-      saguaro: ["a small saguaro cactus planted in a clay pot"]
-      tulip: ["a photo of a tulip"]
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
     num_particles: [8]
 #     feature_extractor_model_name: ["facebook/dinov2-base"]
 #     feature_layer: [6]

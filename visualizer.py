@@ -290,6 +290,11 @@ class GaussianVisualizer:
         if visualize is None:
             visualize = self.opt.visualize
             
+        # Create camera object with current pose and parameters
+        # used ref_size (256) instead of W, H (800) to decrease memory usage
+        eval_W = getattr(self.opt, 'eval_W', self.opt.W) 
+        eval_H = getattr(self.opt, 'eval_H', self.opt.H)
+            
         # Generate camera viewpoints for the specified number of views
         multi_viewpoints = self.set_viewpoints(num_views)
         
@@ -323,11 +328,6 @@ class GaussianVisualizer:
             
             # Compute camera pose for current viewpoint
             pose = orbit_camera(elevation, azimuth, self.cam.radius)
-            
-            # Create camera object with current pose and parameters
-            # used ref_size (256) instead of W, H (800) to decrease memory usage
-            eval_W = getattr(self.opt, 'eval_W', self.opt.W) 
-            eval_H = getattr(self.opt, 'eval_H', self.opt.H)
             
             camera = MiniCam(
                 pose,

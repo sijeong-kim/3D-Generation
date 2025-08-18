@@ -176,8 +176,9 @@ class GUI:
 
     def train_step(self):
         
+        
         with torch.no_grad():
-            if self.opt.metrics and self.metrics_calculator is not None:
+            if self.step % self.opt.efficiency_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
                 starter = torch.cuda.Event(enable_timing=True)
                 ender = torch.cuda.Event(enable_timing=True)
                 starter.record()
@@ -192,7 +193,7 @@ class GUI:
 
         total_loss = 0
 
-        # 1. Render images (novel view)
+        # 1.1. Render images (novel view)
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512) # intial acceleration
         images = []
         outputs = []
@@ -232,40 +233,45 @@ class GUI:
             # Store output for each particle
             outputs.append(out)
         
-
-        
         images = torch.cat(images, dim=0) # [N, 3, H, W]
-        # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
-        
-        
-        # 2. SDS gradient (latent space)
-        if self.opt.use_sigma_weight:
-            score_gradients, latents, sigmas = self.guidance_sd.train_step_gradient(
-                images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-                return_sigma=True
-            )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64], sigma_t: [N]
-        
-            sigma_norm = sigmas / (sigmas.mean() + 1e-8)
-            w_sigma = sigma_norm.pow(self.opt.rep_sigma_power) # gamma
+        if self.opt.repulsion_type == 'wo':
+            # SDS loss == attraction loss
+            target = (latents - score_gradients).detach()
+            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+            attraction_loss = attraction_loss_per_particle.mean()
+            # No repulsion loss for WO
+            repulsion_loss = torch.tensor(0.0, device=images.device, dtype=torch.float32)
         else:
-            score_gradients, latents = self.guidance_sd.train_step_gradient(
-                images, step_ratio=step_ratio if self.opt.anneal_timestep else None
-            )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
-            w_sigma = torch.ones(self.opt.num_particles, device=images.device, dtype=torch.float32) # [N]
-            
-        # cosine decay
-        if self.opt.use_cosine_decay:
-            s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
-            w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
-        else:
-            w_cos = 1.0
-            
-        w_rep = w_sigma * w_cos
-            
-        if self.opt.repulsion_type == 'svgd':
+            # 1.2. Feature extraction
             features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
             
+            # 2. SDS gradient weight (latent space) – use different weight for each particle
+            # 2.1. Sigma weight
+            if self.opt.use_sigma_weight:
+                score_gradients, latents, sigmas = self.guidance_sd.train_step_gradient(
+                    images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+                    return_sigma=True
+                )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64], sigma_t: [N]
+            
+                sigma_norm = sigmas / (sigmas.mean() + 1e-8)
+                w_sigma = sigma_norm.pow(self.opt.rep_sigma_power) # gamma
+            else:
+                score_gradients, latents = self.guidance_sd.train_step_gradient(
+                    images, step_ratio=step_ratio if self.opt.anneal_timestep else None
+                )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
+                w_sigma = torch.ones(self.opt.num_particles, device=images.device, dtype=torch.float32) # [N]
+                
+            # 2.2. Cosine decay
+            if self.opt.use_cosine_decay:
+                s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
+                w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
+            else:
+                w_cos = 1.0
+                
+            w_rep = w_sigma * w_cos
+            
+        if self.opt.repulsion_type == 'svgd':
             # 3. RBF kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
@@ -296,10 +302,7 @@ class GUI:
             repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
             repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
             
-        elif self.opt.repulsion_type == 'rlsd':
-            
-            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
-            
+        if self.opt.repulsion_type == 'rlsd':
             # 3. RBF kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
@@ -330,17 +333,8 @@ class GUI:
             repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
             repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
 
-        elif self.opt.repulsion_type == 'wo':
-            # SDS loss == attraction loss
-            target = (latents - score_gradients).detach()
-            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
-            attraction_loss = attraction_loss_per_particle.mean()
-            # No repulsion loss for WO
-            repulsion_loss = torch.tensor(0.0, device=images.device, dtype=torch.float32)
-        else:
-            raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
         
-        # 6. Scale losses (sigma_t)
+        # 6. Scale losses
         scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
@@ -388,25 +382,50 @@ class GUI:
         # Log metrics and visualize
         #########################################################
         with torch.no_grad():
-            if self.step % self.opt.metrics_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
+            if self.opt.metrics and self.metrics_calculator is not None:
                 # time
-                ender.record()
-                torch.cuda.synchronize()
-                t = starter.elapsed_time(ender)
-                
-                # memory usage
-                memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
-                max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
-                
+                if self.step % self.opt.efficiency_interval == 0:
+                    ender.record()
+                    torch.cuda.synchronize()
+                    t = starter.elapsed_time(ender)
+                    
+                    # memory usage
+                    memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
+                    max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
+                    
+                    # log
+                    self.metrics_calculator.log_efficiency(
+                        step=self.step,
+                        efficiency= {
+                            "time": t,
+                            "memory_allocated_mb": memory_allocated,
+                            "max_memory_allocated_mb": max_memory_allocated,
+                        },
+                    )
+                    
                 # losses
-                attraction_loss_val = attraction_loss.item()
-                repulsion_loss_val = repulsion_loss.item()
-                scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
-                scaled_repulsion_loss_val = self.opt.lambda_repulsion * repulsion_loss_val
-                total_loss_val = total_loss.item()
+                if self.step % self.opt.losses_interval == 0:
+                    attraction_loss_val = attraction_loss.item()
+                    repulsion_loss_val = repulsion_loss.item()
+                    scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
+                    scaled_repulsion_loss_val = self.opt.lambda_repulsion * repulsion_loss_val
+                    total_loss_val = total_loss.item()
+                    
+                    # log
+                    self.metrics_calculator.log_losses(
+                        step=self.step,
+                        losses= {
+                            "attraction_loss": attraction_loss_val,
+                            "repulsion_loss": repulsion_loss_val,
+                            "scaled_attraction_loss": scaled_attraction_loss_val,
+                            "scaled_repulsion_loss": scaled_repulsion_loss_val,
+                            "total_loss": total_loss_val,
+                            "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
+                        },
+                    )
             
                 # quantitative metrics
-                if self.opt.metrics and self.metrics_calculator is not None and self.visualizer is not None:
+                if self.step % self.opt.quantitative_metrics_interval == 0 and self.visualizer is not None:
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step)  # [V, N, 3, H, W]
                     # fidelity
                     fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
@@ -417,43 +436,58 @@ class GUI:
                     if self.opt.enable_lpips:
                         # LPIPS (inter-sample and cross-view consistency)
                         lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std = self.metrics_calculator.compute_lpips_inter_and_consistency(multi_view_images)
-                else:
-                    fidelity_mean, fidelity_std, inter_particle_diversity_mean, inter_particle_diversity_std, cross_view_consistency_mean, cross_view_consistency_std = None, None, None, None, None, None
-                    lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std = None, None, None, None
-                    
-                # log
-                self.metrics_calculator.log_metrics(
-                    # efficiency
-                    step=self.step,
-                    efficiency= {
-                        "time": t,
-                        "memory_allocated_mb": memory_allocated,
-                        "max_memory_allocated_mb": max_memory_allocated,
-                    },
-                    # losses
-                    losses= {
-                        "attraction_loss": attraction_loss_val,
-                        "repulsion_loss": repulsion_loss_val,
-                        "scaled_attraction_loss": scaled_attraction_loss_val,
-                        "scaled_repulsion_loss": scaled_repulsion_loss_val,
-                        "total_loss": total_loss_val,
-                        "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
-                    },
-                    # metrics
-                    metrics= {
-                        "fidelity_mean": fidelity_mean,
-                        "fidelity_std": fidelity_std,
-                        "inter_particle_diversity_mean": inter_particle_diversity_mean,
-                        "inter_particle_diversity_std": inter_particle_diversity_std,
-                        "cross_view_consistency_mean": cross_view_consistency_mean,
-                        "cross_view_consistency_std": cross_view_consistency_std,
-                        # LPIPS
-                        "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
-                        "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
-                        "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
-                        "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
-                    }
-                )
+                        
+                    # log
+                    self.metrics_calculator.log_quantitative_metrics(
+                        step=self.step,
+                        metrics= {
+                            "fidelity_mean": fidelity_mean,
+                            "fidelity_std": fidelity_std,
+                            "inter_particle_diversity_mean": inter_particle_diversity_mean,
+                            "inter_particle_diversity_std": inter_particle_diversity_std,
+                            "cross_view_consistency_mean": cross_view_consistency_mean,
+                            "cross_view_consistency_std": cross_view_consistency_std,
+                            # LPIPS
+                            "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
+                            "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
+                            "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
+                            "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
+                        }
+                    )
+
+                # # log
+                # self.metrics_calculator.log_metrics(
+                #     # efficiency
+                #     step=self.step,
+                #     efficiency= {
+                #         "time": t,
+                #         "memory_allocated_mb": memory_allocated,
+                #         "max_memory_allocated_mb": max_memory_allocated,
+                #     },
+                #     # losses
+                #     losses= {
+                #         "attraction_loss": attraction_loss_val,
+                #         "repulsion_loss": repulsion_loss_val,
+                #         "scaled_attraction_loss": scaled_attraction_loss_val,
+                #         "scaled_repulsion_loss": scaled_repulsion_loss_val,
+                #         "total_loss": total_loss_val,
+                #         "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
+                #     },
+                #     # metrics
+                #     metrics= {
+                #         "fidelity_mean": fidelity_mean,
+                #         "fidelity_std": fidelity_std,
+                #         "inter_particle_diversity_mean": inter_particle_diversity_mean,
+                #         "inter_particle_diversity_std": inter_particle_diversity_std,
+                #         "cross_view_consistency_mean": cross_view_consistency_mean,
+                #         "cross_view_consistency_std": cross_view_consistency_std,
+                #         # LPIPS
+                #         "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
+                #         "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
+                #         "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
+                #         "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
+                #     }
+                # )
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
