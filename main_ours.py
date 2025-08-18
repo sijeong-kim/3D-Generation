@@ -235,6 +235,13 @@ class GUI:
         
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         
+        # 2.1. Get gradients and latents from SD (latent space) and repulsion weight
+        score_gradients, latents, w_sigma = self.guidance_sd.train_step_gradient(
+            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+            use_sigma_weight=self.opt.use_sigma_weight,
+            rep_sigma_power=self.opt.rep_sigma_power
+        )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64], w_sigma: [N]
+
         if self.opt.repulsion_type == 'wo':
             # SDS loss == attraction loss
             target = (latents - score_gradients).detach()
@@ -242,27 +249,44 @@ class GUI:
             attraction_loss = attraction_loss_per_particle.mean()
             # No repulsion loss for WO
             repulsion_loss = torch.tensor(0.0, device=images.device, dtype=torch.float32)
+            
         else:
-            # 1.2. Feature extraction
+            # 3. Feature extraction (feature space)
             features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
             
-            # 2. SDS gradient weight (latent space) – use different weight for each particle
-            # 2.1. Sigma weight
-            if self.opt.use_sigma_weight:
-                score_gradients, latents, sigmas = self.guidance_sd.train_step_gradient(
-                    images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-                    return_sigma=True
-                )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64], sigma_t: [N]
-            
-                sigma_norm = sigmas / (sigmas.mean() + 1e-8)
-                w_sigma = sigma_norm.pow(self.opt.rep_sigma_power) # gamma
+            # 4. RBF kernel computation (feature space)
+            if self.opt.kernel_type == 'rbf':
+                kernel, kernel_grad = rbf_kernel_and_grad(
+                    features, 
+                    repulsion_type=self.opt.repulsion_type, 
+                    tau=self.opt.kernel_tau
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_grad = cosine_kernel_and_grad(
+                    features, 
+                    repulsion_type=self.opt.repulsion_type
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
             else:
-                score_gradients, latents = self.guidance_sd.train_step_gradient(
-                    images, step_ratio=step_ratio if self.opt.anneal_timestep else None
-                )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
-                w_sigma = torch.ones(self.opt.num_particles, device=images.device, dtype=torch.float32) # [N]
-                
-            # 2.2. Cosine decay
+                raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
+            
+            kernel = kernel.detach().to(torch.float32)
+            kernel_grad = kernel_grad.detach().to(torch.float32)
+            
+            # 5. Attraction loss (latent space)            
+            if self.opt.repulsion_type == 'svgd':
+                v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
+                target = (latents - v).detach()
+            elif self.opt.repulsion_type == 'rlsd':
+                target = (latents - score_gradients).detach()
+            else:
+                raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
+
+            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
+            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
+            attraction_loss = attraction_loss_per_particle.mean() # [N] -> [1]
+            
+            
+            # Cosine decay for repulsion weight
             if self.opt.use_cosine_decay:
                 s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
                 w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
@@ -270,71 +294,14 @@ class GUI:
                 w_cos = 1.0
                 
             w_rep = w_sigma * w_cos
-            
-        if self.opt.repulsion_type == 'svgd':
-            # 3. RBF kernel computation (feature space)
-            if self.opt.kernel_type == 'rbf':
-                kernel, kernel_grad = rbf_kernel_and_grad(
-                    features, 
-                    repulsion_type=self.opt.repulsion_type, 
-                    tau=self.opt.kernel_tau
-                )  # kernel:[N,N], kernel_grad:[N, D_feature]
-            elif self.opt.kernel_type == 'cosine':
-                kernel, kernel_grad = cosine_kernel_and_grad(
-                    features, 
-                    repulsion_type=self.opt.repulsion_type
-                )  # kernel:[N,N], kernel_grad:[N, D_feature]
-            else:
-                raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
-            
-            kernel = kernel.detach().to(torch.float32)
-            kernel_grad = kernel_grad.detach().to(torch.float32)
-
-            # 4. Attraction loss (latent space)
-            v = torch.einsum('ij,jchw->ichw', kernel, score_gradients)  # [N,4,64,64]  
-            target = (latents - v).detach()
-            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
-            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
-            attraction_loss = attraction_loss_per_particle.mean() # [N] -> [1]
                 
-            # 5. Repulsion loss
+            # 6. Repulsion loss
             # repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
             repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
             
-        if self.opt.repulsion_type == 'rlsd':
-            # 3. RBF kernel computation (feature space)
-            if self.opt.kernel_type == 'rbf':
-                kernel, kernel_grad = rbf_kernel_and_grad(
-                    features, 
-                    repulsion_type=self.opt.repulsion_type, 
-                    tau=self.opt.kernel_tau
-                )  # kernel:[N,N], kernel_grad:[N, D_feature]
-            
-            elif self.opt.kernel_type == 'cosine':
-                kernel, kernel_grad = cosine_kernel_and_grad(
-                    features,
-                    repulsion_type=self.opt.repulsion_type
-                )  # kernel:[N,N], kernel_grad:[N, D_feature]
-            else:
-                raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
-
-            kernel = kernel.detach().to(torch.float32)
-            kernel_grad = kernel_grad.detach().to(torch.float32)
-            
-            # 4. Attraction loss (latent space)
-            target = (latents - score_gradients).detach()
-            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
-            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
-            attraction_loss = attraction_loss_per_particle.mean() # [N] -> [1]
-                
-            # 5. Repulsion loss
-            # repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
-            repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
-            repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
-
         
-        # 6. Scale losses
+        # 7. Scale losses
         scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss

@@ -229,7 +229,8 @@ class StableDiffusion(nn.Module):
         guidance_scale=100,
         as_latent=False,
         vers=None, hors=None,
-        return_sigma=False,
+        use_sigma_weight=False,
+        rep_sigma_power=1.0,
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -257,9 +258,12 @@ class StableDiffusion(nn.Module):
             # w(t), sigma_t^2
             w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
             
-            if return_sigma:
-                sigma_t = torch.sqrt(w)
-                sigma_t = sigma_t.view(batch_size)
+            if use_sigma_weight:
+                sigma_t = torch.sqrt(w).view(batch_size)
+                sigma_norm = sigma_t / (sigma_t.mean() + 1e-8)
+                w_sigma = sigma_norm.pow(rep_sigma_power) # gamma
+            else:
+                w_sigma = torch.ones(batch_size, device=self.device, dtype=torch.float32) # [N]
 
             # predict the noise residual with unet, NO grad!
             # add noise
@@ -291,11 +295,8 @@ class StableDiffusion(nn.Module):
 
             grad = w * (noise_pred - noise)
             grad = torch.nan_to_num(grad)
-                
-        if return_sigma:
-            return grad.detach().to(torch.float32), latents.to(torch.float32), sigma_t.detach().to(torch.float32)
-        else:
-            return grad.detach().to(torch.float32), latents.to(torch.float32)
+   
+        return grad.detach().to(torch.float32), latents.to(torch.float32), w_sigma.detach().to(torch.float32)
     
     @torch.no_grad()
     def produce_latents(
