@@ -58,7 +58,11 @@ exp1_1_lambda:
       tulip: "a photo of a tulip"
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
-    lambda_repulsion: [600, 800, 1000, 1200, 1400]
+    lambda_repulsion:
+      rlsd_cosine: [100, 200, 300, 400, 500]
+      svgd_cosine: [100, 200, 300, 400, 500]
+      rlsd_rbf: [800, 1000, 1200, 1400, 1600]
+      svgd_rbf: [800, 1000, 1200, 1400, 1600]
     
   fixed_parameters:
     seed: 42
@@ -66,7 +70,7 @@ exp1_1_lambda:
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 6
     kernel_tau: 0.5 # only for rbf
-    iters: 1500
+    iters: 300
     use_sigma_weight: True
     rep_sigma_power: 0.5
     use_cosine_decay: True
@@ -78,9 +82,8 @@ exp1_1_lambda:
     visualize: True
     save_iid: False
     save_rendered_images: True
-    save_rendered_images_interval: 200
-    save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 1000
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256

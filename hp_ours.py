@@ -23,23 +23,80 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
 
 
 def generate_parameter_combinations_and_sweep_params_dict(sweep_params: Dict[str, List]) -> List[Dict[str, Any]]:
-    """Generate all combinations of sweep parameters."""
+    """Generate all combinations of sweep parameters.
 
-    # prompts_dict = sweep_params['prompts_dict']
-    
-    sweep_params_dict = {}
+    Supports special handling for the following cases:
+    - sweep_parameters.prompt provided as a mapping {abbr: full_prompt}. We sweep over the abbr keys
+      and later map to the full string in merge_configs.
+    - sweep_parameters.lambda_repulsion provided as a mapping {"<repulsion>_<kernel>": [values...]}. We expand
+      lambda values AFTER choosing repulsion_type and kernel_type for each base combination.
+    """
+
+    sweep_params_dict: Dict[str, Any] = {}
+
+    # Build base sweep lists (exclude lambda_repulsion when it's a dict; handle later)
+    base_keys: List[str] = []
+    base_values: List[List[Any]] = []
+
     for key, value in sweep_params.items():
         if isinstance(value, dict):
-            sweep_params_dict[key] = value
-            
-    keys = list(sweep_params.keys())
-    values = list(sweep_params.values())
-            
-    combinations = []
-    for combination in itertools.product(*values):
-        param_dict = dict(zip(keys, combination))
-        combinations.append(param_dict)
-    
+            # Store dict-valued sweep parameters for later mapping in merge (e.g., prompt)
+            # but skip adding lambda_repulsion into sweep_params_dict to avoid mapping over numeric values later
+            if key != 'lambda_repulsion':
+                sweep_params_dict[key] = value
+
+            if key == 'prompt':
+                # Sweep over prompt abbreviations (keys)
+                base_keys.append(key)
+                base_values.append(list(value.keys()))
+            elif key == 'lambda_repulsion':
+                # Defer handling lambda_repulsion dict until after base product is formed
+                continue
+            else:
+                # Generic behavior: if a dict is provided and it's not lambda_repulsion, sweep over its keys
+                base_keys.append(key)
+                base_values.append(list(value.keys()))
+        else:
+            # Standard list-like sweep parameter
+            base_keys.append(key)
+            base_values.append(value)
+
+    # Create base combinations (without expanding lambda_repulsion dict)
+    base_combinations: List[Dict[str, Any]] = []
+    for combination in itertools.product(*base_values) if base_values else [()]:
+        param_dict = dict(zip(base_keys, combination))
+        base_combinations.append(param_dict)
+
+    # Expand lambda_repulsion if it is provided as a dict keyed by method+kernel
+    combinations: List[Dict[str, Any]] = []
+    lambda_spec = sweep_params.get('lambda_repulsion', None)
+    if isinstance(lambda_spec, dict):
+        for param_dict in base_combinations:
+            repulsion = param_dict.get('repulsion_type')
+            kernel = param_dict.get('kernel_type')
+            # Only expand if both keys are present
+            if repulsion is not None and kernel is not None:
+                method_kernel_key = f"{repulsion}_{kernel}"
+                lambda_values = lambda_spec.get(method_kernel_key)
+                if isinstance(lambda_values, list) and len(lambda_values) > 0:
+                    for lam in lambda_values:
+                        new_dict = param_dict.copy()
+                        new_dict['lambda_repulsion'] = lam
+                        combinations.append(new_dict)
+                elif isinstance(lambda_values, (int, float)):
+                    new_dict = param_dict.copy()
+                    new_dict['lambda_repulsion'] = lambda_values
+                    combinations.append(new_dict)
+                else:
+                    # No lambda values provided for this method+kernel; keep combination without setting it
+                    combinations.append(param_dict)
+            else:
+                # Cannot infer method+kernel; keep as-is
+                combinations.append(param_dict)
+    else:
+        # lambda_repulsion is not a dict; it was already included in base sweep (if present)
+        combinations = base_combinations
+
     return combinations, sweep_params_dict
     # combinations: [{'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}, {'seed': 42, 'prompt': 'hamburger', 'repulsion_type': 'svgd', 'kernel_type': 'rbf', 'lambda_repulsion': 600}]
     # sweep_params_dict: {'prompt': {'hamburger': 'a photo of a hamburger', 'icecream': 'a photo of an ice cream', 'saguaro': 'a small saguaro cactus planted in a clay pot', 'tulip': 'a photo of a tulip'}}
