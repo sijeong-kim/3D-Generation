@@ -8,12 +8,12 @@
 #SBATCH --error=outputs/%j/error.err
 
 # SLURM batch script for EXPERIMENT testing - Full parameter sweep experiments
-# Usage: sbatch scripts/run_ours_exp.sh <experiment_name>
+# Usage: sbatch scripts/experiments/run_exp0_1_sbatch.sh <experiment_name>
 #
 # Examples:
-#   sbatch scripts/run_ours_exp.sh exp0_baseline
-#   sbatch scripts/run_ours_exp.sh exp1_1_lambda
-#   sbatch scripts/run_ours_exp.sh exp1_2_all_prompts_with_win_lambda
+#   sbatch scripts/experiments/run_exp0_1_sbatch.sh exp0_baseline
+#   sbatch scripts/experiments/run_exp0_1_sbatch.sh exp1_1_lambda
+#   sbatch scripts/experiments/run_exp0_1_sbatch.sh exp1_2_all_prompts_with_win_lambda
 #
 # Purpose: Run full experiments with parameter sweeps and multiple prompts
 
