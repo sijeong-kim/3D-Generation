@@ -47,8 +47,8 @@ exp0_baseline:
 
 # Experiment 1: Repulsion lambda sweep with multiple prompts
 
-exp1_1_lambda_debug:
-  name: exp1_1_lambda_debug
+exp1_1_lambda_debug1:
+  name: exp1_1_lambda_debug1
   method: grid
   sweep_parameters:
     prompt: 
@@ -56,13 +56,14 @@ exp1_1_lambda_debug:
       # icecream: "a photo of an ice cream"
       # saguaro: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
-    repulsion_type: ['rlsd', 'svgd']
-    kernel_type: ['cosine', 'rbf']
-    lambda_repulsion:
-      rlsd_cosine: [1000]
-      svgd_cosine: [1000]
-      rlsd_rbf: [1000]
-      svgd_rbf: [1000]
+    repulsion_type: ['svgd']
+    kernel_type: ['cosine']
+    lambda_repulsion: # TODO: add more values
+      rlsd_cosine: []
+      rlsd_rbf: []
+      svgd_cosine: [1e1, 1e2, 1e3, 1e4, 1e5]
+      svgd_rbf: []
+    
     
   fixed_parameters:
     seed: 42
@@ -70,7 +71,57 @@ exp1_1_lambda_debug:
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 6
     kernel_tau: 0.5 # only for rbf
-    iters: 300
+    iters: 1000
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+exp1_1_lambda_debug2:
+  name: exp1_1_lambda_debug2
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      # saguaro: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    kernel_type: ['cosine']
+    repulsion_type: ['rlsd', 'svgd']
+    lambda_repulsion: # TODO: add more values
+      rlsd_cosine: [1000, 3000, 5000, 7000, 9000]
+      rlsd_rbf: []
+      svgd_cosine: []
+      svgd_rbf: []
+    
+    
+  fixed_parameters:
+    seed: 42
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 6
+    kernel_tau: 0.5 # only for rbf
+    iters: 1000
     use_sigma_weight: True
     rep_sigma_power: 0.5
     use_cosine_decay: True
@@ -105,12 +156,12 @@ exp1_2_lambda:
       # icecream: "a photo of an ice cream"
       # saguaro: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
-    repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
+    repulsion_type: ['rlsd', 'svgd']
     lambda_repulsion: # TODO: add more values
-      rlsd_cosine: [1000]
-      svgd_cosine: [1000]
+      rlsd_cosine: [1000, 3000, 5000, 7000, 9000]
       rlsd_rbf: [1000]
+      svgd_cosine: [1000, 3000, 5000, 7000, 9000]
       svgd_rbf: [1000]
     
   fixed_parameters:
@@ -119,7 +170,7 @@ exp1_2_lambda:
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 6
     kernel_tau: 0.5 # only for rbf
-    iters: 300 # TODO: change to higher value
+    iters: 1500 # TODO: change to higher value
     use_sigma_weight: True
     rep_sigma_power: 0.5
     use_cosine_decay: True
