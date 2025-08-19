@@ -59,10 +59,10 @@ exp1_1_lambda:
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
     lambda_repulsion:
-      rlsd_cosine: [100, 200, 300, 400, 500]
-      svgd_cosine: [100, 200, 300, 400, 500]
-      rlsd_rbf: [800, 1000, 1200, 1400, 1600]
-      svgd_rbf: [800, 1000, 1200, 1400, 1600]
+      rlsd_cosine: [25, 50, 75]
+      svgd_cosine: [25, 50, 75]
+      rlsd_rbf: [800, 1000, 1200]
+      svgd_rbf: [600, 800, 1000]
     
   fixed_parameters:
     seed: 42
@@ -70,7 +70,7 @@ exp1_1_lambda:
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 6
     kernel_tau: 0.5 # only for rbf
-    iters: 300
+    iters: 1200
     use_sigma_weight: True
     rep_sigma_power: 0.5
     use_cosine_decay: True
