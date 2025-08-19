@@ -55,7 +55,7 @@ exp1_1_lambda_debug:
       hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
       # saguaro: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
+      # tulip: "a photo of a tulip"
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
     lambda_repulsion:

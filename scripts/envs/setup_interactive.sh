@@ -67,3 +67,6 @@ echo " ✅ Environment setup is COMPLETE!"
 echo " To activate the virtual environment:"
 echo "   source ${VENV_DIR}/bin/activate"
 echo "====================================="
+
+git config --global user.name "Sijeong Kim"
+git config --global user.email "ssonge413@gmail.com"
