@@ -18,7 +18,7 @@ SLURM-based HPC cluster with CUDA 12.4
 ```bash
 git clone https://github.com/sijeong-kim/3D-Generation.git
 cd 3D-Generation
-bash scripts/setup_venv.sh
+bash scripts/envs/setup_interactive.sh
 ```
 
 ### 📌 Configuration Notes

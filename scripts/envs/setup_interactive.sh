@@ -17,13 +17,56 @@ export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
 echo "[Step 1] Creating Virtual Environment..."
 python3 -m venv "${VENV_DIR}"
 source "${VENV_DIR}/bin/activate"
+cd "${BASE_DIR}"
 
 # -----------------------------
 # 2. CUDA Environment Setup
 # -----------------------------
-echo "[Step 2] Loading CUDA ${CUDA_VERSION}..."
-export CUDA_HOME=${CUDA_HOME}
-source ${CUDA_HOME}/setup.sh
+echo "[Step 2] Locating CUDA toolkit..."
+
+# If a default CUDA_HOME is set and valid, use it; otherwise, try to auto-detect
+if [ -x "${CUDA_HOME}/bin/nvcc" ]; then
+	echo "Using CUDA at ${CUDA_HOME}"
+else
+	# Try to find nvcc in PATH first
+	if command -v nvcc >/dev/null 2>&1; then
+		NVCC_PATH="$(command -v nvcc)"
+		CUDA_HOME="$(dirname "$(dirname "${NVCC_PATH}")")"
+		export CUDA_HOME
+		echo "Detected CUDA at ${CUDA_HOME}"
+	else
+		# Probe common installation locations (prefer highest version)
+		CANDIDATES=$(ls -d /usr/local/cuda-*/ 2>/dev/null | sort -V -r; ls -d /usr/local/cuda/ 2>/dev/null || true)
+		for dir in $CANDIDATES; do
+			if [ -x "${dir%/}/bin/nvcc" ]; then
+				CUDA_HOME="${dir%/}"
+				export CUDA_HOME
+				echo "Detected CUDA at ${CUDA_HOME}"
+				break
+			fi
+		done
+	fi
+fi
+
+# If still not found, stop with guidance
+if [ ! -x "${CUDA_HOME}/bin/nvcc" ]; then
+	echo "ERROR: Could not find nvcc (CUDA compiler)." >&2
+	echo "- Tried '${CUDA_HOME}/bin/nvcc' and common locations under /usr/local." >&2
+	echo "- Ensure the CUDA Toolkit is installed and either set CUDA_HOME or add nvcc to PATH." >&2
+	echo "- Example: export CUDA_HOME=/usr/local/cuda-12.4; export PATH=\"$CUDA_HOME/bin:$PATH\"" >&2
+	exit 1
+fi
+
+# Ensure CUDA tools and libs are available
+export PATH="${CUDA_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${CUDA_HOME}/lib:${LD_LIBRARY_PATH}"
+export CUDACXX="${CUDA_HOME}/bin/nvcc"
+
+# Try to infer CUDA_VERSION from nvcc if possible (non-fatal)
+CUDA_VERSION="$("${CUDA_HOME}/bin/nvcc" --version 2>/dev/null | sed -n 's/.*release \([0-9]\+\.[0-9]\+\).*/\1/p' | head -n1 || true)"
+if [ -n "${CUDA_VERSION}" ]; then
+	echo "Using CUDA version ${CUDA_VERSION}"
+fi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export CUDA_LAUNCH_BLOCKING=1
