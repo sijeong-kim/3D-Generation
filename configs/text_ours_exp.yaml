@@ -64,15 +64,20 @@ exp0_baseline_radius:
     feature_layer: 6
     iters: 300
     invert_bg_prob: 0.0 # always white background
+    # eval_radius:
+    #   hamburger: 3.0
+    #   icecream: 3.0
+    #   saguaro: 3.5
+    #   tulip: 3.5
 
   settings:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: True
+    save_rendered_images: False
     save_rendered_images_interval: 100
     save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 500
+    save_multi_viewpoints_interval: 300
 
     eval_W: 256
     eval_H: 256
@@ -118,6 +123,12 @@ exp1_1_lambda_debug1:
     rep_cosine_warmup: 0.2
     invert_bg_prob: 0.0 # always white background
 
+    eval_radius:
+      hamburger: 3.0
+      icecream: 3.0
+      saguaro: 3.5
+      tulip: 3.5
+
   settings:
     # visualize
     visualize: True
@@ -143,18 +154,17 @@ exp1_1_lambda_debug2:
   method: grid
   sweep_parameters:
     prompt: 
-      # hamburger: "a photo of a hamburger"
+      hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      # saguaro: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
-    repulsion_type: ['svgd']
+    repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values
-      rlsd_cosine: []
+      rlsd_cosine: [1000, 2000, 3000, 4000, 5000]
       rlsd_rbf: []
-      svgd_cosine: [5000, 7000, 10000]
+      svgd_cosine: [1000, 2000, 3000, 4000, 5000]
       svgd_rbf: []
-    feature_layer: [3, 6, 11]
     
   fixed_parameters:
     seed: 42
@@ -162,12 +172,18 @@ exp1_1_lambda_debug2:
     feature_extractor_model_name: "facebook/dinov2-base"
     
     kernel_tau: 0.5 # only for rbf
-    iters: 1000
+    iters: 500
     use_sigma_weight: True
     rep_sigma_power: 0.5
     use_cosine_decay: True
     rep_cosine_warmup: 0.2
     invert_bg_prob: 0.0 # always white background
+
+    eval_radius:
+      hamburger: 3.0
+      icecream: 3.0
+      saguaro: 3.5
+      tulip: 3.5
 
   settings:
     # visualize
