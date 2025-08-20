@@ -30,6 +30,7 @@ visualize_graph_interval: 100 # for debugging
 # save_rep_features_interval: 100 # save features from different layers
 eval_W: 256
 eval_H: 256
+eval_radius: 3.0
 
 # metrics
 metrics: True

@@ -628,6 +628,16 @@ class MetricsCalculator:
         if opt is None:
             raise ValueError("opt parameter cannot be None")
         self.opt = opt
+        
+        # Initialize all attributes to None
+        self.metrics_model = None
+        self.metrics_writer, self.losses_writer, self.efficiency_writer = None, None, None
+        self.metrics_csv_file, self.losses_csv_file, self.efficiency_csv_file = None, None, None
+        self.clip_input_res, self.dino_input_res = None, None
+        self.clip_mean, self.clip_std = None, None
+        self.imagenet_mean, self.imagenet_std = None, None
+        self._warned_metrics = None
+        self._metric_ranges = None
 
         # Accessor for dict or namespace
         def _get(name, default=None):
@@ -666,6 +676,8 @@ class MetricsCalculator:
         # Metrics models (evaluation-time): configurable CLIP + LPIPS
         eval_clip_model_name = _get("eval_clip_model_name", "ViT-bigG-14")
         eval_clip_pretrained = _get("eval_clip_pretrained", None)
+        
+
 
         self.metrics_model = MetricsModel(
             device=self.device,
@@ -673,7 +685,10 @@ class MetricsCalculator:
             eval_clip_pretrained=eval_clip_pretrained,
             enable_lpips=bool(_get("enable_lpips", False)),
         )
+        
 
+        
+        
         # Preprocess configuration from the evaluation CLIP model
         self.eval_preprocess = self.metrics_model.eval_preprocess
         self.input_res = getattr(self.metrics_model.eval_clip_model.visual, "image_size", 224)
@@ -735,14 +750,19 @@ class MetricsCalculator:
     # ------------------------ lifecycle ------------------------
     def close(self) -> None:
         """Close any open CSV files."""
-        for f in (self.metrics_csv_file, self.losses_csv_file, self.efficiency_csv_file):
-            try:
-                f and f.close()
-            except Exception:
-                pass
+        
+        for f in ("metrics_csv_file", "losses_csv_file", "efficiency_csv_file"):
+            if hasattr(self, f) and getattr(self, f):
+                try:
+                    getattr(self, f).close()
+                except Exception:
+                    pass
 
-    def __del__(self):  # pragma: no cover
-        self.close()
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
 
     # ------------------------ helpers ------------------------
     def get_clip_text_features(self) -> Tensor:
@@ -1184,6 +1204,8 @@ class MetricsCalculator:
             lpips_consistency_mean, lpips_consistency_std = None, None
 
         return lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std
+    
+    
 
 
 __all__ = ["MetricsModel", "MetricsCalculator"]

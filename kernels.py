@@ -264,7 +264,7 @@ def cosine_kernel_and_grad(
                                  "Use scale01=True to shift to [0, 1].")
                 
             grad = grad_svgd_raw / denom
-            return K.detach(), grad.detach()
+            return K, grad
         else:
             raise ValueError("Invalid repulsion type. Use 'svgd' or 'rlsd'.")
     
@@ -274,12 +274,12 @@ def cosine_kernel_and_grad(
     if repulsion_type == "svgd":
         # SVGD on scaled kernel: d/dz sum_j k_{ij} = 0.5 * d/dz sum_j K[i, j]
         grad = 0.5 * grad_svgd_raw
-        return K01.detach(), grad.detach()
+        return K01, grad
     elif repulsion_type == "rlsd":
         # RLSD on scaled kernel: log sum_j K[i, j] = log(0.5*sum_j K[i, j] + 0.5*N)
         denom = 0.5 * K_sum_j + (0.5 * N)  # [N, 1]
         grad = 0.5 * grad_svgd_raw / (denom + eps)        
-        return K01.detach(), grad.detach()
+        return K01, grad
     else:
         raise ValueError("Invalid repulsion type. Use 'svgd' or 'rlsd'.")
 

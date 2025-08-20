@@ -294,6 +294,7 @@ class GaussianVisualizer:
         # used ref_size (256) instead of W, H (800) to decrease memory usage
         eval_W = getattr(self.opt, 'eval_W', self.opt.W) 
         eval_H = getattr(self.opt, 'eval_H', self.opt.H)
+        eval_radius = getattr(self.opt, 'eval_radius', self.cam.radius)
             
         # Generate camera viewpoints for the specified number of views
         multi_viewpoints = self.set_viewpoints(num_views)
@@ -327,7 +328,7 @@ class GaussianVisualizer:
         for i, (elevation, azimuth) in enumerate(multi_viewpoints):
             
             # Compute camera pose for current viewpoint
-            pose = orbit_camera(elevation, azimuth, self.cam.radius)
+            pose = orbit_camera(elevation, azimuth, eval_radius)
             
             camera = MiniCam(
                 pose,
