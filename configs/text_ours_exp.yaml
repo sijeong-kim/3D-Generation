@@ -21,9 +21,14 @@ exp0_baseline:
     repulsion_type: 'wo'
     seed: 42
     num_particles: 8
-    feature_layer: 6
+    feature_layer: 11
     iters: 1500
     invert_bg_prob: 0.0 # always white background
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 3.0
+      saguaro: 3.5
+      tulip: 3.5
 
   settings:
     # visualize

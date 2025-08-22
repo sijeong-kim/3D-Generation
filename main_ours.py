@@ -114,6 +114,11 @@ class GUI:
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
+
 
     def prepare_train(self):
 
@@ -124,16 +129,16 @@ class GUI:
             self.renderers[i].gaussians.active_sh_degree = self.renderers[i].gaussians.max_sh_degree
             self.optimizers.append(self.renderers[i].gaussians.optimizer)
 
-        pose = orbit_camera(self.opt.elevation, 0, self.opt.radius)
-        self.fixed_cam = MiniCam(
-            pose,
-            self.opt.ref_size,
-            self.opt.ref_size,
-            self.cam.fovy,
-            self.cam.fovx,
-            self.cam.near,
-            self.cam.far,
-        )
+        # pose = orbit_camera(self.opt.elevation, 0, self.opt.radius)
+        # self.fixed_cam = MiniCam(
+        #     pose,
+        #     self.opt.ref_size,
+        #     self.opt.ref_size,
+        #     self.cam.fovy,
+        #     self.cam.fovx,
+        #     self.cam.near,
+        #     self.cam.far,
+        # )
         
         # feature extractor
         # Use multi-layer extractor for specific layer extraction
@@ -162,7 +167,7 @@ class GUI:
                 
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, device=self.device)
         else:
             self.metrics_calculator = None
 
@@ -198,31 +203,32 @@ class GUI:
         images = []
         outputs = []
         # poses = []
-        vers, hors, radii = [], [], []
+
+        # vers, hors, radii = [], [], []
         # avoid too large elevation (> 80 or < -80), and make sure it always cover [min_ver, max_ver]
         min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
         max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation), 80 - self.opt.elevation)
+        
+        # render random view
+        self.seed_everything(self.seed + self.step)
+        
+        ver = np.random.randint(min_ver, max_ver)
+        hor = np.random.randint(-180, 180)
+        radius = 0
 
+        # vers.append(ver)
+        # hors.append(hor)
+        # radii.append(radius)
+
+        pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
+        cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
+    
         for j in range(self.opt.num_particles):
-            
-            # set seed for each particle + iteration step for different viewpoints each iter
+            # set seed for each particle + iteration step for different background each iter
             self.seed_everything(self.seeds[j] + self.step)
+            
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
-
-            # render random view
-            ver = np.random.randint(min_ver, max_ver)
-            hor = np.random.randint(-180, 180)
-            radius = 0
-
-            vers.append(ver)
-            hors.append(hor)
-            radii.append(radius)
-
-            pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
-            # poses.append(pose)
-
-            cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
 
             bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device=self.device)
             out = self.renderers[j].render(cur_cam, bg_color=bg_color)
@@ -235,6 +241,7 @@ class GUI:
         
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         
+        self.seed_everything(self.seed + self.step)
         # 2.1. Get gradients and latents from SD (latent space) and repulsion weight
         score_gradients, latents, w_sigma = self.guidance_sd.train_step_gradient(
             images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 

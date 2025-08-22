@@ -73,9 +73,11 @@ if [ "${#CUSTOM_SWEEPS[@]}" -gt 0 ]; then
 fi
 
 # --------------------------------
-# Run experiments (mirror sbatch behavior)
+# Run experiments
 # --------------------------------
 for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
+
+    # Create output directory
     mkdir -p "${BASE_DIR}/exp/${SWEEP_NAME}"
 
     echo "========== INTERACTIVE RUN INFO =========="
@@ -88,6 +90,43 @@ for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
     echo "Date & Time   : $(date)"
     echo "=========================================="
 
+    # --------------------------------
+    # Save environment info
+    # --------------------------------
+    LOG_DIR=${BASE_DIR}/exp/${SWEEP_NAME}/logs
+    mkdir -p "$LOG_DIR"
+
+    # ---- Save environment info ----
+    echo "[INFO] Dumping environment info..."
+    echo "Date: $(date)" > "${LOG_DIR}/env_info.txt"
+    echo "User: ${USER:-unknown}" >> "${LOG_DIR}/env_info.txt"
+    echo "Host: $(hostname)" >> "${LOG_DIR}/env_info.txt"
+    echo "" >> "${LOG_DIR}/env_info.txt"
+
+    # System / GPU
+    uname -a >> "${LOG_DIR}/env_info.txt"
+    nvidia-smi >> "${LOG_DIR}/nvidia-smi.txt" 2>/dev/null || true
+
+    # Python / CUDA / Torch versions
+    ${PYTHON_BIN} -c "import torch, sys; print('Python', sys.version); print('Torch', torch.__version__, 'CUDA', torch.version.cuda, 'cudnn', torch.backends.cudnn.version())" \
+        > "${LOG_DIR}/torch_info.txt"
+
+    # Package versions
+    pip freeze > "${LOG_DIR}/requirements.txt"
+
+    # Git state (if repo)
+    if [ -d "${BASE_DIR}/.git" ]; then
+        git -C "${BASE_DIR}" rev-parse HEAD > "${LOG_DIR}/git_commit.txt"
+        git -C "${BASE_DIR}" diff > "${LOG_DIR}/git_diff.patch" || true
+    fi
+
+    # Copy configs used
+    cp "${BASE_CONFIG}" "${LOG_DIR}/"
+    cp "${SWEEP_CONFIG}" "${LOG_DIR}/"
+
+    # --------------------------------
+    # Run experiments
+    # --------------------------------
     cd ${WORKING_DIR}
 
     echo ""
