@@ -145,6 +145,17 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fix
         merged_config['lambda_repulsion'] = method_kernel_value
         print(f"Method kernel (key, value): ({method_kernel_key}, {method_kernel_value})")
     
+    # TODO✅ set eval_radius for each prompt
+    if 'eval_radius' in fixed_params_dict and isinstance(fixed_params_dict['eval_radius'], dict) and \
+        'prompt' in sweep_params:
+        prompt_key = sweep_params['prompt']
+        if prompt_key in fixed_params_dict['eval_radius']:
+            eval_radius_value = fixed_params_dict['eval_radius'][prompt_key]
+            merged_config['eval_radius'] = eval_radius_value
+            print(f"Prompt-specific eval_radius (prompt, radius): ({prompt_key}, {eval_radius_value})")
+        else:
+            print(f"Warning: No eval_radius found for prompt '{prompt_key}'. Available: {list(fixed_params_dict['eval_radius'].keys())}")
+
     return merged_config
 
 
