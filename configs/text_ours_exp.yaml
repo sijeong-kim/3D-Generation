@@ -25,10 +25,10 @@ exp0_baseline:
     iters: 1500
     invert_bg_prob: 0.0 # always white background
     eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 3.0
-      saguaro: 3.5
-      tulip: 3.5
+      hamburger: 3.5
+      icecream: 5.0
+      saguaro: 5.0
+      tulip: 5.0
 
   settings:
     # visualize
@@ -50,54 +50,7 @@ exp0_baseline:
     num_views: 8
     enable_lpips: False # disable lpips for faster training
 
-
-exp0_baseline_radius:
-  name: exp0_baseline_radius
-  method: grid
-  sweep_parameters:
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
-    eval_radius: [3.0, 3.5, 4.0]
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'wo'
-    seed: 42
-    num_particles: 8
-    feature_layer: 6
-    iters: 300
-    invert_bg_prob: 0.0 # always white background
-    # eval_radius:
-    #   hamburger: 3.0
-    #   icecream: 3.0
-    #   saguaro: 3.5
-    #   tulip: 3.5
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    save_rendered_images: False
-    save_rendered_images_interval: 100
-    save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 300
-
-    eval_W: 256
-    eval_H: 256
-    
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    num_views: 8
-    enable_lpips: False # disable lpips for faster training
-
-
 # Experiment 1: Repulsion lambda sweep with multiple prompts
-
 exp1_1_lambda_debug1:
   name: exp1_1_lambda_debug1
   method: grid
@@ -130,9 +83,9 @@ exp1_1_lambda_debug1:
 
     eval_radius:
       hamburger: 3.0
-      icecream: 3.0
-      saguaro: 3.5
-      tulip: 3.5
+      icecream: 4.0
+      saguaro: 4.0
+      tulip: 4.0
 
   settings:
     # visualize

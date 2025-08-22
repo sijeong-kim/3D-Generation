@@ -163,7 +163,8 @@ class MetricsModel:
             ImportError: If open_clip is not installed
         """
         # Device & precision
-        self.device = _pick_device(device)
+        device_str = _pick_device(device)
+        self.device = torch.device(device_str)
         if precision not in {"fp16", "fp32"}:
             raise ValueError("precision must be 'fp16' or 'fp32'")
         self.precision = precision
@@ -349,8 +350,8 @@ class MetricsModel:
         if isinstance(texts, str):
             texts = [texts]
         tokens = self.eval_clip_tokenizer(list(texts)).to(self.device)
-        use_amp = _autocast_enabled(self.device) and self.precision == "fp16"
-        with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=use_amp):
+        use_amp = _autocast_enabled(self.device.type) and self.precision == "fp16"
+        with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=use_amp):
             text_features = self.eval_clip_model.encode_text(tokens)
         return F.normalize(text_features.float(), dim=1)
 
@@ -395,8 +396,8 @@ class MetricsModel:
         # images_clip: [B, 3, H, W], already normalized to CLIP stats
         if images_clip.ndim != 4 or images_clip.shape[1] != 3:
             raise ValueError("images_clip must be [B,3,H,W]")
-        use_amp = _autocast_enabled(self.device) and self.precision == "fp16"
-        with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=use_amp):
+        use_amp = _autocast_enabled(self.device.type) and self.precision == "fp16"
+        with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=use_amp):
             image_features = self.eval_clip_model.encode_image(images_clip.to(self.device))
         return F.normalize(image_features.float(), dim=1)
 
@@ -446,8 +447,8 @@ class MetricsModel:
         if images_dino.ndim != 4 or images_dino.shape[1] != 3:
             raise ValueError("images_dino must be [B,3,H,W]")
 
-        use_amp = _autocast_enabled(self.device) and self.precision == "fp16"
-        with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=use_amp):
+        use_amp = _autocast_enabled(self.device.type) and self.precision == "fp16"
+        with torch.autocast(device_type=self.device.type, dtype=torch.float16, enabled=use_amp):
             feats = self.dino_model.forward_features(images_dino.to(self.device))
             # --- convert to [B, D] ---
             if isinstance(feats, dict):
@@ -537,13 +538,13 @@ class MetricsModel:
             >>> model = model.to('cuda')  # Move to GPU
             >>> model = model.to('auto')  # Auto-select best device
         """
-        device = _pick_device(device)
-        self.device = device
-        self.eval_clip_model.to(device)
+        device_str = _pick_device(device)
+        self.device = torch.device(device_str)
+        self.eval_clip_model.to(device_str)
         if self.dino_model is not None:
-            self.dino_model.to(device)
+            self.dino_model.to(device_str)
         if self.lpips is not None:
-            self.lpips.to(device)
+            self.lpips.to(device_str)
         return self
 
 
@@ -648,7 +649,8 @@ class MetricsCalculator:
         self._get = _get
 
         # Device selection
-        self.device = _pick_device(device or "auto")
+        device_str = _pick_device(device or "auto")
+        self.device = torch.device(device_str)
 
         # Outputs
         outdir = _get("outdir", "./outputs")

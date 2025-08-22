@@ -167,7 +167,7 @@ class GUI:
                 
         # metrics
         if self.opt.metrics:
-            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, device=self.device)
+            self.metrics_calculator = MetricsCalculator(opt=self.opt, prompt=self.prompt, device=self.device.type)
         else:
             self.metrics_calculator = None
 
