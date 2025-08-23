@@ -30,8 +30,8 @@ exp_wo:
     visualize: true
     save_iid: false
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
-    save_multi_viewpoints_interval: 2000
+    visualize_multi_viewpoints: False
+    visualize_multi_viewpoints_interval: 2000
     visualize_graph: false
     metrics: true
     quantitative_metrics_interval: 10
@@ -62,8 +62,8 @@ exp_svgd_rbf:
     save_iid: false
     save_rendered_images: False
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
-    save_multi_viewpoints_interval: 2000
+    visualize_multi_viewpoints: False
+    visualize_multi_viewpoints_interval: 2000
     metrics: true
     quantitative_metrics_interval: 10
     losses_interval: 10
@@ -92,8 +92,8 @@ exp_svgd_cosine:
     visualize: true
     save_iid: false
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
-    save_multi_viewpoints_interval: 2000
+    visualize_multi_viewpoints: False
+    visualize_multi_viewpoints_interval: 2000
     metrics: true
     quantitative_metrics_interval: 10
     losses_interval: 10
@@ -122,8 +122,8 @@ exp_rlsd_rbf:
     visualize: true
     save_iid: false
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
-    save_multi_viewpoints_interval: 2000
+    visualize_multi_viewpoints: False
+    visualize_multi_viewpoints_interval: 2000
     metrics: true
     quantitative_metrics_interval: 10
     losses_interval: 10
@@ -152,8 +152,8 @@ exp_rlsd_cosine:
     visualize: true
     save_iid: false
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
-    save_multi_viewpoints_interval: 2000
+    visualize_multi_viewpoints: False
+    visualize_multi_viewpoints_interval: 2000
     metrics: true
     quantitative_metrics_interval: 10
     losses_interval: 10
@@ -183,8 +183,8 @@ exp_all_methods:
     visualize: true
     save_iid: false
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
-    save_multi_viewpoints_interval: 2000
+    visualize_multi_viewpoints: False
+    visualize_multi_viewpoints_interval: 2000
     metrics: true
     quantitative_metrics_interval: 10
     losses_interval: 10

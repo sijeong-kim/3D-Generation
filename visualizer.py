@@ -70,8 +70,8 @@ class GaussianVisualizer:
              - num_particles: Number of particles to visualize
              - W, H: Image width and height
              - save_iid: Whether to save individual particle images
-             - save_multi_viewpoints: Whether to save multi-viewpoint renders
-             - save_multi_viewpoints_interval: Interval for saving multi-view renders
+             - visualize_multi_viewpoints: Whether to save multi-viewpoint renders
+             - visualize_multi_viewpoints_interval: Interval for saving multi-view renders
         renderers: List of renderer objects, one per particle. Each renderer should
                   have a render() method and gaussians attribute for debugging.
         cam: Camera configuration object with radius, fovy, fovx, near, far attributes.
@@ -96,8 +96,8 @@ class GaussianVisualizer:
                  - num_particles (int): Number of particles to visualize
                  - W, H (int): Image width and height for rendering
                  - save_iid (bool): Whether to save individual particle images
-                 - save_multi_viewpoints (bool): Whether to save multi-viewpoint renders
-                 - save_multi_viewpoints_interval (int): Interval for saving multi-view renders
+                 - visualize_multi_viewpoints (bool): Whether to save multi-viewpoint renders
+                 - visualize_multi_viewpoints_interval (int): Interval for saving multi-view renders
             renderers: List of renderer objects, one per particle. Each renderer should
                       have a render() method and gaussians attribute for debugging.
                       The renderers are used to generate images from different viewpoints.
@@ -267,7 +267,7 @@ class GaussianVisualizer:
                 └── ...
         
         Note:
-            - Images are only saved when step % save_multi_viewpoints_interval == 0
+            - Images are only saved when step % visualize_multi_viewpoints_interval == 0
             - Individual particle images are only saved when save_iid is True
             - Combined particle images are only saved when num_particles > 1
             - All rendering uses white background for consistent visualization
@@ -303,7 +303,7 @@ class GaussianVisualizer:
         multi_viewpoints_dir = None
         save_paths = None
         
-        if visualize_multi_viewpoints and (step % self.opt.save_multi_viewpoints_interval == 0):
+        if visualize_multi_viewpoints and (step % self.opt.visualize_multi_viewpoints_interval == 0):
             # Create directory for combined particle views
             if self.opt.num_particles > 1:
                 multi_viewpoints_dir = os.path.join(
@@ -350,7 +350,7 @@ class GaussianVisualizer:
                 particle_images.append(image)
                 
                 # Save individual particle image if enabled
-                if visualize_multi_viewpoints and save_iid and (step % self.opt.save_multi_viewpoints_interval == 0):
+                if visualize_multi_viewpoints and save_iid and (step % self.opt.visualize_multi_viewpoints_interval == 0):
                     output_path = os.path.join(save_paths[particle_id], f'view_{i:03d}.png')
                     vutils.save_image(image, output_path, normalize=False)
             
@@ -359,7 +359,7 @@ class GaussianVisualizer:
             multi_viewpoint_images.append(particle_images)
             
             # Save combined view of all particles if multiple particles exist
-            if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step % self.opt.save_multi_viewpoints_interval == 0):
+            if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step % self.opt.visualize_multi_viewpoints_interval == 0):
                 output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
                 vutils.save_image(particle_images, output_path, normalize=False)
         

@@ -39,8 +39,8 @@ exp0_baseline:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 500
+    visualize_multi_viewpoints: True
+    visualize_multi_viewpoints_interval: 500
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
@@ -92,7 +92,7 @@ exp1_lambda_coarse_svgd:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -149,7 +149,7 @@ exp1_lambda_coarse_rlsd:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -202,7 +202,7 @@ exp2_lambda_fine_rbf:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -256,7 +256,7 @@ exp2_lambda_fine_cosine:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -308,7 +308,7 @@ exp3_beta:
     save_iid: True
     save_rendered_images: True
     save_rendered_images_interval: 250
-    save_multi_viewpoints: False # TODO: save the final (high resolution)
+    visualize_multi_viewpoints: False # TODO: save the final (high resolution)
 
     eval_W: 800
     eval_H: 800

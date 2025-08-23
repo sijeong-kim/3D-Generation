@@ -46,7 +46,7 @@ debug_quick_test:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 50  # More frequent saves for debugging
-    save_multi_viewpoints: False  # Disable for speed
+    visualize_multi_viewpoints: False  # Disable for speed
 
     eval_W: 128  # Lower resolution for speed
     eval_H: 128
@@ -94,7 +94,7 @@ debug_kernel_comparison:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -139,8 +139,8 @@ exp0_baseline:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: True
-    save_multi_viewpoints_interval: 500
+    visualize_multi_viewpoints: True
+    visualize_multi_viewpoints_interval: 500
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
@@ -194,7 +194,7 @@ exp1_lambda_coarse:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -252,7 +252,7 @@ exp2_lambda_fine:
     save_iid: False
     save_rendered_images: True
     save_rendered_images_interval: 100
-    save_multi_viewpoints: False
+    visualize_multi_viewpoints: False
 
     eval_W: 256
     eval_H: 256
@@ -304,7 +304,7 @@ exp3_beta:
     save_iid: True
     save_rendered_images: True
     save_rendered_images_interval: 250
-    save_multi_viewpoints: False # TODO: save the final (high resolution)
+    visualize_multi_viewpoints: False # TODO: save the final (high resolution)
 
     eval_W: 800
     eval_H: 800
