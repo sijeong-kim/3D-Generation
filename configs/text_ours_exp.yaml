@@ -166,7 +166,7 @@ exp1_lambda_coarse_rlsd:
     enable_lpips: False # disable lpips for faster training
 
 exp2_lambda_fine_svgd:
-  name: exp2_lambda_fine_rbf
+  name: exp2_lambda_fine_svgd
   method: grid
   sweep_parameters:
     prompt: 

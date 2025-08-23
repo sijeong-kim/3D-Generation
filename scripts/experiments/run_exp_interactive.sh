@@ -92,7 +92,8 @@ export HF_DATASETS_OFFLINE=1
 # --------------------------------
 # Default sweep names; can be overridden by CLI args
 # --------------------------------
-SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine")
+SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine" "exp2_lambda_fine_svgd" "exp2_lambda_fine_rlsd")
+
 
 # Parse CLI args: allow various flags and optional sweep names
 DRY_RUN_ARG=""
@@ -123,7 +124,7 @@ fi
 # --------------------------------
 # Validate experiment names
 # --------------------------------
-VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine")
+VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine" "exp2_lambda_fine_svgd" "exp2_lambda_fine_rlsd")
 
 for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
     if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${SWEEP_NAME} " ]]; then
