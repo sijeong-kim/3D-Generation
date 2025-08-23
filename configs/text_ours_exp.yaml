@@ -44,6 +44,7 @@ exp0_baseline:
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
@@ -100,6 +101,7 @@ exp1_lambda_coarse_svgd:
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
@@ -157,12 +159,13 @@ exp1_lambda_coarse_rlsd:
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
 
-exp2_lambda_fine_rbf:
+exp2_lambda_fine_svgd:
   name: exp2_lambda_fine_rbf
   method: grid
   sweep_parameters:
@@ -171,11 +174,12 @@ exp2_lambda_fine_rbf:
       # icecream: "a photo of an ice cream"
       saguaro: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
-    repulsion_type: ['svgd', 'rlsd']
-    kernel_type: ['rbf']
+    repulsion_type: ['svgd']
+    kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_rbf: [300, 500, 700]
       svgd_rbf: [150, 250, 350]
+      svgd_cosine: [350, 500, 650]
+      
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
@@ -187,7 +191,7 @@ exp2_lambda_fine_rbf:
     use_sigma_weight: True
     rep_sigma_power: 0.5
     use_cosine_decay: True
-    rep_cosine_warmup: 0.2
+    rep_cosine_warmup: 0.3 # increase for svgd to avoid overshooting
     invert_bg_prob: 0.0 # always white background
 
     eval_radius:
@@ -210,13 +214,14 @@ exp2_lambda_fine_rbf:
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
 
-exp2_lambda_fine_cosine:
-  name: exp2_lambda_fine_cosine
+exp2_lambda_fine_rlsd:
+  name: exp2_lambda_fine_rlsd
   method: grid
   sweep_parameters:
     prompt: 
@@ -224,11 +229,11 @@ exp2_lambda_fine_cosine:
       # icecream: "a photo of an ice cream"
       saguaro: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
-    repulsion_type: ['svgd', 'rlsd']
-    kernel_type: ['cosine']
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_cosine: [700, 900, 1200]
-      svgd_cosine: [350, 500, 650]
+      rlsd_cosine: [700, 900, 1100]
+      rlsd_rbf: [300, 500, 700]
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
@@ -264,10 +269,48 @@ exp2_lambda_fine_cosine:
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
+
+
+### START SPOTCHECK ### 
+exp2b_beta_spotcheck_rbf:
+  name: exp2b_beta_spotcheck_rbf
+  method: grid
+  sweep_parameters:
+    prompt:
+      hamburger: "a photo of a hamburger"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+    repulsion_type: ['svgd', 'rlsd']
+    kernel_type: ['rbf']
+    lambda_repulsion:
+      rlsd_rbf: [500]   # 각자 sweet-spot 중앙값 하나만
+      svgd_rbf: [250]
+    rbf_beta: [0.5, 1.0]   # ← 여기만 스팟체크
+    seed: [42]
+  fixed_parameters: { ...exp2와 동일... }
+  settings: { ...exp2와 동일... }
+
+exp2b_beta_spotcheck_cosine:
+  name: exp2b_beta_spotcheck_cosine
+  method: grid
+  sweep_parameters:
+    prompt:
+      hamburger: "a photo of a hamburger"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+    repulsion_type: ['rlsd']
+    kernel_type: ['cosine']
+    lambda_repulsion:
+      rlsd_cosine: [900]    # 중앙값 하나
+    cosine_beta: [1.0, 2.0] # 스팟체크
+    seed: [42]
+  fixed_parameters: { ... }
+  settings: { ... }
+
+### END SPOTCHECK ###   
 
 exp3_beta:
   name: exp3_beta
@@ -316,6 +359,7 @@ exp3_beta:
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
