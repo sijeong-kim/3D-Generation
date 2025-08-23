@@ -16,7 +16,7 @@ multi_view_type: best_views # best_views, average_views, cross_attention_views
 losses_interval: 1
 efficiency_interval: 1
 quantitative_metrics_interval: 1
-kernel_stats_interval: 10  # interval for logging kernel statistics
+kernel_metrics_interval: 10  # interval for logging kernel statistics
 
 # multi-viewpoints
 num_views: 4

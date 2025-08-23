@@ -295,7 +295,7 @@ class GUI:
             kernel_grad = kernel_grad.detach().to(torch.float32)
             
             # 4.5. Compute and log kernel statistics (if metrics enabled)
-            if self.opt.metrics and self.metrics_calculator is not None and self.step % self.opt.kernel_stats_interval == 0:
+            if self.opt.metrics and self.metrics_calculator is not None and self.step % self.opt.kernel_metrics_interval == 0:
                 neff_mean, neff_std, row_sum_mean, row_sum_std, gradient_norm_mean, gradient_norm_std = self.metrics_calculator.compute_kernel_statistics(kernel, kernel_grad, features)
                 self.metrics_calculator.log_kernel_stats(
                     step=self.step,
