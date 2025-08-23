@@ -86,7 +86,7 @@ fi
 # --------------------------------
 # Default sweep names; can be overridden by CLI args
 # --------------------------------
-SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse" "exp2_lambda_fine" "exp3_beta_rbf" "exp3_beta_cosine")
+SWEEP_NAMES=("exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
 
 # Parse CLI args: allow various flags and optional sweep names
 DRY_RUN_ARG=""
@@ -117,7 +117,7 @@ fi
 # --------------------------------
 # Validate experiment names
 # --------------------------------
-VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse" "exp2_lambda_fine" "exp3_beta")
+VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
 
 for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
     if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${SWEEP_NAME} " ]]; then
@@ -126,9 +126,8 @@ for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
         echo ""
         echo "Available experiments from text_ours_exp.yaml:"
         echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
-        echo "  exp1_lambda_coarse         # Coarse lambda sweep"
-        echo "  exp2_lambda_fine           # Fine lambda sweep"
-        echo "  exp3_beta                  # Beta sweep for both RBF and cosine kernels"
+        echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVGD"
+        echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSd"
         exit 1
     fi
 done

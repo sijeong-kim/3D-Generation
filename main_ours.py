@@ -1,5 +1,11 @@
 # main_ours.py
 import os
+
+# Set environment variables for local model loading
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+
 import cv2
 import time
 import tqdm
@@ -151,6 +157,11 @@ class GUI:
                 device=self.device
             )
             
+            # Freeze feature extractor weights
+            self.feature_extractor.model.eval()
+            for param in self.feature_extractor.model.parameters():
+                param.requires_grad = False
+            
             # Make sure the feature layer is an integer and convert str to int if necessary
             n_layers = len(self.feature_extractor.model.encoder.layer)
             fl = self.opt.feature_layer
@@ -173,6 +184,13 @@ class GUI:
 
         print(f"[INFO] loading SD...")
         self.guidance_sd = StableDiffusion(self.device)
+        
+        # Freeze all model weights
+        for module in [self.guidance_sd.vae, self.guidance_sd.text_encoder, self.guidance_sd.unet]:
+            module.eval()
+            for param in module.parameters():
+                param.requires_grad = False
+        
         print(f"[INFO] loaded SD!")
 
         # prepare embeddings

@@ -69,15 +69,29 @@ class DINOv2MultiLayerFeatureExtractor:
         self.device = device
         self.model_name = model_name
         
-        # Load model and processor from HuggingFace
+        # Load model and processor from HuggingFace with offline mode support
         print(f"Loading {model_name} model and processor...")
-        self.processor = AutoImageProcessor.from_pretrained(model_name, use_fast=True)
-        self.model = AutoModel.from_pretrained(model_name, attn_implementation="eager").to(device)
+        try:
+            self.processor = AutoImageProcessor.from_pretrained(model_name, use_fast=True)
+            self.model = AutoModel.from_pretrained(model_name, attn_implementation="eager").to(device)
+        except Exception as e:
+            print(f"[WARNING] Failed to download model from HuggingFace Hub: {e}")
+            print("[INFO] Attempting to load from local cache...")
+            try:
+                self.processor = AutoImageProcessor.from_pretrained(model_name, use_fast=True, local_files_only=True)
+                self.model = AutoModel.from_pretrained(model_name, attn_implementation="eager", local_files_only=True).to(device)
+            except Exception as e2:
+                print(f"[ERROR] Failed to load model from local cache: {e2}")
+                print("[INFO] Please ensure you have downloaded the model previously or check your internet connection.")
+                raise e2
         self.model.eval()
 
         # Freeze all parameters to prevent accidental updates
         for param in self.model.parameters():
             param.requires_grad = False
+            
+        # Ensure model is in eval mode and gradients are disabled
+        self.model.requires_grad_(False)
         
         # Define feature dimensions for each model variant
         feature_dims = {
