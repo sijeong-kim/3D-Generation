@@ -287,8 +287,8 @@ class GaussianVisualizer:
             num_views = self.opt.num_views
         if save_iid is None:
             save_iid = self.opt.save_iid
-        if visualize is None:
-            visualize = self.opt.visualize
+        if visualize_multi_viewpoints is None:
+            visualize_multi_viewpoints = self.opt.visualize_multi_viewpoints
             
         # Create camera object with current pose and parameters
         # used ref_size (256) instead of W, H (800) to decrease memory usage
@@ -303,7 +303,7 @@ class GaussianVisualizer:
         multi_viewpoints_dir = None
         save_paths = None
         
-        if visualize and (step % self.opt.save_multi_viewpoints_interval == 0):
+        if visualize_multi_viewpoints and (step % self.opt.save_multi_viewpoints_interval == 0):
             # Create directory for combined particle views
             if self.opt.num_particles > 1:
                 multi_viewpoints_dir = os.path.join(
@@ -350,7 +350,7 @@ class GaussianVisualizer:
                 particle_images.append(image)
                 
                 # Save individual particle image if enabled
-                if visualize and save_iid and (step % self.opt.save_multi_viewpoints_interval == 0):
+                if visualize_multi_viewpoints and save_iid and (step % self.opt.save_multi_viewpoints_interval == 0):
                     output_path = os.path.join(save_paths[particle_id], f'view_{i:03d}.png')
                     vutils.save_image(image, output_path, normalize=False)
             
@@ -359,7 +359,7 @@ class GaussianVisualizer:
             multi_viewpoint_images.append(particle_images)
             
             # Save combined view of all particles if multiple particles exist
-            if visualize and (self.opt.num_particles > 1) and (step % self.opt.save_multi_viewpoints_interval == 0):
+            if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step % self.opt.save_multi_viewpoints_interval == 0):
                 output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
                 vutils.save_image(particle_images, output_path, normalize=False)
         
@@ -434,7 +434,7 @@ class GaussianVisualizer:
         """
         
         # Create output directory for this specific viewpoint
-        if self.opt.visualize:
+        if self.opt.visualize_fixed_viewpoint:
             viewpoint_dir = os.path.join(
                 self.save_dir, 
                 f'step_{step}_view_{elevation}_{horizontal}'
@@ -465,7 +465,7 @@ class GaussianVisualizer:
             particle_images.append(image)
         
             # Save individual particle image if visualization is enabled
-            if self.opt.visualize:
+            if self.opt.visualize_fixed_viewpoint:
                 filename = f'particle_{particle_id}.png'
                 output_path = os.path.join(viewpoint_dir, filename)
                 vutils.save_image(image, output_path, normalize=False)
@@ -474,7 +474,7 @@ class GaussianVisualizer:
         particle_images = torch.cat(particle_images, dim=0)  # [N, 3, H, W]
         
         # Save combined view of all particles if visualization is enabled
-        if self.opt.visualize:
+        if self.opt.visualize_fixed_viewpoint:
             filename = f'all_particles.png'
             output_path = os.path.join(viewpoint_dir, filename)
             vutils.save_image(particle_images, output_path, normalize=False)

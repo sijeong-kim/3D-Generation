@@ -174,8 +174,8 @@ exp2_lambda_fine_rbf:
     repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_rbf: [500, 750, 1000, 1500, 2000]
-      svgd_rbf: [500, 750, 1000, 1500, 2000]
+      rlsd_rbf: [250, 500, 750, 1000, 1500, 2000]
+      svgd_rbf: [250, 500, 750, 1000, 1500, 2000]
     seed: [42, 123] # TODO: add more seeds
     
   fixed_parameters:

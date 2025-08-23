@@ -25,6 +25,8 @@ save_rendered_images_interval: 100 # for debugging
 save_iid: False # for visualization
 save_multi_viewpoints: False # for visualization
 save_multi_viewpoints_interval: 500 # for debugging
+visualize_fixed_viewpoint: False # for visualization
+visualize_fixed_viewpoint_interval: 100 # for debugging
 visualize_graph: False # save graph for debugging
 visualize_graph_interval: 100 # for debugging
 # save_rep_features: False # save features from different layers
