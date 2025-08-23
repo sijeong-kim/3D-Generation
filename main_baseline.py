@@ -260,7 +260,7 @@ class GUI:
                 total_loss_val = total_loss.item()
             
                 # quantitative metrics
-                multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
+                multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize_multi_viewpoints=False, save_iid=False) # [V, N, 3, H, W]
                 representative_images, clip_similarities = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints(multi_view_images, self.opt.multi_view_type)
                 fidelity = clip_similarities.mean().item()
                 features = self.feature_extractor(representative_images) # [V, N, D_featture]

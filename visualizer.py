@@ -224,7 +224,7 @@ class GaussianVisualizer:
         vutils.save_image(images, output_path, normalize=False)
 
     @torch.no_grad()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None):
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize_multi_viewpoints=None, save_iid=None):
         """
         Render all particles from multiple viewpoints and optionally save individual images.
         
@@ -243,7 +243,7 @@ class GaussianVisualizer:
                        Used to determine whether to save images based on save intervals.
             num_views (int, optional): Number of viewpoints to render. If None, uses
                                      opt.num_views from configuration. Default: None
-            visualize (bool, optional): Whether to save images. If None, uses opt.visualize
+            visualize_multi_viewpoints (bool, optional): Whether to save images. If None, uses opt.visualize_multi_viewpoints
                                        from configuration. Default: None
             save_iid (bool, optional): Whether to save individual particle images. If None,
                                      uses opt.save_iid from configuration. Default: None

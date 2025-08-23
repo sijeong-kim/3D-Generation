@@ -430,7 +430,7 @@ class GUI:
             
                 # quantitative metrics
                 if self.step % self.opt.quantitative_metrics_interval == 0 and self.visualizer is not None:
-                    multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step)  # [V, N, 3, H, W]
+                    multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, visualize_multi_viewpoints=self.opt.visualize_multi_viewpoints, save_iid=self.opt.save_iid)  # [V, N, 3, H, W]
                     # fidelity
                     fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
                     # compute inter-particle diversity 
