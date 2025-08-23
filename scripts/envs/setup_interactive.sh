@@ -113,3 +113,12 @@ echo "====================================="
 
 git config --global user.name "Sijeong Kim"
 git config --global user.email "ssonge413@gmail.com"
+
+
+# download data
+python download_data.py
+
+# # set environment variables
+# export HF_HUB_OFFLINE=1
+# export TRANSFORMERS_OFFLINE=1
+# export HF_DATASETS_OFFLINE=1
