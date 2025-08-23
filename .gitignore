@@ -224,3 +224,6 @@ exp/
 debug/
 
 *.out
+
+
+analysis/
