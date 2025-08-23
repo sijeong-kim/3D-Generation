@@ -632,8 +632,8 @@ class MetricsCalculator:
         
         # Initialize all attributes to None
         self.metrics_model = None
-        self.metrics_writer, self.losses_writer, self.efficiency_writer = None, None, None
-        self.metrics_csv_file, self.losses_csv_file, self.efficiency_csv_file = None, None, None
+        self.metrics_writer, self.losses_writer, self.efficiency_writer, self.kernel_stats_writer = None, None, None, None
+        self.metrics_csv_file, self.losses_csv_file, self.efficiency_csv_file, self.kernel_stats_csv_file = None, None, None, None
         self.clip_input_res, self.dino_input_res = None, None
         self.clip_mean, self.clip_std = None, None
         self.imagenet_mean, self.imagenet_std = None, None
@@ -702,15 +702,18 @@ class MetricsCalculator:
         self.metrics_csv_path = os.path.join(self.save_dir, "quantitative_metrics.csv")
         self.losses_csv_path = os.path.join(self.save_dir, "losses.csv")
         self.efficiency_csv_path = os.path.join(self.save_dir, "efficiency.csv")
+        self.kernel_stats_csv_path = os.path.join(self.save_dir, "kernel_stats.csv")
 
         # Open files in newline-safe mode; buffered writes
         self.metrics_csv_file = open(self.metrics_csv_path, "w", newline="", buffering=1)
         self.losses_csv_file = open(self.losses_csv_path, "w", newline="", buffering=1)
         self.efficiency_csv_file = open(self.efficiency_csv_path, "w", newline="", buffering=1)
+        self.kernel_stats_csv_file = open(self.kernel_stats_csv_path, "w", newline="", buffering=1)
 
         self.metrics_writer = csv.writer(self.metrics_csv_file)
         self.losses_writer = csv.writer(self.losses_csv_file)
         self.efficiency_writer = csv.writer(self.efficiency_csv_file)
+        self.kernel_stats_writer = csv.writer(self.kernel_stats_csv_file)
 
         enable_lpips = bool(_get("enable_lpips", False)) and self.metrics_model.lpips is not None
         if enable_lpips:
@@ -737,6 +740,12 @@ class MetricsCalculator:
         # Explicit units: time in milliseconds, memory in megabytes
         self.efficiency_writer.writerow(["step", "time_ms", "memory_allocated_MB", "max_memory_allocated_MB"])  # noqa: N806
 
+        # Kernel statistics header
+        self.kernel_stats_writer.writerow([
+            "step", "neff_mean", "neff_std", "row_sum_mean", "row_sum_std", 
+            "gradient_norm_mean", "gradient_norm_std"
+        ])
+
         self._warned_metrics = set()  # already warned metric names
 
         # expected range specs (adjust as needed)
@@ -753,7 +762,7 @@ class MetricsCalculator:
     def close(self) -> None:
         """Close any open CSV files."""
         
-        for f in ("metrics_csv_file", "losses_csv_file", "efficiency_csv_file"):
+        for f in ("metrics_csv_file", "losses_csv_file", "efficiency_csv_file", "kernel_stats_csv_file"):
             if hasattr(self, f) and getattr(self, f):
                 try:
                     getattr(self, f).close()
@@ -1207,6 +1216,101 @@ class MetricsCalculator:
 
         return lpips_inter_mean, lpips_inter_std, lpips_consistency_mean, lpips_consistency_std
     
+    @torch.no_grad()
+    def compute_kernel_statistics(
+        self, 
+        kernel: Tensor, 
+        kernel_grad: Tensor, 
+        features: Tensor
+    ) -> Tuple[float, float, float, float, float, float]:
+        """
+        Compute kernel statistics for monitoring kernel behavior during training.
+        
+        This method computes various statistics that help understand the kernel's behavior:
+        1. Effective sample size (Neff): Measures how many effective independent samples we have
+        2. Row-sum statistics: Measures the total influence of each particle
+        3. Gradient norm: Measures the magnitude of the repulsion gradient
+        
+        Args:
+            kernel: Kernel matrix with shape [N, N] where N is the number of particles
+            kernel_grad: Kernel gradient with shape [N, D] where D is the feature dimension
+            features: Feature vectors with shape [N, D] where D is the feature dimension
+        
+        Returns:
+            Tuple[float, float, float, float, float, float]: 
+                (neff_mean, neff_std, row_sum_mean, row_sum_std, gradient_norm_mean, gradient_norm_std)
+                
+                Where:
+                - neff_mean: Mean effective sample size across particles
+                - neff_std: Standard deviation of effective sample size
+                - row_sum_mean: Mean of kernel row sums
+                - row_sum_std: Standard deviation of kernel row sums  
+                - gradient_norm_mean: Mean gradient norm across particles
+                - gradient_norm_std: Standard deviation of gradient norm
+        
+        Note:
+            - Effective sample size is computed as Neff = 1 / (sum of squared kernel values)
+            - Row sums indicate how much each particle influences others
+            - Gradient norm measures the strength of repulsion forces
+        
+        Example:
+            >>> calculator = MetricsCalculator(opt, prompt="a cat")
+            >>> kernel = torch.randn(4, 4)
+            >>> kernel_grad = torch.randn(4, 768)
+            >>> features = torch.randn(4, 768)
+            >>> neff_mean, neff_std, row_sum_mean, row_sum_std, grad_norm_mean, grad_norm_std = calculator.compute_kernel_statistics(kernel, kernel_grad, features)
+            >>> print(f"Neff: {neff_mean:.3f} ± {neff_std:.3f}")
+        """
+        if kernel.ndim != 2 or kernel.shape[0] != kernel.shape[1]:
+            raise ValueError("kernel must be a square matrix [N, N]")
+        if kernel_grad.ndim != 2 or kernel_grad.shape[0] != kernel.shape[0]:
+            raise ValueError("kernel_grad must be [N, D] where N matches kernel")
+        if features.ndim != 2 or features.shape[0] != kernel.shape[0]:
+            raise ValueError("features must be [N, D] where N matches kernel")
+            
+        N = kernel.shape[0]
+        if N == 0:
+            return 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            
+        # 1. Effective sample size (Neff) per particle
+        # Neff = 1 / (sum of squared kernel values for each row)
+        kernel_squared = kernel ** 2
+        neff_per_particle = 1.0 / (kernel_squared.sum(dim=1) + 1e-8)  # [N]
+        neff_mean = float(neff_per_particle.mean().item())
+        neff_std = float(neff_per_particle.std(unbiased=False).item()) if N > 1 else 0.0
+        
+        # 2. Row-sum statistics
+        row_sums = kernel.sum(dim=1)  # [N]
+        row_sum_mean = float(row_sums.mean().item())
+        row_sum_std = float(row_sums.std(unbiased=False).item()) if N > 1 else 0.0
+        
+        # 3. Gradient norm statistics
+        gradient_norms = kernel_grad.norm(dim=1)  # [N]
+        gradient_norm_mean = float(gradient_norms.mean().item())
+        gradient_norm_std = float(gradient_norms.std(unbiased=False).item()) if N > 1 else 0.0
+        
+        return neff_mean, neff_std, row_sum_mean, row_sum_std, gradient_norm_mean, gradient_norm_std
+
+    @torch.no_grad()
+    def log_kernel_stats(self, step: int, kernel_stats: dict):
+        """
+        Log kernel statistics to CSV file.
+        
+        Args:
+            step: Current training step
+            kernel_stats: Dictionary containing kernel statistics
+        """
+        if self.kernel_stats_writer is None:
+            return
+        self.kernel_stats_writer.writerow([
+            step,
+            kernel_stats.get("neff_mean", ""),
+            kernel_stats.get("neff_std", ""),
+            kernel_stats.get("row_sum_mean", ""),
+            kernel_stats.get("row_sum_std", ""),
+            kernel_stats.get("gradient_norm_mean", ""),
+            kernel_stats.get("gradient_norm_std", ""),
+        ])
     
 
 

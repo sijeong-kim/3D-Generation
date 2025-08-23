@@ -38,6 +38,7 @@ metrics: True
 quantitative_metrics_interval: 1
 losses_interval: 1
 efficiency_interval: 1
+kernel_stats_interval: 10  # interval for logging kernel statistics
 enable_lpips: False
 
 # multi-viewpoints (for metrics)
