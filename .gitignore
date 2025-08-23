@@ -221,5 +221,6 @@ outputs/
 backups/
 logs/
 exp/
+debug/
 
 *.out

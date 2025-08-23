@@ -1,296 +1,318 @@
-# DEBUG CONFIGURATION - Quick tests to verify main_ours.py runs correctly
+# EXPERIMENT CONFIGURATION - Full parameter sweep experiments
 #
-# DEBUG COST SUMMARY:
-# ===================
-# Total experiments: 3 runs (very fast)
-# Total estimated time: ~6-12 minutes
-# GPU memory required: ~5-7GB
-# Storage needed: ~50-100MB total
-# 
-# PURPOSE: 
-# - Verify main_ours.py runs without errors
-# - Test all 3 repulsion types ('svgd', 'rlsd', 'wo')
-# - Quick validation of pipeline
-# - Fast iteration cycles for debugging
+# This configuration allows you to set prompts in the YAML file.
+# The prompts' keys are abbreviations that can be used for naming files,
+# and their values are the actual prompts for text-to-3D generation.
 #
 # USAGE:
-# sbatch scripts/run_ours_debug.sh debug_quick_test
+# sbatch scripts/run_ours_exp.sh exp_repulsion_lambda_sweep
 
-# DEBUG: Quick test - 3 repulsion types with minimal iterations
-# COST ESTIMATE:
-#   Total combinations: 3 × 1 = 3 runs (very fast!)
-#   Time per run: ~2-4 min (50 iters)
-#   Total time: ~6-12 minutes
-#   GPU memory: ~5-7GB peak per run  
-#   Storage: ~20-40MB per run (3 runs ≈ 60-120MB total)
-#   Recommended SLURM: --time=00:30:00 --mem=16G --gres=gpu:1
-debug_001:
-  name: rbf_kernel_viz
+# TODO: λ_repulsion 1D coarse → fine 탐색 → 그다음 β(temperature) 단일 축 튜닝 → 마지막에 국소 2D(λ×β) 미세탐색.
+
+# ============================================================================
+# DEBUG EXPERIMENTS - Quick testing with short iterations
+# ============================================================================
+
+debug_quick_test:
+  name: debug_quick_test
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd']  # Test all 3 methods quickly
-
+    prompt: 
+      hamburger: "a photo of a hamburger"  # Simple prompt for quick testing
+    repulsion_type: ['wo', 'svgd']  # Test baseline and one repulsion method
+    kernel_type: ['rbf']  # Single kernel type
+    lambda_repulsion: 
+      svgd_rbf: [100, 1000]  # Just 2 values for quick testing
+    seeds: [42]  # Single seed for speed
+    
   fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [8]                         # Ultra minimal views for debugging
-    kernel_tau: [0.5]
-    lambda_sd: [1.0]
-    lambda_repulsion: [1]                # Single value
-    feature_layer: [6]                     # Single layer
-    kernel_type: ['rbf']
-    iters: [500]                                # Very short for debugging (~2-4 min per run)
+    num_particles: 2  # Minimal particles for debugging
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    kernel_beta: 1.0
+    iters: 100  # Very short for quick debugging
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+    eval_radius:
+      hamburger: 3.0
 
   settings:
-    visualize: true
-    save_iid: false
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
-    visualize_graph: false # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10           
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 50  # More frequent saves for debugging
+    save_multi_viewpoints: False  # Disable for speed
 
+    eval_W: 128  # Lower resolution for speed
+    eval_H: 128
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 25  # More frequent metrics
+    losses_interval: 5  # Very frequent loss logging
+    efficiency_interval: 5 
+    num_views: 4  # Fewer views for speed
+    enable_lpips: False # disable lpips for faster training
 
-debug_002:
-  name: cosine_kernel_viz
+debug_kernel_comparison:
+  name: debug_kernel_comparison
   method: grid
   sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
     repulsion_type: ['svgd', 'rlsd']
-    lambda_repulsion: [0, 0.1, 1.0, 10.0]               # Single value
-
-  fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [8]                         # Ultra minimal views for debugging
-    lambda_repulsion: [1.0]                   # scale for repulsive loss
-    feature_layer: [11]                     # Single layer
-    kernel_type: ['cosine']
-    iters: [500]           
-    kernel_tau: [0.5]                   # 2.0~5.0 soft, 0.1~0.5 sharp
-    lambda_sd: [1.0]                      # 0.01~0.1 (increase after being stable)
-    grad_clip: [5.0]                       # 1.0~5.0 (clip gradient)
-
-    
-  settings:
-    visualize: true
-    save_iid: false
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
-    visualize_graph: false # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10       
-
-debug_003:
-  name: kernel_viz
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd'] 
     kernel_type: ['rbf', 'cosine']
-    lambda_repulsion: [0, 1, 10, 100]
-
-  fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [8]                         # Ultra minimal views for debugging
-    iters: [500]                          # ~30-45 min per run
-
-    # sds loss
-    lambda_sd: [1.0]
-
-    # feature extractor
-    feature_layer: [11]                     # Single layer
+    lambda_repulsion: 
+      rlsd_rbf: [500]
+      rlsd_cosine: [500]
+      svgd_rbf: [500]
+      svgd_cosine: [500]
+    seeds: [42]
     
-    # repulsive loss
-    kernel_tau: [0.5]
+  fixed_parameters:
+    num_particles: 4  # Small number for debugging
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    kernel_beta: 1.0
+    iters: 200  # Short for debugging
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0
 
-    # kernel
-    kernel_tau: [0.5]
-    kernel_eps: [1e-12]
+    eval_radius:
+      hamburger: 3.0
 
   settings:
-    visualize: true
-    save_iid: false
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
-    visualize_graph: false # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10     
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
 
-debug_004:
-  name: sigma_weight_viz
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd', 'wo'] 
-    rep_sigma_power: [0.5, 1.0, 2.0]
-    use_sigma_weight: [True, False]
-    use_cosine_decay: [True, False]
-    rep_cosine_warmup: [0.0, 0.1]
-
-
-  fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [2]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [8]                         # Ultra minimal views for debugging
-    iters: [500]                          # ~30-45 min per run
-
-    # sds loss
-    lambda_sd: [1.0]
-
-    # feature extractor
-    feature_layer: [11]                     # Single layer
+    eval_W: 256
+    eval_H: 256
     
-    # repulsive loss
-    lambda_repulsion: [1000]
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 6
+    enable_lpips: False
 
-    # kernel
-    kernel_tau: [0.5]
-    kernel_eps: [1e-12]
-    
+# ============================================================================
+# ORIGINAL EXPERIMENTS (kept for reference)
+# ============================================================================
 
-  settings:
-    visualize: true
-    save_iid: false
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
-    visualize_graph: false # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10     
-
-
-debug_005:
-  name: graph_viz
+exp0_baseline:
+  name: exp0_baseline
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+  seeds: [42]
 
+  # fixed parameters
   fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [8]                         # Ultra minimal views for debugging
-    kernel_tau: [0.5]
-    lambda_sd: [1.0]
-    lambda_repulsion: [700]                # Single value
-    feature_layer: [6]                     # Single layer
-    kernel_type: ['rbf']
-    iters: [500]                                # Very short for debugging (~2-4 min per run)
+    repulsion_type: 'wo'
+    num_particles: 8
+    iters: 1500
+    invert_bg_prob: 0.0 # always white background
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      saguaro: 4.0
+      tulip: 4.0
 
   settings:
-    visualize: true
-    save_iid: true
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 1000     # Less frequent saves to reduce memory
-    visualize_graph: true # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 50     # Less frequent metrics
-    losses_interval: 25                    # Less frequent for memory
-    efficiency_interval: 25         
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: True
+    save_multi_viewpoints_interval: 500
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
 
-
-debug_006:
-  name: graph_viz
+# Experiment 1: Repulsion lambda sweep with multiple prompts
+exp1_lambda_coarse:
+  name: exp1_lambda_coarse
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd', 'wo']  # Test all 3 methods quickly
-
-  fixed_parameters:
-    seed: [42]                             # Single seed for speed
-    prompts: ["a photo of a hamburger"]    # Simple prompt
-    num_particles: [4]                     # Minimal particles for SVGD/RLSD (need >1)
-    num_views: [8]                         # Ultra minimal views for debugging
-    kernel_tau: [0.5]
-    lambda_sd: [1.0]
-    lambda_repulsion: [700]                # Single value
-    feature_layer: [6]                     # Single layer
-    kernel_type: ['rbf']
-    iters: [500]                                # Very short for debugging (~2-4 min per run)
-
-  settings:
-    visualize: true
-    save_iid: true
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 1000     # Less frequent saves to reduce memory
-    visualize_graph: true # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 50     # Less frequent metrics
-    losses_interval: 25                    # Less frequent for memory
-    efficiency_interval: 25         
-
-
-debug_007:
-  name: loss_ratio_record
-  method: grid
-  sweep_parameters:
-    prompts: ["a photo of a hamburger", "chair", "vintage car"]
-    repulsion_type: ['svgd', 'rlsd', 'wo'] 
+    prompt: 
+      hamburger: "a photo of a hamburger" # simple prompt
+      # icecream: "a photo of an ice cream" # complex prompt
+      saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
+      # tulip: "a photo of a tulip" # simple prompt
+    repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['rbf', 'cosine']
-
-  fixed_parameters:
-    lambda_repulsion: [1000]
-    seed: [42]                             
-    num_particles: [8]                     
-    num_views: [8]                         
-    iters: [200]                          
-
-    # sds loss
-    lambda_sd: [1.0]
-
-    # feature extractor
-    feature_layer: [6]                     
-    use_sigma_weight: [True]
-    use_cosine_decay: [True]
-    rep_cosine_warmup: [0.0]
-    rep_sigma_power: [1.0]
-
-    # kernel
-    kernel_tau: [0.5]
-    kernel_eps: [1e-12]
-    iters: [1000]
+    lambda_repulsion: # TODO: add more values
+      rlsd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4]
+      rlsd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4]
+      svgd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4]
+      svgd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4]
+    seeds: [42]
     
+  fixed_parameters:
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+    eval_radius:
+      hamburger: 3.0
+      icecream: 4.0
+      saguaro: 4.0
+      tulip: 4.0
 
   settings:
-    visualize: true
-    save_iid: false
-    save_rendered_images_interval: 100      # Less frequent saves to reduce memory
-    save_multi_viewpoints_interval: 2000     # Less frequent saves to reduce memory
-    visualize_graph: false # save graph for debugging
-    visualize_graph_interval: 100
-    metrics: true                         # Enable metrics to save memory
-    quantitative_metrics_interval: 10     # Less frequent metrics
-    losses_interval: 10                    # Less frequent for memory
-    efficiency_interval: 10     
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
 
 
+exp2_lambda_fine:
+  name: exp2_lambda_fine
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+    repulsion_type: ['svgd', 'rlsd']
+    kernel_type: ['cosine', 'rbf']
+    lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
+      rlsd_cosine: [700, 800, 900, 1000, 1100, 1200]
+      rlsd_rbf: [700, 800, 900, 1000, 1100, 1200]
+      svgd_cosine: [700, 800, 900, 1000, 1100, 1200]
+      svgd_rbf: [700, 800, 900, 1000, 1100, 1200]
+    seeds: [42, 123] # TODO: add more seeds
+    
+  fixed_parameters:
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
 
+    eval_radius:
+      hamburger: 3.0
+      icecream: 4.0
+      saguaro: 4.0
+      tulip: 4.0
 
-# ==================
-# ============================================================================
-# DEBUG CONFIGURATION COMPLETE
-# ============================================================================
-# This debug config only contains one experiment (debug_quick_test) with:
-# - 3 runs total (svgd, rlsd, wo)
-# - 50 iterations each (~2-4 min per run)
-# - Minimal resources for quick validation
-# - Frequent saves/metrics for debugging
-#
-# TO RUN: sbatch scripts/run_ours_debug.sh debug_quick_test
-# RESULTS: Check logs/debug_001/ for the 3 test runs
-# ============================================================================
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    save_rendered_images: True
+    save_rendered_images_interval: 100
+    save_multi_viewpoints: False
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+exp3_beta:
+  name: exp3_beta
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger" # simple prompt
+      icecream: "a photo of an ice cream" # complex prompt
+      saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
+      tulip: "a photo of a tulip" # simple prompt
+    repulsion_type: ['rlsd', 'svgd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: λ* from exp2_lambda_fine
+      rlsd_rbf: 1000
+      svgd_rbf: 1000
+      rlsd_cosine: 1000
+      svgd_cosine: 1000 
+    seed: [42, 123, 456]
+    rbf_beta: [0.5, 1.0, 2.0, 4.0] # β
+    cosine_beta: [0.1, 0.3, 1.0, 3.0, 10.0] # β
+    
+  fixed_parameters:
+    
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    iters: 1500
+    cosine_eps_shift: 1e-3
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: True
+    save_rendered_images: True
+    save_rendered_images_interval: 250
+    save_multi_viewpoints: False # TODO: save the final (high resolution)
+
+    eval_W: 800
+    eval_H: 800
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
