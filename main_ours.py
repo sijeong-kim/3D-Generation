@@ -261,17 +261,18 @@ class GUI:
             # 3. Feature extraction (feature space)
             features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
             
-            # 4. RBF kernel computation (feature space)
+            # 4. Kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
                 kernel, kernel_grad = rbf_kernel_and_grad(
                     features, 
                     repulsion_type=self.opt.repulsion_type, 
-                    tau=self.opt.kernel_tau
+                    beta=self.opt.kernel_beta,
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             elif self.opt.kernel_type == 'cosine':
                 kernel, kernel_grad = cosine_kernel_and_grad(
                     features, 
-                    repulsion_type=self.opt.repulsion_type
+                    repulsion_type=self.opt.repulsion_type,
+                    beta=self.opt.kernel_beta,
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
