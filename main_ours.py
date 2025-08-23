@@ -266,13 +266,14 @@ class GUI:
                 kernel, kernel_grad = rbf_kernel_and_grad(
                     features, 
                     repulsion_type=self.opt.repulsion_type, 
-                    beta=self.opt.kernel_beta,
+                    beta=self.opt.rbf_beta,
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             elif self.opt.kernel_type == 'cosine':
                 kernel, kernel_grad = cosine_kernel_and_grad(
                     features, 
                     repulsion_type=self.opt.repulsion_type,
-                    beta=self.opt.kernel_beta,
+                    beta=self.opt.cosine_beta,
+                    eps_shift=self.opt.cosine_eps_shift,
                 )  # kernel:[N,N], kernel_grad:[N, D_feature]
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")

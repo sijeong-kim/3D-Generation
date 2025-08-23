@@ -8,7 +8,9 @@ feature_layer: 6 # 0-2: early, 3-7: mid, 8-11: late
 lambda_repulsion: 500 # weight for repulsive loss
 repulsion_type: "svgd" # "svgd" or "rlsd" or "wo"
 kernel_type: "rbf" # "rbf" or "cosine"
-kernel_beta: 1.0 # beta for kernel
+rbf_beta: 1.0 # beta for rbf kernel
+cosine_beta: 1.0 # beta for cosine kernel
+cosine_eps_shift: 1e-3 # eps shift for cosine kernel
 
 # sigma_t
 use_sigma_weight: True
