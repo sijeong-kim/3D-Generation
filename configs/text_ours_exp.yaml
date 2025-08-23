@@ -168,15 +168,15 @@ exp2_lambda_fine_rbf:
   sweep_parameters:
     prompt: 
       hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
+      # icecream: "a photo of an ice cream"
       saguaro: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
+      # tulip: "a photo of a tulip"
     repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_rbf: [250, 500, 750, 1000, 1500, 2000]
-      svgd_rbf: [250, 500, 750, 1000, 1500, 2000]
-    seed: [42, 123] # TODO: add more seeds
+      rlsd_rbf: [300, 500, 700]
+      svgd_rbf: [150, 250, 350]
+    seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
     num_particles: 8
@@ -223,13 +223,13 @@ exp2_lambda_fine_cosine:
       hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
       saguaro: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
+      # tulip: "a photo of a tulip"
     repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_cosine: [700, 800, 900, 1000, 1100, 1200]
-      svgd_cosine: [700, 800, 900, 1000, 1100, 1200]
-    seed: [42, 123] # TODO: add more seeds
+      rlsd_cosine: [700, 900, 1200]
+      svgd_cosine: [350, 500, 650]
+    seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
     num_particles: 8
