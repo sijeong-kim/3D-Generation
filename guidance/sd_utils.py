@@ -72,6 +72,18 @@ class StableDiffusion(nn.Module):
         self.tokenizer = pipe.tokenizer
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
+        
+        
+        # xformers
+        try:
+            pipe.unet.enable_xformers_memory_efficient_attention()
+        except Exception:
+            pass
+        # channels_last for UNet activations
+        try:
+            pipe.unet.to(memory_format=torch.channels_last)
+        except Exception:
+            pass
 
         self.scheduler = DDIMScheduler.from_pretrained(
             model_key, subfolder="scheduler", torch_dtype=self.dtype
