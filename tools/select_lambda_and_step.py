@@ -3,7 +3,7 @@ import os, glob, pandas as pd
 import numpy as np
 from pathlib import Path
 
-OUT = "./tools/analysis/exp1_lambda_coarse_svgd"
+OUT = "./analysis/exp1_lambda_coarse_svgd"
 os.makedirs(OUT, exist_ok=True)
 
 def read_last(df):
