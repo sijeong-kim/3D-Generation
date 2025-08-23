@@ -11,6 +11,8 @@ show_usage() {
     echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
     echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVGD"
     echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSd"
+    echo "  exp2_lambda_fine_rbf       # Fine lambda sweep with RBF kernel"
+    echo "  exp2_lambda_fine_cosine    # Fine lambda sweep with cosine kernel"
     echo ""
     echo "Options:"
     echo "  --dry-run, --dry_run          Print commands without running experiments"
@@ -90,7 +92,7 @@ export HF_DATASETS_OFFLINE=1
 # --------------------------------
 # Default sweep names; can be overridden by CLI args
 # --------------------------------
-SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
+SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine")
 
 # Parse CLI args: allow various flags and optional sweep names
 DRY_RUN_ARG=""
@@ -121,7 +123,7 @@ fi
 # --------------------------------
 # Validate experiment names
 # --------------------------------
-VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
+VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine")
 
 for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
     if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${SWEEP_NAME} " ]]; then
@@ -132,6 +134,8 @@ for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
         echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
         echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVGD"
         echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSd"
+        echo "  exp2_lambda_fine_rbf       # Fine lambda sweep with RBF kernel"
+        echo "  exp2_lambda_fine_cosine    # Fine lambda sweep with cosine kernel"
         exit 1
     fi
 done
