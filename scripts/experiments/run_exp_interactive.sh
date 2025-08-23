@@ -9,9 +9,8 @@ show_usage() {
     echo ""
     echo "Available Experiments (from text_ours_exp.yaml):"
     echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
-    echo "  exp1_lambda_coarse         # Coarse lambda sweep"
-    echo "  exp2_lambda_fine           # Fine lambda sweep"
-    echo "  exp3_beta                  # Beta sweep for both RBF and cosine kernels"
+    echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVGD"
+    echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSd"
     echo ""
     echo "Options:"
     echo "  --dry-run, --dry_run          Print commands without running experiments"
@@ -83,10 +82,15 @@ if [ ! -f "$SWEEP_CONFIG" ]; then
     exit 1
 fi
 
+# Set environment variables for local model loading
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
+
 # --------------------------------
 # Default sweep names; can be overridden by CLI args
 # --------------------------------
-SWEEP_NAMES=("exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
+SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
 
 # Parse CLI args: allow various flags and optional sweep names
 DRY_RUN_ARG=""

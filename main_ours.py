@@ -1,13 +1,7 @@
 # main_ours.py
-import os
-
-# Set environment variables for local model loading
-os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
-os.environ["HF_DATASETS_OFFLINE"] = "1"
-
 import cv2
 import time
+import gc
 import tqdm
 import numpy as np
 import random
@@ -503,6 +497,64 @@ class GUI:
                 if self.opt.save_rendered_images and (self.step % self.opt.save_rendered_images_interval == 0):
                     self.visualizer.save_rendered_images(self.step, images)
 
+        # Periodic GPU memory cleanup
+        if self.step % self.opt.efficiency_interval == 0:
+            try:
+                del images
+            except NameError:
+                pass
+            try:
+                del outputs
+            except NameError:
+                pass
+            try:
+                del score_gradients
+            except NameError:
+                pass
+            try:
+                del latents
+            except NameError:
+                pass
+            try:
+                del w_sigma
+            except NameError:
+                pass
+            try:
+                del features
+            except NameError:
+                pass
+            try:
+                del kernel
+            except NameError:
+                pass
+            try:
+                del kernel_grad
+            except NameError:
+                pass
+            try:
+                del attraction_loss_per_particle
+            except NameError:
+                pass
+            try:
+                del repulsion_loss_per_particle
+            except NameError:
+                pass
+            try:
+                del scaled_attraction_loss
+            except NameError:
+                pass
+            try:
+                del scaled_repulsion_loss
+            except NameError:
+                pass
+            try:
+                del total_loss
+            except NameError:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
         path = os.path.join(self.opt.outdir, f'saved_models')
@@ -512,6 +564,14 @@ class GUI:
             path = os.path.join(path, f'particle_{particle_id}_mesh.ply')
             mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
             mesh.write_ply(path)
+            # Cleanup heavy objects and CUDA cache
+            try:
+                del mesh
+            except NameError:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         elif mode == 'geo+tex':
             path = os.path.join(path, f'particle_{particle_id}_mesh.' + self.opt.mesh_format)
@@ -632,11 +692,32 @@ class GUI:
             mesh.albedo = torch.from_numpy(albedo).to(self.device)
             mesh.write(path)
 
+            # Cleanup heavy objects and CUDA cache
+            try:
+                del albedo
+            except NameError:
+                pass
+            try:
+                del cnt
+            except NameError:
+                pass
+            try:
+                del mesh
+            except NameError:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
         else:
             path = os.path.join(path, f'particle_{particle_id}_model.ply')
             self.renderers[particle_id].gaussians.save_ply(path)
 
             print(f"[INFO] particle {particle_id} save model to {path}.")
+            # Cleanup CUDA cache after saving
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
     
     # no gui mode
     def train(self, iters=500):
