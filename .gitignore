@@ -218,7 +218,12 @@ outputs/
 *.jpeg
 *.gif
 
+# backups
 backups/
+backup/
+*/backups/
+*/backup/
+
 logs/
 exp/
 debug/
