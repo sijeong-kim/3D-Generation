@@ -57,9 +57,9 @@ exp1_lambda_coarse_svgd:
   sweep_parameters:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
-      # icecream: "a photo of an ice cream" # complex prompt
+      icecream: "a photo of an ice cream" # complex prompt
       saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
-      # tulip: "a photo of a tulip" # simple prompt
+      tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['svgd']
     kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values
@@ -115,9 +115,9 @@ exp1_lambda_coarse_rlsd:
   sweep_parameters:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
-      # icecream: "a photo of an ice cream" # complex prompt
+      icecream: "a photo of an ice cream" # complex prompt
       saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
-      # tulip: "a photo of a tulip" # simple prompt
+      tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['rlsd']
     kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values
@@ -177,12 +177,13 @@ exp2_lambda_fine_svgd:
     repulsion_type: ['svgd']
     kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      svgd_rbf: [150, 250, 350]
-      svgd_cosine: [350, 500, 650]
+      svgd_rbf: [1100, 1000, 1200, 900, 1400] # [900, 1000, 1100, 1200, 1400] # [150, 250, 350]
+      svgd_cosine: [900, 1000, 800, 1100] # [800, 900, 1000, 1100] # [350, 500, 650]
       
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
+    num_pts: 5000
     num_particles: 8
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 11
@@ -232,11 +233,12 @@ exp2_lambda_fine_rlsd:
     repulsion_type: ['rlsd']
     kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_cosine: [700, 900, 1100]
-      rlsd_rbf: [300, 500, 700]
+      rlsd_cosine: [800, 1000, 1200, 1500, 2000] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
+      rlsd_rbf: [500, 700, 1000, 1500] # [1000, 1100, 1200, 1400, 1600] # [300, 500, 700]
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
+    num_pts: 5000
     num_particles: 8
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 11

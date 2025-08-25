@@ -68,7 +68,7 @@ mkdir -p $MPLCONFIGDIR
 # Create output directory
 # --------------------------------
 # Default sweep names; can be overridden by CLI args
-SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse" "exp2_lambda_fine" "exp3_beta_rbf" "exp3_beta_cosine")
+SWEEP_NAMES=("exp0_baseline" "exp1_lambda_coarse" "exp2_lambda_fine" "exp3_beta_rbf" "exp3_beta_cosine" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
 
 # Parse CLI args: allow various flags and optional sweep names
 DRY_RUN_ARG=""
@@ -99,7 +99,7 @@ fi
 # --------------------------------
 # Validate experiment names
 # --------------------------------
-VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse" "exp2_lambda_fine" "exp3_beta")
+VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse" "exp2_lambda_fine" "exp3_beta" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd")
 
 for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
     if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${SWEEP_NAME} " ]]; then

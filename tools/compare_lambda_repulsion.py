@@ -114,6 +114,114 @@ def create_comparison_plot(baseline_data, experiment_data, config_params, output
     
     return output_path
 
+# ---------- multi-prompt comparison ----------
+def create_comparison_plot_multi_prompt(
+    baseline_data,
+    experiment_data_by_prompt: dict[str, dict[str, pd.DataFrame]],
+    config_params,
+    output_dir: Path
+):
+    """
+    Create grid (metrics × λ) like original version,
+    but overlay ALL prompts in different colors inside each subplot.
+    """
+    kernel_type = config_params['kernel_type']
+    repulsion_type = config_params['repulsion_type']
+
+    metrics = [
+        ("fidelity_mean", "CLIP Fidelity (mean)"),
+        ("inter_particle_diversity_mean", "Inter-Particle Diversity (mean)"),
+        ("cross_view_consistency_mean", "Cross-View Consistency (mean)"),
+        ("lpips_inter_mean", "LPIPS Inter (mean)"),
+        ("lpips_consistency_mean", "LPIPS Consistency (mean)"),
+    ]
+
+    # Only metrics that exist
+    def has_metric(col):
+        if any(col in df.columns for df in baseline_data.values()):
+            return True
+        for prompt_map in experiment_data_by_prompt.values():
+            for exp_df in prompt_map.values():
+                if col in exp_df.columns:
+                    return True
+        return False
+
+    available_metrics = [(c, label) for c, label in metrics if has_metric(c)]
+    if not available_metrics:
+        print(f"No metrics available for {kernel_type}_{repulsion_type}")
+        return None
+
+    # Collect λ values (union across prompts)
+    all_lambda_values = sorted({
+        lv for prompt_map in experiment_data_by_prompt.values() for lv in prompt_map.keys()
+    }, key=get_lambda_repulsion_order)
+
+    n_metrics = len(available_metrics)
+    n_lambdas = len(all_lambda_values)
+
+    fig, axes = plt.subplots(
+        n_metrics, n_lambdas,
+        figsize=(4 * n_lambdas, 3.5 * n_metrics),
+        squeeze=False
+    )
+
+    prompts = list(experiment_data_by_prompt.keys())
+    cmap = plt.cm.get_cmap("tab10", max(1, len(prompts)))
+
+    for m_idx, (metric_col, metric_label) in enumerate(available_metrics):
+        for l_idx, lambda_val in enumerate(all_lambda_values):
+            ax = axes[m_idx, l_idx]
+
+            # plot each prompt in its own color
+            for p_idx, prompt in enumerate(prompts):
+                color = cmap(p_idx)
+                base_key = f"prompt={prompt}_seed=42"
+
+                # Baseline
+                if base_key in baseline_data and metric_col in baseline_data[base_key].columns:
+                    base_df = baseline_data[base_key][["step", metric_col]].dropna().sort_values("step")
+                    if len(base_df):
+                        ax.plot(
+                            base_df["step"], base_df[metric_col],
+                            "--", linewidth=1.8, alpha=0.7, color=color,
+                            label=f"{prompt} baseline" if (m_idx == 0 and l_idx == 0) else None
+                        )
+
+                # Experiment
+                exp_map = experiment_data_by_prompt.get(prompt, {})
+                if lambda_val in exp_map and metric_col in exp_map[lambda_val].columns:
+                    exp_df = exp_map[lambda_val][["step", metric_col]].dropna().sort_values("step")
+                    if len(exp_df):
+                        ax.plot(
+                            exp_df["step"], exp_df[metric_col],
+                            "-", linewidth=2, color=color,
+                            label=f"{prompt} λ={lambda_val}" if (m_idx == 0 and l_idx == 0) else None
+                        )
+
+            # labels
+            if l_idx == 0:
+                ax.set_ylabel(metric_label, fontsize=10)
+            if m_idx == 0:
+                ax.set_title(f"λ={lambda_val}", fontsize=12, fontweight="bold")
+            if m_idx == n_metrics - 1:
+                ax.set_xlabel("Step", fontsize=10)
+
+            ax.grid(True, alpha=0.3)
+            ax.tick_params(labelsize=8)
+
+    # add legend once
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper center", fontsize=8, ncol=3)
+
+    fig.suptitle(f"{kernel_type.upper()} Kernel — {repulsion_type.upper()} (all prompts)", fontsize=14, y=0.995)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+    outpath = output_dir / f"comparison_{kernel_type}_{repulsion_type}_all_prompts_GRID.png"
+    fig.savefig(outpath, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    return outpath
+
 ###### Pareto Frontier Analysis ######
 import numpy as np
 import pandas as pd
@@ -353,7 +461,9 @@ def main():
                         help='Base directory for experiments (default: exp)')
     parser.add_argument('--output_dir', type=str, default="analysis",
                         help='Output directory for comparison plots (default: comparison_plots)')
-    parser.add_argument('--compare_plots', action='store_true', default=False,
+    parser.add_argument('--compare_plots_multi_prompt', action='store_true', default=False,
+                        help='Whether to generate comparison plots (default: True)')
+    parser.add_argument('--compare_plots_single_prompt', action='store_true', default=False,
                         help='Whether to generate comparison plots (default: True)')
     parser.add_argument('--pareto_plots', action='store_true', default=False,
                         help='Whether to generate Pareto plots (default: True)')
@@ -361,7 +471,7 @@ def main():
     args = parser.parse_args()
     
     # Create output directory
-    if args.compare_plots:
+    if args.compare_plots_multi_prompt or args.compare_plots_single_prompt:
         comparison_plots_output_dir = Path(args.output_dir) / "comparison_plots"
         comparison_plots_output_dir.mkdir(exist_ok=True)
 
@@ -406,10 +516,45 @@ def main():
         if metrics_path.exists():
             baseline_data[config_name] = pd.read_csv(metrics_path)
             print(f"Loaded baseline data for {config_name}")
-    
+ 
+    if args.compare_plots_multi_prompt:
+        saved_plots = []
+        pairs = sorted({(k, r) for (k, _p, r) in config_groups.keys()})
+
+        for (kernel_type, repulsion_type) in pairs:
+            print(f"\nProcessing: {kernel_type}_{repulsion_type} (ALL PROMPTS in grid)")
+
+            experiment_data_by_prompt = {}
+            prompts_for_pair = sorted({p for (k, p, r) in config_groups.keys()
+                                       if k == kernel_type and r == repulsion_type})
+
+            for prompt in prompts_for_pair:
+                lambda_configs = config_groups[(kernel_type, prompt, repulsion_type)]
+                lambda_to_df = {}
+                for lambda_val, config_name in lambda_configs.items():
+                    metrics_path = experiment_dir / config_name / "metrics" / "quantitative_metrics.csv"
+                    if metrics_path.exists():
+                        lambda_to_df[lambda_val] = pd.read_csv(metrics_path)
+                        print(f"  Loaded {prompt} | λ={lambda_val}")
+                if lambda_to_df:
+                    experiment_data_by_prompt[prompt] = lambda_to_df
+
+            if not experiment_data_by_prompt:
+                continue
+
+            config_params = {"kernel_type": kernel_type, "repulsion_type": repulsion_type}
+            plot_path = create_comparison_plot_multi_prompt(
+                baseline_data, experiment_data_by_prompt, config_params, comparison_plots_output_dir
+            )
+            if plot_path:
+                saved_plots.append(plot_path)
+                print(f"  Generated: {plot_path.name}")
+
+        print(f"\nGenerated {len(saved_plots)} multi-prompt grid plots in {comparison_plots_output_dir}")
+
     # Create comparison plots for each combination
     
-    if args.compare_plots:
+    if args.compare_plots_single_prompt:
         saved_plots = []
         
         for (kernel_type, prompt, repulsion_type), lambda_configs in config_groups.items():
@@ -452,31 +597,31 @@ def main():
         
         print(f"\nGenerated {len(saved_plots)} comparison plots in {comparison_plots_output_dir}")
     
-    # Create summary table
-    # create_tradeoff_analysis_table(config_groups, baseline_data, experiment_dir, tradeoff_analysis_output_dir)
+    # # Create summary table
+    # # create_tradeoff_analysis_table(config_groups, baseline_data, experiment_dir, tradeoff_analysis_output_dir)
     
-    if args.pareto_plots:    
-        # 1) Pareto for Diversity ↑ vs Fidelity change ↑
-        pareto_df = run_pareto_plots(
-            config_groups=config_groups,
-            baseline_data=baseline_data,
-            experiment_dir=experiment_dir,
-            x_metric="Inter-Particle Diversity Improvement (%)",
-            y_metric="CLIP Fidelity Change (%)",
-            output_dir=pareto_analysis_output_dir
-        )
+    # if args.pareto_plots:    
+    #     # 1) Pareto for Diversity ↑ vs Fidelity change ↑
+    #     pareto_df = run_pareto_plots(
+    #         config_groups=config_groups,
+    #         baseline_data=baseline_data,
+    #         experiment_dir=experiment_dir,
+    #         x_metric="Inter-Particle Diversity Improvement (%)",
+    #         y_metric="CLIP Fidelity Change (%)",
+    #         output_dir=pareto_analysis_output_dir
+    #     )
 
-        # 2) If you also want Diversity ↑ vs Consistency change ↑
-        plot_pareto_subplots(
-            pareto_df,
-            x_metric="Inter-Particle Diversity Improvement (%)",
-            y_metric="Cross-View Consistency Change (%)",
-            annotate_lambda=True,
-            annotate_step=False,
-            group_prompts=True,
-            title_suffix="(Consistency axis)",
-            output_dir=pareto_analysis_output_dir
-        )
+    #     # 2) If you also want Diversity ↑ vs Consistency change ↑
+    #     plot_pareto_subplots(
+    #         pareto_df,
+    #         x_metric="Inter-Particle Diversity Improvement (%)",
+    #         y_metric="Cross-View Consistency Change (%)",
+    #         annotate_lambda=True,
+    #         annotate_step=False,
+    #         group_prompts=True,
+    #         title_suffix="(Consistency axis)",
+    #         output_dir=pareto_analysis_output_dir
+    #     )
 
 
 # def detect_plateau(metric_series, window_size=5, threshold=0.01):
