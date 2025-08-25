@@ -37,10 +37,9 @@ exp0_baseline:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: True
-    save_rendered_images_interval: 100
-    visualize_multi_viewpoints: True
-    visualize_multi_viewpoints_interval: 500
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
     # metrics
     metrics: True
     quantitative_metrics_interval: 50
@@ -91,9 +90,8 @@ exp1_lambda_coarse_svgd:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: True
-    save_rendered_images_interval: 100
-    visualize_multi_viewpoints: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
 
     eval_W: 256
     eval_H: 256
@@ -163,9 +161,8 @@ exp1_lambda_coarse_rlsd:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: True
-    save_rendered_images_interval: 100
-    visualize_multi_viewpoints: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
 
     eval_W: 256
     eval_H: 256
@@ -219,9 +216,8 @@ exp2_lambda_fine_svgd:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: True
-    save_rendered_images_interval: 100
-    visualize_multi_viewpoints: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
 
     eval_W: 256
     eval_H: 256
@@ -275,9 +271,8 @@ exp2_lambda_fine_rlsd:
     # visualize
     visualize: True
     save_iid: False
-    save_rendered_images: True
-    save_rendered_images_interval: 100
-    visualize_multi_viewpoints: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
 
     eval_W: 256
     eval_H: 256
@@ -364,10 +359,9 @@ exp3_beta:
   settings:
     # visualize
     visualize: True
-    save_iid: True
-    save_rendered_images: True
-    save_rendered_images_interval: 250
-    visualize_multi_viewpoints: False # TODO: save the final (high resolution)
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
 
     eval_W: 800
     eval_H: 800
