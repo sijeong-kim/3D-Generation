@@ -209,243 +209,288 @@ def create_comparison_plot_multi_prompt(
             ax.grid(True, alpha=0.3)
             ax.tick_params(labelsize=8)
 
-    # add legend once
+    # # add legend once
+    # handles, labels = axes[0, 0].get_legend_handles_labels()
+    # if handles:
+    #     fig.legend(handles, labels, loc="upper center", fontsize=8, ncol=3)
+
+    # fig.suptitle(f"{kernel_type.upper()} Kernel — {repulsion_type.upper()} (all prompts)", fontsize=14, y=0.995)
+    # plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+    # outpath = output_dir / f"comparison_{kernel_type}_{repulsion_type}_all_prompts_GRID.png"
+    # fig.savefig(outpath, dpi=300, bbox_inches="tight")
+    # plt.close(fig)
+    # return outpath
+
+    # add legend once (아래: 제목과 겹치지 않게 상단 바깥에 배치)
     handles, labels = axes[0, 0].get_legend_handles_labels()
     if handles:
-        fig.legend(handles, labels, loc="upper center", fontsize=8, ncol=3)
+        # 중복 라벨 제거(같은 라벨이 반복 수집되는 경우 대비)
+        uniq = {}
+        for h, l in zip(handles, labels):
+            if l not in uniq:
+                uniq[l] = h
+        handles, labels = list(uniq.values()), list(uniq.keys())
 
-    fig.suptitle(f"{kernel_type.upper()} Kernel — {repulsion_type.upper()} (all prompts)", fontsize=14, y=0.995)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
+        n_items = len(labels)
+
+        # 1) config에서 강제 지정 가능
+        forced_ncol = config_params.get("legend_ncol", None)
+        if forced_ncol is not None:
+            ncol = int(forced_ncol)
+        else:
+            # 2) 자동: 4개면 2x2, 그 외엔 가로로 최대 4개까지
+            ncol = 2 if n_items == 4 else min(n_items, 4)
+
+        fig.legend(
+            handles, labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.965),  # 제목 바로 아래
+            fontsize=8,
+            ncol=ncol,
+            frameon=True,
+            borderaxespad=0.2
+        )
+
+    # 제목(맨 위)
+    fig.suptitle(
+        f"{kernel_type.upper()} Kernel — {repulsion_type.upper()} (all prompts)",
+        fontsize=14, y=0.99
+    )
+
+    # 상단 10%는 제목+legend 공간으로 비워두기
+    plt.tight_layout(rect=[0, 0, 1, 0.90])
 
     outpath = output_dir / f"comparison_{kernel_type}_{repulsion_type}_all_prompts_GRID.png"
     fig.savefig(outpath, dpi=300, bbox_inches="tight")
     plt.close(fig)
     return outpath
 
-###### Pareto Frontier Analysis ######
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
 
-# ---------- helpers ----------
-def pareto_efficient_mask(points: np.ndarray, maximize: tuple[bool, ...]) -> np.ndarray:
-    """
-    Return a boolean mask for Pareto-efficient points.
-    points: shape (N, D) array of objective values.
-    maximize: tuple of booleans, length D. True if that objective is to be maximized.
-    """
-    if points.ndim != 2:
-        raise ValueError("points must be a 2D array (N, D)")
-    if len(maximize) != points.shape[1]:
-        raise ValueError("len(maximize) must equal number of columns in points")
+# ###### Pareto Frontier Analysis ######
+# import numpy as np
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# from pathlib import Path
 
-    # Convert maximization to minimization by negating objectives we want to maximize
-    signed = points.copy()
-    for j, is_max in enumerate(maximize):
-        if is_max:
-            signed[:, j] = -signed[:, j]
+# # ---------- helpers ----------
+# def pareto_efficient_mask(points: np.ndarray, maximize: tuple[bool, ...]) -> np.ndarray:
+#     """
+#     Return a boolean mask for Pareto-efficient points.
+#     points: shape (N, D) array of objective values.
+#     maximize: tuple of booleans, length D. True if that objective is to be maximized.
+#     """
+#     if points.ndim != 2:
+#         raise ValueError("points must be a 2D array (N, D)")
+#     if len(maximize) != points.shape[1]:
+#         raise ValueError("len(maximize) must equal number of columns in points")
 
-    # A point i is Pareto-efficient if no other point strictly dominates it
-    N = signed.shape[0]
-    efficient = np.ones(N, dtype=bool)
-    for i in range(N):
-        if not efficient[i]:
-            continue
-        # Any point that dominates i? (all <= and at least one <)
-        dominates = np.all(signed <= signed[i], axis=1) & np.any(signed < signed[i], axis=1)
-        efficient[dominates] = False  # dominated points cannot be efficient
-    return efficient
+#     # Convert maximization to minimization by negating objectives we want to maximize
+#     signed = points.copy()
+#     for j, is_max in enumerate(maximize):
+#         if is_max:
+#             signed[:, j] = -signed[:, j]
 
-def build_summary_table(config_groups, baseline_data, experiment_dir) -> pd.DataFrame:
-    """
-    Light refactor of your create_tradeoff_analysis_table that RETURNS a DataFrame
-    (and doesn't print/save). Keeps your plateau logic.
-    """
-    key_metrics = [
-        ("fidelity_mean", "CLIP Fidelity"),
-        ("inter_particle_diversity_mean", "Inter-Particle Diversity"),
-        ("cross_view_consistency_mean", "Cross-View Consistency"),
-    ]
+#     # A point i is Pareto-efficient if no other point strictly dominates it
+#     N = signed.shape[0]
+#     efficient = np.ones(N, dtype=bool)
+#     for i in range(N):
+#         if not efficient[i]:
+#             continue
+#         # Any point that dominates i? (all <= and at least one <)
+#         dominates = np.all(signed <= signed[i], axis=1) & np.any(signed < signed[i], axis=1)
+#         efficient[dominates] = False  # dominated points cannot be efficient
+#     return efficient
 
-    rows = []
-    for (kernel_type, prompt, repulsion_type), lambda_configs in config_groups.items():
-        baseline_key = f"prompt={prompt}_seed=42"
-        baseline_final = {}
-        if baseline_key in baseline_data:
-            baseline_df = baseline_data[baseline_key]
-            for metric_col, _ in key_metrics:
-                if metric_col in baseline_df.columns and len(baseline_df) > 0:
-                    baseline_final[metric_col] = baseline_df[metric_col].iloc[-1]
-                else:
-                    baseline_final[metric_col] = np.nan
-        else:
-            # If baseline missing, skip this group
-            continue
+# def build_summary_table(config_groups, baseline_data, experiment_dir) -> pd.DataFrame:
+#     """
+#     Light refactor of your create_tradeoff_analysis_table that RETURNS a DataFrame
+#     (and doesn't print/save). Keeps your plateau logic.
+#     """
+#     key_metrics = [
+#         ("fidelity_mean", "CLIP Fidelity"),
+#         ("inter_particle_diversity_mean", "Inter-Particle Diversity"),
+#         ("cross_view_consistency_mean", "Cross-View Consistency"),
+#     ]
 
-        for lambda_val, config_name in lambda_configs.items():
-            metrics_path = Path(experiment_dir) / config_name / "metrics" / "quantitative_metrics.csv"
-            if not metrics_path.exists():
-                continue
-            exp_df = pd.read_csv(metrics_path)
-            if "fidelity_mean" not in exp_df.columns or len(exp_df) == 0:
-                continue
+#     rows = []
+#     for (kernel_type, prompt, repulsion_type), lambda_configs in config_groups.items():
+#         baseline_key = f"prompt={prompt}_seed=42"
+#         baseline_final = {}
+#         if baseline_key in baseline_data:
+#             baseline_df = baseline_data[baseline_key]
+#             for metric_col, _ in key_metrics:
+#                 if metric_col in baseline_df.columns and len(baseline_df) > 0:
+#                     baseline_final[metric_col] = baseline_df[metric_col].iloc[-1]
+#                 else:
+#                     baseline_final[metric_col] = np.nan
+#         else:
+#             # If baseline missing, skip this group
+#             continue
 
-            plateaued_step = find_plateaued_step(exp_df, "fidelity_mean")
-            if plateaued_step < 0:
-                continue
+#         for lambda_val, config_name in lambda_configs.items():
+#             metrics_path = Path(experiment_dir) / config_name / "metrics" / "quantitative_metrics.csv"
+#             if not metrics_path.exists():
+#                 continue
+#             exp_df = pd.read_csv(metrics_path)
+#             if "fidelity_mean" not in exp_df.columns or len(exp_df) == 0:
+#                 continue
 
-            row = {
-                "Kernel": kernel_type.upper(),
-                "Prompt": str(prompt).title(),
-                "Repulsion": repulsion_type.upper(),
-                "Lambda": lambda_val,
-                "Step": plateaued_step,
-            }
+#             plateaued_step = find_plateaued_step(exp_df, "fidelity_mean")
+#             if plateaued_step < 0:
+#                 continue
 
-            # Compare metrics at the plateau step vs baseline final
-            for metric_col, metric_name in key_metrics:
-                if metric_col in exp_df.columns:
-                    exp_val = exp_df[metric_col].iloc[min(plateaued_step, len(exp_df) - 1)]
-                    base_val = baseline_final.get(metric_col, np.nan)
-                    row[f"{metric_name} (Exp)"] = exp_val
-                    row[f"{metric_name} (Base)"] = base_val
-                    if not (np.isnan(exp_val) or np.isnan(base_val)):
-                        pct = (exp_val - base_val) / (base_val + 1e-12) * 100.0
-                    else:
-                        pct = np.nan
-                    sign = "Improvement" if metric_col == "inter_particle_diversity_mean" else "Change"
-                    row[f"{metric_name} {sign} (%)"] = pct
-            rows.append(row)
+#             row = {
+#                 "Kernel": kernel_type.upper(),
+#                 "Prompt": str(prompt).title(),
+#                 "Repulsion": repulsion_type.upper(),
+#                 "Lambda": lambda_val,
+#                 "Step": plateaued_step,
+#             }
 
-    return pd.DataFrame(rows)
+#             # Compare metrics at the plateau step vs baseline final
+#             for metric_col, metric_name in key_metrics:
+#                 if metric_col in exp_df.columns:
+#                     exp_val = exp_df[metric_col].iloc[min(plateaued_step, len(exp_df) - 1)]
+#                     base_val = baseline_final.get(metric_col, np.nan)
+#                     row[f"{metric_name} (Exp)"] = exp_val
+#                     row[f"{metric_name} (Base)"] = base_val
+#                     if not (np.isnan(exp_val) or np.isnan(base_val)):
+#                         pct = (exp_val - base_val) / (base_val + 1e-12) * 100.0
+#                     else:
+#                         pct = np.nan
+#                     sign = "Improvement" if metric_col == "inter_particle_diversity_mean" else "Change"
+#                     row[f"{metric_name} {sign} (%)"] = pct
+#             rows.append(row)
+
+#     return pd.DataFrame(rows)
 
 
-# ---------- plotting ----------
-def plot_pareto_subplots(
-    df: pd.DataFrame,
-    x_metric: str = "Inter-Particle Diversity Improvement (%)",
-    y_metric: str = "CLIP Fidelity Change (%)",
-    annotate_lambda: bool = True,
-    annotate_step: bool = False,
-    group_prompts: bool = True,
-    title_suffix: str = "",
-    output_dir: str = "analysis/pareto_analysis"
-):
-    """
-    Make a 2x2 grid of subplots for (Kernel x Repulsion).
-    Each subplot: scatter of all points (lambdas, all prompts), highlight Pareto frontier.
-    x_metric, y_metric: columns of df to use on axes.
-    """
-    # Validate
-    needed = ["Kernel", "Repulsion", "Prompt", "Lambda", "Step", x_metric, y_metric]
-    for c in needed:
-        if c not in df.columns:
-            raise ValueError(f"Missing column: {c}")
+# # ---------- plotting ----------
+# def plot_pareto_subplots(
+#     df: pd.DataFrame,
+#     x_metric: str = "Inter-Particle Diversity Improvement (%)",
+#     y_metric: str = "CLIP Fidelity Change (%)",
+#     annotate_lambda: bool = True,
+#     annotate_step: bool = False,
+#     group_prompts: bool = True,
+#     title_suffix: str = "",
+#     output_dir: str = "analysis/pareto_analysis"
+# ):
+#     """
+#     Make a 2x2 grid of subplots for (Kernel x Repulsion).
+#     Each subplot: scatter of all points (lambdas, all prompts), highlight Pareto frontier.
+#     x_metric, y_metric: columns of df to use on axes.
+#     """
+#     # Validate
+#     needed = ["Kernel", "Repulsion", "Prompt", "Lambda", "Step", x_metric, y_metric]
+#     for c in needed:
+#         if c not in df.columns:
+#             raise ValueError(f"Missing column: {c}")
 
-    # Define the 4 panels order
-    cases = [
-        ("COSINE", "RLSD"),
-        ("COSINE", "SVGD"),
-        ("RBF", "RLSD"),
-        ("RBF", "SVGD"),
-    ]
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
+#     # Define the 4 panels order
+#     cases = [
+#         ("COSINE", "RLSD"),
+#         ("COSINE", "SVGD"),
+#         ("RBF", "RLSD"),
+#         ("RBF", "SVGD"),
+#     ]
+#     fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
 
-    for ax, (kernel, rep) in zip(axes.ravel(), cases):
-        sub = df[(df["Kernel"] == kernel) & (df["Repulsion"] == rep)].copy()
-        ax.set_title(f"{kernel} + {rep}{(' — ' + title_suffix) if title_suffix else ''}")
-        ax.set_xlabel(x_metric)
-        ax.set_ylabel(y_metric)
-        if sub.empty:
-            ax.text(0.5, 0.5, "No data", ha="center", va="center", alpha=0.6)
-            continue
+#     for ax, (kernel, rep) in zip(axes.ravel(), cases):
+#         sub = df[(df["Kernel"] == kernel) & (df["Repulsion"] == rep)].copy()
+#         ax.set_title(f"{kernel} + {rep}{(' — ' + title_suffix) if title_suffix else ''}")
+#         ax.set_xlabel(x_metric)
+#         ax.set_ylabel(y_metric)
+#         if sub.empty:
+#             ax.text(0.5, 0.5, "No data", ha="center", va="center", alpha=0.6)
+#             continue
 
-        # Optional: different markers/colors per prompt for readability
-        if group_prompts:
-            for prompt, g in sub.groupby("Prompt"):
-                ax.scatter(g[x_metric], g[y_metric], label=prompt, alpha=0.7)
-                if annotate_lambda:
-                    for _, r in g.iterrows():
-                        lbl = f"λ={r['Lambda']}"
-                        if annotate_step:
-                            lbl += f"\nS{int(r['Step'])}"
-                        ax.annotate(lbl, (r[x_metric], r[y_metric]), fontsize=8, xytext=(3, 3), textcoords="offset points")
-        else:
-            ax.scatter(sub[x_metric], sub[y_metric], alpha=0.8)
-            if annotate_lambda:
-                for _, r in sub.iterrows():
-                    lbl = f"λ={r['Lambda']}"
-                    if annotate_step:
-                        lbl += f"\nS{int(r['Step'])}"
-                    ax.annotate(lbl, (r[x_metric], r[y_metric]), fontsize=8, xytext=(3, 3), textcoords="offset points")
+#         # Optional: different markers/colors per prompt for readability
+#         if group_prompts:
+#             for prompt, g in sub.groupby("Prompt"):
+#                 ax.scatter(g[x_metric], g[y_metric], label=prompt, alpha=0.7)
+#                 if annotate_lambda:
+#                     for _, r in g.iterrows():
+#                         lbl = f"λ={r['Lambda']}"
+#                         if annotate_step:
+#                             lbl += f"\nS{int(r['Step'])}"
+#                         ax.annotate(lbl, (r[x_metric], r[y_metric]), fontsize=8, xytext=(3, 3), textcoords="offset points")
+#         else:
+#             ax.scatter(sub[x_metric], sub[y_metric], alpha=0.8)
+#             if annotate_lambda:
+#                 for _, r in sub.iterrows():
+#                     lbl = f"λ={r['Lambda']}"
+#                     if annotate_step:
+#                         lbl += f"\nS{int(r['Step'])}"
+#                     ax.annotate(lbl, (r[x_metric], r[y_metric]), fontsize=8, xytext=(3, 3), textcoords="offset points")
 
-        # Compute Pareto frontier (maximize both axes by default)
-        pts = sub[[x_metric, y_metric]].to_numpy()
-        mask = pareto_efficient_mask(pts, maximize=(True, True))
-        pareto_pts = sub[mask].sort_values([x_metric, y_metric])
-        # Draw frontier
-        ax.scatter(pareto_pts[x_metric], pareto_pts[y_metric], s=70, edgecolor="k", linewidth=1.0, zorder=3)
-        ax.plot(pareto_pts[x_metric], pareto_pts[y_metric], linestyle="--", zorder=2)
-        # Optional legend for prompts
-        if group_prompts:
-            ax.legend(frameon=False, fontsize=8)
+#         # Compute Pareto frontier (maximize both axes by default)
+#         pts = sub[[x_metric, y_metric]].to_numpy()
+#         mask = pareto_efficient_mask(pts, maximize=(True, True))
+#         pareto_pts = sub[mask].sort_values([x_metric, y_metric])
+#         # Draw frontier
+#         ax.scatter(pareto_pts[x_metric], pareto_pts[y_metric], s=70, edgecolor="k", linewidth=1.0, zorder=3)
+#         ax.plot(pareto_pts[x_metric], pareto_pts[y_metric], linestyle="--", zorder=2)
+#         # Optional legend for prompts
+#         if group_prompts:
+#             ax.legend(frameon=False, fontsize=8)
 
-        # Light grid
-        ax.grid(True, alpha=0.25)
+#         # Light grid
+#         ax.grid(True, alpha=0.25)
 
-    fig.suptitle("Pareto Frontier: Diversity vs Fidelity (↑ better on both axes)", fontsize=14)
+#     fig.suptitle("Pareto Frontier: Diversity vs Fidelity (↑ better on both axes)", fontsize=14)
     
-    # Save figure
-    if output_dir is not None:
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        fig_path = output_dir / f"pareto_diversity_vs_fidelity_change_{x_metric.replace(' ', '_')}_vs_{y_metric.replace(' ', '_')}.png"
-        fig.savefig(fig_path, dpi=300)
-        print(f"Saved Pareto plot → {fig_path}")
+#     # Save figure
+#     if output_dir is not None:
+#         output_dir = Path(output_dir)
+#         output_dir.mkdir(parents=True, exist_ok=True)
+#         fig_path = output_dir / f"pareto_diversity_vs_fidelity_change_{x_metric.replace(' ', '_')}_vs_{y_metric.replace(' ', '_')}.png"
+#         fig.savefig(fig_path, dpi=300)
+#         print(f"Saved Pareto plot → {fig_path}")
 
-        # if save_csv:
-        #     pareto_all = pd.concat(pareto_rows, ignore_index=True)
-        #     csv_path = output_dir / f"pareto_points.csv"
-        #     pareto_all.to_csv(csv_path, index=False)
-        #     print(f"Saved Pareto-optimal configs → {csv_path}")
+#         # if save_csv:
+#         #     pareto_all = pd.concat(pareto_rows, ignore_index=True)
+#         #     csv_path = output_dir / f"pareto_points.csv"
+#         #     pareto_all.to_csv(csv_path, index=False)
+#         #     print(f"Saved Pareto-optimal configs → {csv_path}")
 
-    plt.show()
+#     plt.show()
 
 
-# ---------- high-level runner ----------
-def run_pareto_plots(
-    config_groups,
-    baseline_data,
-    experiment_dir,
-    x_metric="Inter-Particle Diversity Improvement (%)",
-    y_metric="CLIP Fidelity Change (%)",
-    output_dir: str = "analysis/pareto_analysis"
-):
-    """
-    Convenience wrapper: builds the summary df and renders 2x2 Pareto subplots.
-    """
-    df = build_summary_table(config_groups, baseline_data, experiment_dir)
+# # ---------- high-level runner ----------
+# def run_pareto_plots(
+#     config_groups,
+#     baseline_data,
+#     experiment_dir,
+#     x_metric="Inter-Particle Diversity Improvement (%)",
+#     y_metric="CLIP Fidelity Change (%)",
+#     output_dir: str = "analysis/pareto_analysis"
+# ):
+#     """
+#     Convenience wrapper: builds the summary df and renders 2x2 Pareto subplots.
+#     """
+#     df = build_summary_table(config_groups, baseline_data, experiment_dir)
 
-    # Only keep rows with valid x/y
-    df = df.dropna(subset=[x_metric, y_metric]).copy()
+#     # Only keep rows with valid x/y
+#     df = df.dropna(subset=[x_metric, y_metric]).copy()
 
-    # Optional: enforce your criterion (diversity must be > baseline)
-    df = df[df["Inter-Particle Diversity Improvement (%)"] > 0].copy()
+#     # Optional: enforce your criterion (diversity must be > baseline)
+#     df = df[df["Inter-Particle Diversity Improvement (%)"] > 0].copy()
 
-    # Plot
-    plot_pareto_subplots(
-        df,
-        x_metric=x_metric,
-        y_metric=y_metric,
-        annotate_lambda=True,
-        annotate_step=False,
-        group_prompts=True,
-        title_suffix="(at fidelity plateau step)",
-        output_dir=output_dir
-    )
+    # # Plot
+    # plot_pareto_subplots(
+    #     df,
+    #     x_metric=x_metric,
+    #     y_metric=y_metric,
+    #     annotate_lambda=True,
+    #     annotate_step=False,
+    #     group_prompts=True,
+    #     title_suffix="(at fidelity plateau step)",
+    #     output_dir=output_dir
+    # )
 
-    return df  # so you can inspect/save if you want
+    # return df  # so you can inspect/save if you want
 
 
 
@@ -461,7 +506,7 @@ def main():
                         help='Base directory for experiments (default: exp)')
     parser.add_argument('--output_dir', type=str, default="analysis",
                         help='Output directory for comparison plots (default: comparison_plots)')
-    parser.add_argument('--compare_plots_multi_prompt', action='store_true', default=False,
+    parser.add_argument('--compare_plots_multi_prompts', action='store_true', default=False,
                         help='Whether to generate comparison plots (default: True)')
     parser.add_argument('--compare_plots_single_prompt', action='store_true', default=False,
                         help='Whether to generate comparison plots (default: True)')
@@ -471,7 +516,7 @@ def main():
     args = parser.parse_args()
     
     # Create output directory
-    if args.compare_plots_multi_prompt or args.compare_plots_single_prompt:
+    if args.compare_plots_multi_prompts or args.compare_plots_single_prompt:
         comparison_plots_output_dir = Path(args.output_dir) / "comparison_plots"
         comparison_plots_output_dir.mkdir(exist_ok=True)
 
@@ -517,7 +562,7 @@ def main():
             baseline_data[config_name] = pd.read_csv(metrics_path)
             print(f"Loaded baseline data for {config_name}")
  
-    if args.compare_plots_multi_prompt:
+    if args.compare_plots_multi_prompts:
         saved_plots = []
         pairs = sorted({(k, r) for (k, _p, r) in config_groups.keys()})
 

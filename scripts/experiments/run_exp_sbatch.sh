@@ -109,8 +109,19 @@ for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
         echo "Available experiments from text_ours_exp.yaml:"
         echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
         echo "  exp1_lambda_coarse         # Coarse lambda sweep"
+        echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVDG repulsion"
+        echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSD repulsion"
         echo "  exp2_lambda_fine           # Fine lambda sweep"
         echo "  exp3_beta                  # Beta sweep for both RBF and cosine kernels"
+        echo "  exp3_beta_rbf              # Beta sweep for RBF kernel"
+        echo "  exp3_beta_cosine           # Beta sweep for cosine kernel"        
+        echo "  exp4_num_pts               # Number of points sweep"
+        echo "  exp5_num_particles         # Number of particles sweep"
+        echo "  exp6_feature_extractor     # Feature extractor sweep"
+        echo "  exp7_feature_layer         # Feature layer sweep"
+        echo "  exp8_rbf_beta              # RBF beta sweep"
+        echo "  exp9_cosine_beta           # Cosine beta sweep"
+        echo "  exp10_cosine_eps_shift     # Cosine eps shift sweep"
         exit 1
     fi
 done
