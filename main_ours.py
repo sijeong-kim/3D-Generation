@@ -130,17 +130,6 @@ class GUI:
             self.renderers[i].gaussians.active_sh_degree = self.renderers[i].gaussians.max_sh_degree
             self.optimizers.append(self.renderers[i].gaussians.optimizer)
 
-        # pose = orbit_camera(self.opt.elevation, 0, self.opt.radius)
-        # self.fixed_cam = MiniCam(
-        #     pose,
-        #     self.opt.ref_size,
-        #     self.opt.ref_size,
-        #     self.cam.fovy,
-        #     self.cam.fovx,
-        #     self.cam.near,
-        #     self.cam.far,
-        # )
-        
         # feature extractor
         # Use multi-layer extractor for specific layer extraction
         # Supports: 'early' (25% depth), 'mid' (50% depth), 'last' (final layer)
@@ -458,46 +447,15 @@ class GUI:
                             "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
                         }
                     )
-
-                # # log
-                # self.metrics_calculator.log_metrics(
-                #     # efficiency
-                #     step=self.step,
-                #     efficiency= {
-                #         "time": t,
-                #         "memory_allocated_mb": memory_allocated,
-                #         "max_memory_allocated_mb": max_memory_allocated,
-                #     },
-                #     # losses
-                #     losses= {
-                #         "attraction_loss": attraction_loss_val,
-                #         "repulsion_loss": repulsion_loss_val,
-                #         "scaled_attraction_loss": scaled_attraction_loss_val,
-                #         "scaled_repulsion_loss": scaled_repulsion_loss_val,
-                #         "total_loss": total_loss_val,
-                #         "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
-                #     },
-                #     # metrics
-                #     metrics= {
-                #         "fidelity_mean": fidelity_mean,
-                #         "fidelity_std": fidelity_std,
-                #         "inter_particle_diversity_mean": inter_particle_diversity_mean,
-                #         "inter_particle_diversity_std": inter_particle_diversity_std,
-                #         "cross_view_consistency_mean": cross_view_consistency_mean,
-                #         "cross_view_consistency_std": cross_view_consistency_std,
-                #         # LPIPS
-                #         "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
-                #         "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
-                #         "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
-                #         "lpips_consistency_std": lpips_consistency_std if self.opt.enable_lpips else None,
-                #     }
-                # )
+                    
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.opt.save_rendered_images and (self.step % self.opt.save_rendered_images_interval == 0):
-                    # self.visualizer.save_rendered_images(self.step, images)
-                    self.
+                    self.visualizer.save_rendered_images(self.step, images)
+                    
+                if self.opt.visualize_fixed_viewpoint and (self.step % self.opt.visualize_fixed_viewpoint_interval == 0):
+                    self.visualizer.visualize_fixed_viewpoint(self.step)
 
         # Periodic GPU memory cleanup
         if self.step % self.opt.efficiency_interval == 0:
