@@ -1,26 +1,16 @@
 """
 3D Gaussian Splatting Evaluation Metrics Module
 
-This module provides comprehensive evaluation capabilities for 3D Gaussian Splatting models,
-enabling quantitative assessment of generation quality, diversity, and consistency across
-multiple viewpoints and particles.
+Provides comprehensive evaluation capabilities for 3D Gaussian Splatting models,
+enabling quantitative assessment of generation quality, diversity, and consistency.
 
 Key Components:
 - MetricsModel: Evaluation-time model wrapper (OpenCLIP, DINO, LPIPS)
-- MetricsCalculator: Batch processing and logging utilities for metrics computation
-
-Key Features:
-- Multi-model evaluation: CLIP for fidelity, DINO for diversity, LPIPS for perceptual similarity
-- Robust device selection with automatic fallback (CUDA → MPS → CPU)
-- Mixed precision support (fp16/fp32) for efficient computation
-- Graceful handling of optional dependencies with clear warnings
-- Comprehensive CSV logging with buffered, newline-safe output
-- Multi-viewpoint analysis for 3D consistency evaluation
-- Inter-particle diversity measurement for multi-particle scenarios
+- MetricsCalculator: Batch processing and logging utilities
 
 Supported Metrics:
 - Fidelity: Text-image alignment using CLIP embeddings
-- Diversity: Inter-particle variation using DINO features
+- Diversity: Inter-particle variation using DINO features  
 - Consistency: Cross-viewpoint stability using DINO features
 - Perceptual Similarity: LPIPS-based distance measurements
 
@@ -29,14 +19,11 @@ Supported Models:
 - DINO: ViT-Base-Patch16-224 (timm/torch.hub)
 - LPIPS: AlexNet, VGG, SqueezeNet backbones
 
-Usage Example:
+Usage:
     >>> mm = MetricsModel(device="auto", eval_clip_model_name="ViT-bigG-14")
     >>> calc = MetricsCalculator({"metrics": True, "outdir": "./out"}, prompt="a photo of a hamburger")
     >>> # Compute metrics with calc.compute_* methods
     >>> # Log results with calc.log_metrics(...)
-
-Author: [Your Name]
-Date: [Date]
 """
 
 from __future__ import annotations
@@ -90,14 +77,14 @@ def _autocast_enabled(device: str) -> bool:
 
 class MetricsModel:
     """
-    Evaluation-time model wrapper for comprehensive 3D Gaussian Splatting metrics.
+    Evaluation-time model wrapper for 3D Gaussian Splatting metrics.
     
-    This class manages multiple pre-trained models for different evaluation tasks:
+    Manages multiple pre-trained models for different evaluation tasks:
     - CLIP models for text-image fidelity assessment
     - DINO models for diversity and consistency analysis
     - LPIPS networks for perceptual similarity measurements
     
-    The class provides unified interfaces for feature extraction, preprocessing,
+    Provides unified interfaces for feature extraction, preprocessing,
     and model management with automatic device placement and precision control.
     
     Attributes:
@@ -552,9 +539,9 @@ class MetricsCalculator:
     """
     Comprehensive metrics calculator for 3D Gaussian Splatting evaluation.
     
-    This class provides batch processing capabilities for computing and logging various
+    Provides batch processing capabilities for computing and logging various
     evaluation metrics including fidelity, diversity, consistency, and efficiency metrics.
-    It manages CSV logging, preprocessing pipelines, and metric computation workflows.
+    Manages CSV logging, preprocessing pipelines, and metric computation workflows.
     
     Key Features:
     - Multi-metric computation: fidelity, diversity, consistency, perceptual similarity
@@ -885,7 +872,7 @@ class MetricsCalculator:
         """
         Compute inter-particle diversity statistics across multiple viewpoints.
         
-        This metric measures how different the generated particles are from each other
+        Measures how different the generated particles are from each other
         across multiple viewpoints. Higher diversity indicates more varied and interesting
         generations. The metric is computed per viewpoint and then aggregated.
         
@@ -958,7 +945,7 @@ class MetricsCalculator:
         """
         Compute cross-view consistency statistics across multiple viewpoints.
         
-        This metric measures how consistent each particle appears across different viewpoints.
+        Measures how consistent each particle appears across different viewpoints.
         Higher consistency indicates better 3D structure and viewpoint invariance.
         The metric is computed per particle and then aggregated.
         
@@ -1050,7 +1037,7 @@ class MetricsCalculator:
         """
         Compute text-image CLIP fidelity statistics across multiple viewpoints.
         
-        This metric measures how well the generated images match the text prompt
+        Measures how well the generated images match the text prompt
         across multiple viewpoints. Higher fidelity indicates better text-image alignment.
         The metric aggregates CLIP similarity scores across viewpoints using the specified method.
         
@@ -1133,7 +1120,7 @@ class MetricsCalculator:
         """
         Compute LPIPS-based inter-sample diversity and cross-view consistency.
         
-        This method provides perceptual similarity metrics using the Learned Perceptual
+        Provides perceptual similarity metrics using the Learned Perceptual
         Image Patch Similarity (LPIPS) network. LPIPS is particularly useful for measuring
         perceptual differences that align with human visual perception.
         
@@ -1226,7 +1213,7 @@ class MetricsCalculator:
         """
         Compute kernel statistics for monitoring kernel behavior during training.
         
-        This method computes various statistics that help understand the kernel's behavior:
+        Computes various statistics that help understand the kernel's behavior:
         1. Effective sample size (Neff): Measures how many effective independent samples we have
         2. Row-sum statistics: Measures the total influence of each particle
         3. Gradient norm: Measures the magnitude of the repulsion gradient

@@ -496,7 +496,8 @@ class GUI:
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.opt.save_rendered_images and (self.step % self.opt.save_rendered_images_interval == 0):
-                    self.visualizer.save_rendered_images(self.step, images)
+                    # self.visualizer.save_rendered_images(self.step, images)
+                    self.
 
         # Periodic GPU memory cleanup
         if self.step % self.opt.efficiency_interval == 0:

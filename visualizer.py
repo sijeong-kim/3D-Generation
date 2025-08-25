@@ -2,7 +2,7 @@
 """
 3D Gaussian Splatting Visualization and Rendering Module
 
-This module provides comprehensive visualization capabilities for 3D Gaussian Splatting models,
+Provides comprehensive visualization capabilities for 3D Gaussian Splatting models,
 enabling multi-viewpoint rendering, individual particle visualization, and advanced debugging
 tools for analyzing rendering configurations and image quality.
 
@@ -35,9 +35,6 @@ The module creates organized directory structures for different visualization ty
 - Individual particle renders: step_{step}_view_{num_views}_particle_{id}/
 - Fixed viewpoint renders: step_{step}_view_{elevation}_{horizontal}/
 - Debug renders: debug_renders_step_{step}/
-
-Author: [Your Name]
-Date: [Date]
 """
 
 import os
@@ -53,12 +50,12 @@ class GaussianVisualizer:
     """
     A comprehensive visualizer for 3D Gaussian Splatting models with advanced rendering capabilities.
     
-    This class provides methods to render and save images from multiple viewpoints,
-    visualize individual particles, and debug rendering configurations. It supports
+    Provides methods to render and save images from multiple viewpoints,
+    visualize individual particles, and debug rendering configurations. Supports
     both single-particle and multi-particle scenarios with flexible camera controls
     and comprehensive debugging tools.
     
-    The visualizer creates organized directory structures for different visualization
+    Creates organized directory structures for different visualization
     types and provides detailed analysis tools for optimizing rendering parameters
     and diagnosing rendering issues.
     
@@ -84,8 +81,8 @@ class GaussianVisualizer:
         """
         Initialize the GaussianVisualizer with configuration and rendering components.
         
-        This method sets up the visualizer with the provided configuration and validates
-        required parameters. It initializes the output directory structure and pre-computes
+        Sets up the visualizer with the provided configuration and validates
+        required parameters. Initializes the output directory structure and pre-computes
         camera viewpoints for efficient rendering.
         
         Args:
@@ -146,7 +143,7 @@ class GaussianVisualizer:
         """
         Generate a set of camera viewpoints for multi-view rendering.
         
-        This method creates a horizontal orbit around the object at zero elevation,
+        Creates a horizontal orbit around the object at zero elevation,
         distributing viewpoints evenly across 360 degrees. The viewpoints are designed
         for comprehensive 3D scene analysis and consistent multi-view visualization.
         
@@ -190,7 +187,7 @@ class GaussianVisualizer:
         """
         Save rendered images to the visualization directory with step-based naming.
         
-        This method creates a 'rendered_images' subdirectory within the main visualization
+        Creates a 'rendered_images' subdirectory within the main visualization
         directory and saves the provided images with a step-based naming convention.
         Images are saved without normalization to preserve original pixel values.
         
@@ -228,8 +225,8 @@ class GaussianVisualizer:
         """
         Render all particles from multiple viewpoints and optionally save individual images.
         
-        This method creates a comprehensive multi-view visualization by rendering each particle
-        from multiple camera positions arranged in a horizontal orbit. It supports both
+        Creates a comprehensive multi-view visualization by rendering each particle
+        from multiple camera positions arranged in a horizontal orbit. Supports both
         individual particle saving and combined particle views with flexible saving options.
         
         Methodology:
@@ -371,67 +368,29 @@ class GaussianVisualizer:
     @torch.no_grad()
     def visualize_fixed_viewpoint(self, step, elevation, horizontal):
         """
-        Render images from a specific fixed viewpoint with custom elevation and azimuth angles.
-        
-        This method provides precise control over camera positioning, allowing for
-        detailed examination of the 3D scene from any desired angle. It renders all
-        particles from the specified viewpoint and optionally saves individual and
-        combined particle images.
-        
-        Methodology:
-        1. Compute camera pose for the specified elevation and azimuth angles
-        2. Create camera object with the computed pose and configured parameters
-        3. Render each particle from the fixed viewpoint
-        4. Optionally save individual particle images and combined view
-        5. Return particle images tensor for further processing
+        Render images from a fixed viewpoint with custom elevation and azimuth angles.
         
         Args:
-            step (int): Current training step for file naming. Used to create
-                       step-based directory names for organizing outputs.
-            elevation (float): Vertical angle in degrees. Range: [-90, 90]
-                             - 90: Directly above the scene (top view)
-                             - 0: Horizontal view (eye level)
-                             - -90: Directly below the scene (bottom view)
-            horizontal (float): Horizontal angle in degrees. Range: [0, 360]
-                              - 0: Front view
-                              - 90: Right view
-                              - 180: Back view
-                              - 270: Left view
+            step (int): Current training step for file naming
+            elevation (float): Vertical angle in degrees [-90, 90]
+                             - 90: Top view, 0: Eye level, -90: Bottom view
+            horizontal (float): Horizontal angle in degrees [0, 360]
+                              - 0: Front, 90: Right, 180: Back, 270: Left
         
         Returns:
-            torch.Tensor: Particle images with shape [N, 3, H, W] where:
-                         - N: Number of particles
-                         - 3: RGB channels
-                         - H, W: Image height and width
+            torch.Tensor: Particle images with shape [N, 3, H, W]
         
         Directory Structure (when visualization enabled):
-            visualizations/
-            └── step_{step}_view_{elevation}_{horizontal}/
-                ├── particle_0.png  # Individual particle images
-                ├── particle_1.png
-                ├── ...
-                └── all_particles.png  # Combined view of all particles
+            visualizations/step_{step}_view_{elevation}_{horizontal}/
+                ├── particle_0.png, particle_1.png, ...
+                └── all_particles.png
         
         Note:
-            - Camera pose is computed using orbit_camera() function
-            - All rendering uses white background for consistent visualization
-            - Individual particle images are saved when visualization is enabled
-            - Combined particle image is only saved when num_particles > 1
-            - All operations are performed with torch.no_grad() for efficiency
-        
-        Example:
-            >>> # Render from front view at eye level
-            >>> images = visualizer.visualize_fixed_viewpoint(100, 0, 0)
-            >>> print(f"Front view images shape: {images.shape}")  # [4, 3, 256, 256]
-            >>> 
-            >>> # Render from top-down view
-            >>> images = visualizer.visualize_fixed_viewpoint(100, 90, 0)
-            >>> print(f"Top view images shape: {images.shape}")  # [4, 3, 256, 256]
-            >>> 
-            >>> # Render from side view
-            >>> images = visualizer.visualize_fixed_viewpoint(100, 0, 90)
-            >>> print(f"Side view images shape: {images.shape}")  # [4, 3, 256, 256]
+            - Uses white background for consistent visualization
+            - Individual images saved when visualization enabled
+            - Combined image saved when num_particles > 1
         """
+        
         
         # Create output directory for this specific viewpoint
         if self.opt.visualize_fixed_viewpoint:
@@ -486,9 +445,9 @@ class GaussianVisualizer:
         """
         Comprehensive debugging tool for analyzing rendering configurations and Gaussian properties.
         
-        This method performs detailed analysis of the rendering setup, including Gaussian
+        Performs detailed analysis of the rendering setup, including Gaussian
         statistics, visibility analysis, distance distribution, and camera configuration
-        testing. It helps diagnose rendering issues and optimize rendering parameters.
+        testing. Helps diagnose rendering issues and optimize rendering parameters.
         
         Analysis Components:
         1. Gaussian Property Analysis:
@@ -606,7 +565,7 @@ class GaussianVisualizer:
         """
         Analyze and log detailed statistics about rendered images and render outputs.
         
-        This method provides pixel-level analysis of rendered images and additional
+        Provides pixel-level analysis of rendered images and additional
         render outputs like depth and alpha maps to help diagnose rendering issues
         and assess rendering quality.
         
