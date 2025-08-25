@@ -116,7 +116,7 @@ git config --global user.email "ssonge413@gmail.com"
 
 
 # download data
-python download_models.py
+python tools/download_models.py
 
 # # set environment variables
 # export HF_HUB_OFFLINE=1
