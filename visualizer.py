@@ -34,7 +34,7 @@ class GaussianVisualizer:
             self.multi_viewpoints_cameras = None
             
         if self.opt.visualize_fixed_viewpoint:
-            self.fixed_viewpoint_camera = self.get_fixed_view_camera(self.opt.elevation, self.opt.horizontal, self.eval_radius)
+            self.fixed_viewpoint_camera = self.get_front_view_camera()
         else:
             self.fixed_viewpoint_camera = None
         
@@ -111,7 +111,7 @@ class GaussianVisualizer:
     
     # Set front view camera
     @torch.no_grad()
-    def front_view_camera(self):
+    def get_front_view_camera(self):
         """
         Generate a camera viewpoint for front view rendering.
         """

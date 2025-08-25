@@ -106,23 +106,11 @@ exp1_lambda_coarse_svgd:
     enable_lpips: False # disable lpips for faster training
 
 
-# Experiment 1: Repulsion lambda sweep with multiple prompts
+### 🔖 Experiment 1: Repulsion lambda sweep with multiple prompts
 exp1_lambda_coarse_rlsd:
   name: exp1_lambda_coarse_rlsd
   method: grid
   sweep_parameters:
-    # prompt: 
-    #   hamburger: "a photo of a hamburger" # simple prompt
-    #   icecream: "a photo of an ice cream" # complex prompt
-    #   saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
-    #   tulip: "a photo of a tulip" # simple prompt
-    # repulsion_type: ['rlsd']
-    # kernel_type: ['rbf', 'cosine']
-    # lambda_repulsion: # TODO: add more values
-    #   rlsd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4]
-    #   rlsd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4]
-    # seed: [42]
-
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
       # icecream: "a photo of an ice cream" # complex prompt
@@ -176,6 +164,7 @@ exp1_lambda_coarse_rlsd:
     num_views: 8
     enable_lpips: False # disable lpips for faster training
 
+### Experiment 2: Lambda fine sweep with multiple prompts
 exp2_lambda_fine_svgd:
   name: exp2_lambda_fine_svgd
   method: grid

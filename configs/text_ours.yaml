@@ -60,6 +60,8 @@ negative_prompt:
 mesh:
 # estimated elevation angle for input image 
 elevation: 0
+# estimated horizontal angle for input image (azimuth)
+horizontal: 0
 # reference image resolution
 ref_size: 256
 # density thresh for mesh extraction
