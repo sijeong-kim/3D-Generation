@@ -28,7 +28,7 @@ class GaussianVisualizer:
         
         
         ### Pre-compute camera positions for efficient rendering
-        if self.opt.visualize_multi_viewpoints and self.opt.metrics:
+        if self.opt.visualize_multi_viewpoints or self.opt.metrics:
             self.multi_viewpoints_cameras = self.get_multi_view_cameras(self.opt.num_views)
         else:
             self.multi_viewpoints_cameras = None
@@ -165,6 +165,9 @@ class GaussianVisualizer:
                     particle_dir = os.path.join(self.iid_dir, f'step_{step}_view_{num_views}_particle_{particle_id}')
                     os.makedirs(particle_dir, exist_ok=True)
                     save_iid_paths.append(particle_dir)
+        
+        
+        print(f"self.multi_viewpoints_cameras: {self.multi_viewpoints_cameras}")
         
         # Render images from each viewpoint
         multi_viewpoint_images = []
