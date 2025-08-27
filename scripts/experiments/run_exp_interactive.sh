@@ -121,25 +121,25 @@ if [ "${#CUSTOM_SWEEPS[@]}" -gt 0 ]; then
     SWEEP_NAMES=("${CUSTOM_SWEEPS[@]}")
 fi
 
-# --------------------------------
-# Validate experiment names
-# --------------------------------
-VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine" "exp2_lambda_fine_svgd" "exp2_lambda_fine_rlsd")
+# # --------------------------------
+# # Validate experiment names
+# # --------------------------------
+# VALID_EXPERIMENTS=("exp0_baseline" "exp1_lambda_coarse_svgd" "exp1_lambda_coarse_rlsd" "exp2_lambda_fine_rbf" "exp2_lambda_fine_cosine" "exp2_lambda_fine_svgd" "exp2_lambda_fine_rlsd")
 
-for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
-    if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${SWEEP_NAME} " ]]; then
-        echo "[ERROR] Invalid experiment: $SWEEP_NAME"
-        echo "Valid experiments: ${VALID_EXPERIMENTS[*]}"
-        echo ""
-        echo "Available experiments from text_ours_exp.yaml:"
-        echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
-        echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVGD"
-        echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSd"
-        echo "  exp2_lambda_fine_rbf       # Fine lambda sweep with RBF kernel"
-        echo "  exp2_lambda_fine_cosine    # Fine lambda sweep with cosine kernel"
-        exit 1
-    fi
-done
+# for SWEEP_NAME in "${SWEEP_NAMES[@]}"; do
+#     if [[ ! " ${VALID_EXPERIMENTS[@]} " =~ " ${SWEEP_NAME} " ]]; then
+#         echo "[ERROR] Invalid experiment: $SWEEP_NAME"
+#         echo "Valid experiments: ${VALID_EXPERIMENTS[*]}"
+#         echo ""
+#         echo "Available experiments from text_ours_exp.yaml:"
+#         echo "  exp0_baseline              # Baseline experiment (wo repulsion)"
+#         echo "  exp1_lambda_coarse_svgd    # Coarse lambda sweep with SVGD"
+#         echo "  exp1_lambda_coarse_rlsd    # Coarse lambda sweep with RLSd"
+#         echo "  exp2_lambda_fine_rbf       # Fine lambda sweep with RBF kernel"
+#         echo "  exp2_lambda_fine_cosine    # Fine lambda sweep with cosine kernel"
+#         exit 1
+#     fi
+# done
 
 # --------------------------------
 # Run experiments

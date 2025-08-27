@@ -56,14 +56,16 @@ exp1_lambda_coarse_svgd:
   sweep_parameters:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
-      # icecream: "a photo of an ice cream" # complex prompt
+      icecream: "a photo of an ice cream" # complex prompt
       saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
-      # tulip: "a photo of a tulip" # simple prompt
+      tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['svgd']
     kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values
-      svgd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4]
-      svgd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4]
+      # svgd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4]
+      # svgd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4]
+      svgd_cosine: [100, 500, 1000, 2000]
+      svgd_rbf: [100, 500, 1000, 2000]
     seed: [42]
     
   fixed_parameters:
@@ -113,16 +115,16 @@ exp1_lambda_coarse_rlsd:
   sweep_parameters:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
-      # icecream: "a photo of an ice cream" # complex prompt
+      icecream: "a photo of an ice cream" # complex prompt
       saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
-      # tulip: "a photo of a tulip" # simple prompt
+      tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['rlsd']
     kernel_type: ['rbf', 'cosine']
     lambda_repulsion: # TODO: add more values
-      # rlsd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4, 5e4, 1e5]
-      # rlsd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4, 5e4, 1e5]
-      rlsd_cosine: [5e4, 1e5]
-      rlsd_rbf: [5e4, 1e5]
+      # rlsd_cosine: [1e2, 5e2, 1e3, 5e3, 1e4]
+      # rlsd_rbf: [1e2, 5e2, 1e3, 5e3, 1e4]
+      rlsd_cosine: [100, 500, 1000, 2000]
+      rlsd_rbf: [100, 500, 1000, 2000]
     seed: [42]
     
   fixed_parameters:
@@ -165,8 +167,8 @@ exp1_lambda_coarse_rlsd:
     enable_lpips: False # disable lpips for faster training
 
 ### Experiment 2: Lambda fine sweep with multiple prompts
-exp2_lambda_fine_svgd:
-  name: exp2_lambda_fine_svgd
+exp2_lambda_fine_svgd_cosine:
+  name: exp2_lambda_fine_svgd_cosine
   method: grid
   sweep_parameters:
     prompt: 
@@ -175,10 +177,9 @@ exp2_lambda_fine_svgd:
       saguaro: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
     repulsion_type: ['svgd']
-    kernel_type: ['rbf', 'cosine']
+    kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      svgd_rbf: [1100, 1000, 1200, 900, 1400] # [900, 1000, 1100, 1200, 1400] # [150, 250, 350]
-      svgd_cosine: [900, 1000, 800, 1100] # [800, 900, 1000, 1100] # [350, 500, 650]
+      svgd_cosine: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [800, 900, 1000, 1100] # [350, 500, 650]
       
     seed: [42, 123, 456] # TODO: add more seeds
     
@@ -220,8 +221,65 @@ exp2_lambda_fine_svgd:
     num_views: 8
     enable_lpips: False # disable lpips for faster training
 
-exp2_lambda_fine_rlsd:
-  name: exp2_lambda_fine_rlsd
+
+### Experiment 2: Lambda fine sweep with multiple prompts
+exp2_lambda_fine_svgd_rbf:
+  name: exp2_lambda_fine_svgd_rbf
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    repulsion_type: ['svgd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
+      svgd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1400] # [150, 250, 350]
+      
+    seed: [42, 123, 456] # TODO: add more seeds
+    
+  fixed_parameters:
+    num_pts: 5000
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    rbf_beta: 1.0
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.3 # increase for svgd to avoid overshooting
+    invert_bg_prob: 0.0 # always white background
+
+    eval_radius:
+      hamburger: 3.0
+      icecream: 4.0
+      saguaro: 4.0
+      tulip: 4.0
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+
+exp2_lambda_fine_rlsd_cosine:
+  name: exp2_lambda_fine_rlsd_cosine
   method: grid
   sweep_parameters:
     prompt: 
@@ -230,10 +288,64 @@ exp2_lambda_fine_rlsd:
       saguaro: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
     repulsion_type: ['rlsd']
-    kernel_type: ['rbf', 'cosine']
+    kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_cosine: [800, 1000, 1200, 1500, 2000] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
-      rlsd_rbf: [500, 700, 1000, 1500] # [1000, 1100, 1200, 1400, 1600] # [300, 500, 700]
+      rlsd_cosine: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
+    seed: [42, 123, 456] # TODO: add more seeds
+    
+  fixed_parameters:
+    num_pts: 5000
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+    iters: 1500
+    use_sigma_weight: True
+    rep_sigma_power: 0.5
+    use_cosine_decay: True
+    rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.0 # always white background
+
+    eval_radius:
+      hamburger: 3.0
+      icecream: 4.0
+      saguaro: 4.0
+      tulip: 4.0
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+
+exp2_lambda_fine_rlsd_rbf:
+  name: exp2_lambda_fine_rlsd_rbf
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      saguaro: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
+      rlsd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
@@ -362,4 +474,4 @@ exp3_beta:
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
-    enable_lpips: False # disable lpips for faster training
+    enable_lpips: False # disable lpips for faster trainings
