@@ -28,7 +28,7 @@ class GaussianVisualizer:
         
         
         ### Pre-compute camera positions for efficient rendering
-        if self.opt.visualize_multi_viewpoints:
+        if self.opt.visualize_multi_viewpoints and self.opt.metrics:
             self.multi_viewpoints_cameras = self.get_multi_view_cameras(self.opt.num_views)
         else:
             self.multi_viewpoints_cameras = None
