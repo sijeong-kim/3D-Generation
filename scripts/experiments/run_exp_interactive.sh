@@ -159,7 +159,10 @@ run_single_experiment() {
     export CUDA_VISIBLE_DEVICES="$gpu_id"
     print_info "Assigned GPU (CUDA_VISIBLE_DEVICES): $gpu_id"
   else
-    print_warning "No GPU assignment; default visibility will be used"
+    # Default to GPU 0 if no GPUs specified
+    export CUDA_VISIBLE_DEVICES="0"
+    gpu_id="0"
+    print_info "No GPU specified, using default GPU 0"
   fi
 
   # Threads
@@ -173,7 +176,7 @@ run_single_experiment() {
 
   # PyTorch allocator (helps multi-run fragmentation)
   export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:128"
-  export CUDA_VISIBLE_DEVICES=1
+  
 
   # Optional soft memory cap for child
   local ULIMIT_PREFIX=""
