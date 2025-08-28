@@ -2,6 +2,16 @@
 """
 Hyperparameter tuning script for 3D Generation experiments.
 Reads experiment configurations from YAML files and runs grid search experiments.
+
+IMPORTANT CHANGES (GPU Resource Management):
+- Replaced subprocess execution with direct GUI import from main_ours
+- Added explicit GPU device initialization for each experiment
+- Implemented comprehensive GPU cleanup after each experiment
+- Added GPU resource monitoring and logging
+- Each experiment now properly initializes its own GPU context
+
+This ensures that GPU resources are properly managed and cleaned up between experiments,
+preventing memory leaks and resource conflicts in hyperparameter tuning runs.
 """
 
 import argparse
@@ -9,12 +19,17 @@ import itertools
 import os
 import sys
 import yaml
-import subprocess
 import copy
 from pathlib import Path
 from typing import Dict, List, Any, Tuple
 import time
 import datetime
+import torch
+import gc
+
+# Import the GUI class directly instead of using subprocess
+from main_ours import GUI
+from omegaconf import OmegaConf
 
 
 def load_yaml_config(config_path: str) -> Dict[str, Any]:
@@ -246,6 +261,27 @@ def get_gpu_info() -> Dict[str, Any]:
     return gpu_info
 
 
+def verify_gpu_availability(gpu_id: int) -> bool:
+    """Verify that the specified GPU is available and accessible."""
+    if not torch.cuda.is_available():
+        print(f"❌ CUDA is not available on this system")
+        return False
+    
+    if gpu_id >= torch.cuda.device_count():
+        print(f"❌ GPU {gpu_id} does not exist. Available GPUs: {list(range(torch.cuda.device_count()))}")
+        return False
+    
+    try:
+        # Test if we can access the GPU
+        torch.cuda.set_device(gpu_id)
+        torch.cuda.empty_cache()
+        print(f"✅ GPU {gpu_id} is available and accessible: {torch.cuda.get_device_name(gpu_id)}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to access GPU {gpu_id}: {e}")
+        return False
+
+
 def select_gpu_for_experiment(gpu_info: Dict[str, Any], experiment_id: int) -> int:
     """
     Select a GPU for the experiment.
@@ -335,42 +371,54 @@ def run_single_experiment(
     save_config_to_file(config, config_path)
     
 
-    # Prepare command
-    cmd = [
-        sys.executable, "main_ours.py",
-        "--config", config_path,
-        "--outdir", output_dir
-    ]
-    
-    # Add prompt if specified
-    if config.get('prompt'):
-        cmd.extend(["--prompt", config['prompt']])
-    
     print(f"Running experiment: {output_dir}")
-    print(f"Command: {' '.join(cmd)}")
+    print(f"GPU ID: {gpu_id}")
     print("-" * 80)
     
     # Collect metadata before running
     metadata = collect_run_metadata()
-    metadata['command'] = ' '.join(cmd)
     metadata['start_time'] = datetime.datetime.now().isoformat()
     metadata['gpu_id'] = gpu_id
-    
-    # Set GPU environment variable for the subprocess
-    env = os.environ.copy()
-    env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     
     # Save metadata
     metadata_path = os.path.join(output_dir, "run_metadata.yaml")
     with open(metadata_path, 'w') as f:
         yaml.dump(metadata, f, default_flow_style=False, indent=2)
     
-    # TODO✅:check cmd
+    # Set GPU device for this experiment
+    if torch.cuda.is_available():
+        print(f"🖥️  Available GPUs: {torch.cuda.device_count()}")
+        print(f"🖥️  Current GPU: {torch.cuda.current_device()}")
+        print(f"🖥️  Target GPU: {gpu_id}")
+        
+        # Verify GPU availability before starting
+        if not verify_gpu_availability(gpu_id):
+            print(f"⚠️  Warning: GPU {gpu_id} verification failed, but continuing...")
+        
+        # Clear GPU cache before starting
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        gc.collect()
+    
     try:
-        # Run the experiment with streaming output to avoid truncation
-        with open(os.path.join(output_dir, "stdout.log"), "w") as out, \
-             open(os.path.join(output_dir, "stderr.log"), "w") as err:
-            result = subprocess.run(cmd, stdout=out, stderr=err, cwd=os.getcwd(), env=env)
+        # Create OmegaConf object from config dict
+        opt = OmegaConf.create(config)
+        
+        # Add GPU ID to the config for the GUI to use
+        opt.gpu_id = gpu_id
+        
+        # Initialize GUI and run training
+        print(f"🚀 Starting training with {opt.iters} iterations...")
+        gui = GUI(opt)
+        
+        # Explicitly set GPU device in GUI
+        if torch.cuda.is_available():
+            if not gui.set_gpu_device(gpu_id):
+                print(f"⚠️  Warning: Failed to set GPU {gpu_id}, experiment may use different GPU")
+        
+        # Run training
+        print(f"🎯 Starting training on device: {gui.device}")
+        gui.train(opt.iters)
         
         # Calculate duration
         end_time = datetime.datetime.now()
@@ -379,56 +427,64 @@ def run_single_experiment(
         # Update metadata with results
         metadata['end_time'] = end_time.isoformat()
         metadata['duration_sec'] = duration_sec
-        metadata['return_code'] = result.returncode
+        metadata['return_code'] = 0  # Success
         
         # Save updated metadata
         with open(metadata_path, 'w') as f:
             yaml.dump(metadata, f, default_flow_style=False, indent=2)
         
-        if result.returncode == 0:
-            print(f"✅ Experiment completed successfully: {output_dir} (duration: {duration_sec:.1f}s)")
-            # Create .done marker to prevent duplicate runs
-            done_flag = os.path.join(output_dir, ".done")
-            Path(done_flag).write_text(end_time.isoformat())
-            return {
-                'success': True,
-                'return_code': result.returncode,
-                'start_time': metadata['start_time'],
-                'end_time': metadata['end_time'],
-                'duration_sec': duration_sec
-            }
-        else:
-            print(f"❌ Experiment failed (return code {result.returncode}): {output_dir} (duration: {duration_sec:.1f}s)")
-            
-            # Show last 50 lines of stderr.log for debugging
-            stderr_path = os.path.join(output_dir, "stderr.log")
-            if os.path.exists(stderr_path):
-                try:
-                    with open(stderr_path, "r") as err:
-                        lines = err.readlines()
-                        print("---- Last 50 lines of stderr.log ----")
-                        print("".join(lines[-50:]))
-                        print("---- End of stderr.log ----")
-                except Exception as e:
-                    print(f"Warning: Could not read stderr.log: {e}")
-            
-            return {
-                'success': False,
-                'return_code': result.returncode,
-                'start_time': metadata['start_time'],
-                'end_time': metadata['end_time'],
-                'duration_sec': duration_sec
-            }
+        print(f"✅ Experiment completed successfully: {output_dir} (duration: {duration_sec:.1f}s)")
+        
+        # Create .done marker to prevent duplicate runs
+        done_flag = os.path.join(output_dir, ".done")
+        Path(done_flag).write_text(end_time.isoformat())
+        
+        # Cleanup GPU resources after successful completion
+        if torch.cuda.is_available():
+            print(f"🧹 Cleaning up GPU {gpu_id} resources...")
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            gc.collect()
+        
+        return {
+            'success': True,
+            'return_code': 0,
+            'start_time': metadata['start_time'],
+            'end_time': metadata['end_time'],
+            'duration_sec': duration_sec
+        }
             
     except Exception as e:
         print(f"❌ Exception during experiment: {output_dir}")
         print(f"Error: {str(e)}")
+        
+        # Calculate duration even for failed experiments
+        end_time = datetime.datetime.now()
+        duration_sec = (end_time - datetime.datetime.fromisoformat(metadata['start_time'])).total_seconds()
+        
+        # Update metadata with error results
+        metadata['end_time'] = end_time.isoformat()
+        metadata['duration_sec'] = duration_sec
+        metadata['return_code'] = -1
+        metadata['error'] = str(e)
+        
+        # Save updated metadata
+        with open(metadata_path, 'w') as f:
+            yaml.dump(metadata, f, default_flow_style=False, indent=2)
+        
+        # Cleanup GPU resources even after failure
+        if torch.cuda.is_available():
+            print(f"🧹 Cleaning up GPU {gpu_id} resources after failure...")
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            gc.collect()
+        
         return {
             'success': False,
             'return_code': -1,
-            'start_time': metadata.get('start_time', datetime.datetime.now().isoformat()),
-            'end_time': datetime.datetime.now().isoformat(),
-            'duration_sec': 0,
+            'start_time': metadata['start_time'],
+            'end_time': metadata['end_time'],
+            'duration_sec': duration_sec,
             'error': str(e)
         }
 

@@ -40,6 +40,13 @@ class GUI:
 
         # models
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        
+        # Set CUDA device if specified in options
+        if hasattr(opt, 'gpu_id') and opt.gpu_id is not None and torch.cuda.is_available():
+            torch.cuda.set_device(opt.gpu_id)
+            self.device = torch.device(f"cuda:{opt.gpu_id}")
+            print(f"[INFO] Using GPU {opt.gpu_id}: {torch.cuda.get_device_name(opt.gpu_id)}")
+        
         self.bg_remover = None
 
         self.guidance_sd = None
@@ -102,6 +109,64 @@ class GUI:
             
     def __del__(self):
         pass
+    
+    def cleanup_gpu_resources(self):
+        """Clean up GPU resources and free memory."""
+        print("[INFO] Cleaning up GPU resources...")
+        
+        # Clean up renderers
+        if hasattr(self, 'renderers'):
+            for renderer in self.renderers:
+                if hasattr(renderer, 'gaussians'):
+                    del renderer.gaussians
+                del renderer
+            self.renderers.clear()
+        
+        # Clean up visualizer
+        if hasattr(self, 'visualizer'):
+            del self.visualizer
+            self.visualizer = None
+        
+        # Clean up feature extractor
+        if hasattr(self, 'feature_extractor'):
+            del self.feature_extractor
+            self.feature_extractor = None
+        
+        # Clean up guidance models
+        if hasattr(self, 'guidance_sd'):
+            del self.guidance_sd
+            self.guidance_sd = None
+        
+        # Clean up metrics calculator
+        if hasattr(self, 'metrics_calculator'):
+            del self.metrics_calculator
+            self.metrics_calculator = None
+        
+        # Clean up optimizers
+        if hasattr(self, 'optimizers'):
+            for optimizer in self.optimizers:
+                del optimizer
+            self.optimizers.clear()
+        
+        # Force garbage collection and CUDA cleanup
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        
+        print("[INFO] GPU resources cleaned up successfully.")
+    
+    def set_gpu_device(self, gpu_id: int):
+        """Set the CUDA device for this experiment."""
+        if torch.cuda.is_available() and gpu_id < torch.cuda.device_count():
+            torch.cuda.set_device(gpu_id)
+            self.device = torch.device(f"cuda:{gpu_id}")
+            print(f"[INFO] Switched to GPU {gpu_id}: {torch.cuda.get_device_name(gpu_id)}")
+            return True
+        else:
+            print(f"[WARNING] GPU {gpu_id} not available, using CPU")
+            self.device = torch.device("cpu")
+            return False
 
     def seed_everything(self, seed):
         try:
@@ -698,6 +763,9 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.save_model(mode='model', particle_id=j)
                 self.save_model(mode='geo+tex', particle_id=j)
+        
+        # Clean up GPU resources after training
+        self.cleanup_gpu_resources()
 
 if __name__ == "__main__":
     import argparse
