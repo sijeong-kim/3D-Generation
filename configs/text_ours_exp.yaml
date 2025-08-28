@@ -17,7 +17,7 @@ exp0_baseline:
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
     seed: [42]
 
@@ -30,7 +30,7 @@ exp0_baseline:
     eval_radius: # not to crop the object adjust the radius
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -57,7 +57,7 @@ exp1_lambda_coarse_svgd:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
       icecream: "a photo of an ice cream" # complex prompt
-      saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
+      cactus: "a small saguaro cactus planted in a clay pot" # complex prompt
       tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['svgd']
     kernel_type: ['rbf', 'cosine']
@@ -85,7 +85,7 @@ exp1_lambda_coarse_svgd:
     eval_radius:
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -116,7 +116,7 @@ exp1_lambda_coarse_rlsd:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
       icecream: "a photo of an ice cream" # complex prompt
-      saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
+      cactus: "a small saguaro cactus planted in a clay pot" # complex prompt
       tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['rlsd']
     kernel_type: ['rbf', 'cosine']
@@ -144,7 +144,7 @@ exp1_lambda_coarse_rlsd:
     eval_radius:
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -174,7 +174,7 @@ exp2_lambda_fine_svgd_cosine:
     prompt: 
       hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
     repulsion_type: ['svgd']
     kernel_type: ['cosine']
@@ -199,7 +199,7 @@ exp2_lambda_fine_svgd_cosine:
     eval_radius:
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -230,7 +230,7 @@ exp2_lambda_fine_svgd_rbf:
     prompt: 
       hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
     repulsion_type: ['svgd']
     kernel_type: ['rbf']
@@ -255,7 +255,7 @@ exp2_lambda_fine_svgd_rbf:
     eval_radius:
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -285,7 +285,7 @@ exp2_lambda_fine_rlsd_cosine:
     prompt: 
       hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
     repulsion_type: ['rlsd']
     kernel_type: ['cosine']
@@ -310,7 +310,7 @@ exp2_lambda_fine_rlsd_cosine:
     eval_radius:
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -340,7 +340,7 @@ exp2_lambda_fine_rlsd_rbf:
     prompt: 
       hamburger: "a photo of a hamburger"
       # icecream: "a photo of an ice cream"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
     repulsion_type: ['rlsd']
     kernel_type: ['rbf']
@@ -365,7 +365,7 @@ exp2_lambda_fine_rlsd_rbf:
     eval_radius:
       hamburger: 3.0
       icecream: 4.0
-      saguaro: 4.0
+      cactus: 4.0
       tulip: 4.0
 
   settings:
@@ -395,7 +395,7 @@ exp2b_beta_spotcheck_rbf:
   sweep_parameters:
     prompt:
       hamburger: "a photo of a hamburger"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
     repulsion_type: ['svgd', 'rlsd']
     kernel_type: ['rbf']
     lambda_repulsion:
@@ -412,7 +412,7 @@ exp2b_beta_spotcheck_cosine:
   sweep_parameters:
     prompt:
       hamburger: "a photo of a hamburger"
-      saguaro: "a small saguaro cactus planted in a clay pot"
+      cactus: "a small saguaro cactus planted in a clay pot"
     repulsion_type: ['rlsd']
     kernel_type: ['cosine']
     lambda_repulsion:
@@ -431,7 +431,7 @@ exp3_beta:
     prompt: 
       hamburger: "a photo of a hamburger" # simple prompt
       icecream: "a photo of an ice cream" # complex prompt
-      saguaro: "a small saguaro cactus planted in a clay pot" # complex prompt
+      cactus: "a small saguaro cactus planted in a clay pot" # complex prompt
       tulip: "a photo of a tulip" # simple prompt
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['rbf', 'cosine']
