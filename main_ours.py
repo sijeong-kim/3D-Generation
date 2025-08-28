@@ -349,7 +349,7 @@ class GUI:
             kernel_grad = kernel_grad.detach().to(torch.float32)
             
             # 4.5. Compute and log kernel statistics (if metrics enabled)
-            if self.opt.metrics and self.metrics_calculator is not None and self.step % self.opt.kernel_metrics_interval == 0:
+            if self.opt.metrics and self.metrics_calculator is not None and (self.step==1 or self.step % self.opt.kernel_metrics_interval == 0):
                 neff_mean, neff_std, row_sum_mean, row_sum_std, gradient_norm_mean, gradient_norm_std = self.metrics_calculator.compute_kernel_statistics(kernel, kernel_grad, features)
                 self.metrics_calculator.log_kernel_stats(
                     step=self.step,
@@ -403,7 +403,7 @@ class GUI:
         
         # 1. Compute gradients
         # Optionally visualize autograd graph before backward to avoid retaining graph twice
-        if self.opt.visualize_graph and self.step % self.opt.visualize_graph_interval == 0:
+        if self.opt.visualize_graph and (self.step==1 or self.step % self.opt.visualize_graph_interval == 0):
             graph_dir = os.path.join(self.opt.outdir, "visualizations", "loss_graph")
             os.makedirs(graph_dir, exist_ok=True)
             params = {n: p for n,p in self.renderers[0].gaussians.named_parameters() if p.requires_grad}
@@ -442,7 +442,7 @@ class GUI:
         with torch.no_grad():
             if self.opt.metrics and self.metrics_calculator is not None:
                 # time
-                if self.step % self.opt.efficiency_interval == 0:
+                if self.step==1 or self.step % self.opt.efficiency_interval == 0:
                     ender.record()
                     torch.cuda.synchronize()
                     t = starter.elapsed_time(ender)
@@ -462,7 +462,7 @@ class GUI:
                     )
                     
                 # losses
-                if self.step % self.opt.losses_interval == 0:
+                if self.step==1 or self.step % self.opt.losses_interval == 0:
                     attraction_loss_val = attraction_loss.item()
                     repulsion_loss_val = repulsion_loss.item()
                     scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
@@ -483,7 +483,7 @@ class GUI:
                     )
             
                 # quantitative metrics
-                if self.step % self.opt.quantitative_metrics_interval == 0 and self.visualizer is not None:
+                if self.step==1 or self.step % self.opt.quantitative_metrics_interval == 0 and self.visualizer is not None:
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, visualize_multi_viewpoints=self.opt.visualize_multi_viewpoints, save_iid=self.opt.save_iid)  # [V, N, 3, H, W]
                     # fidelity
                     fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
@@ -516,10 +516,10 @@ class GUI:
             # visualize
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
-                if self.opt.save_rendered_images and (self.step % self.opt.save_rendered_images_interval == 0):
+                if self.opt.save_rendered_images and (self.step==1 or self.step % self.opt.save_rendered_images_interval == 0):
                     self.visualizer.save_rendered_images(self.step, images)
                     
-                if self.opt.visualize_fixed_viewpoint and (self.step % self.opt.visualize_fixed_viewpoint_interval == 0):
+                if self.opt.visualize_fixed_viewpoint and (self.step==1 or self.step % self.opt.visualize_fixed_viewpoint_interval == 0):
                     self.visualizer.visualize_fixed_viewpoint(self.step)
 
         # Periodic GPU memory cleanup
