@@ -173,6 +173,7 @@ run_single_experiment() {
 
   # PyTorch allocator (helps multi-run fragmentation)
   export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:128"
+  export CUDA_VISIBLE_DEVICES=1
 
   # Optional soft memory cap for child
   local ULIMIT_PREFIX=""
