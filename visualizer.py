@@ -166,9 +166,6 @@ class GaussianVisualizer:
                     os.makedirs(particle_dir, exist_ok=True)
                     save_iid_paths.append(particle_dir)
         
-        
-        print(f"self.multi_viewpoints_cameras: {self.multi_viewpoints_cameras}")
-        
         # Render images from each viewpoint
         multi_viewpoint_images = []
         for i, camera in enumerate(self.multi_viewpoints_cameras):

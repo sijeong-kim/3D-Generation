@@ -7,8 +7,9 @@ Handles loading, parsing, and generating parameter combinations from YAML config
 import yaml
 import itertools
 import copy
-from typing import Dict, List, Any, Tuple
+import os
 from pathlib import Path
+from typing import Dict, List, Any, Tuple
 
 
 def load_yaml_config(config_path: str) -> Dict[str, Any]:
@@ -163,12 +164,12 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fix
         if sweep_params['repulsion_type'] == 'wo':
             # For "wo" case, set lambda_repulsion to 0 or remove it entirely
             merged_config['lambda_repulsion'] = 0
-            print(f"Baseline case (wo): lambda_repulsion set to 0")
+            # print(f"Baseline case (wo): lambda_repulsion set to 0")
         else:
             method_kernel_key = sweep_params['repulsion_type'] + "_" + sweep_params['kernel_type']
             method_kernel_value = fixed_params_dict['lambda_repulsion'][method_kernel_key]
             merged_config['lambda_repulsion'] = method_kernel_value
-            print(f"Method kernel (key, value): ({method_kernel_key}, {method_kernel_value})")
+            # print(f"Method kernel (key, value): ({method_kernel_key}, {method_kernel_value})")
     
     # Set eval_radius for each prompt with default fallback
     if 'eval_radius' in fixed_params_dict and isinstance(fixed_params_dict['eval_radius'], dict) and \
@@ -178,11 +179,12 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fix
         eval_radius_value = fixed_params_dict['eval_radius'].get(prompt_key, default_radius)
         merged_config['eval_radius'] = eval_radius_value
         
-        if prompt_key in fixed_params_dict['eval_radius']:
-            print(f"Prompt-specific eval_radius (prompt, radius): ({prompt_key}, {eval_radius_value})")
-        else:
-            print(f"Warning: No eval_radius found for prompt '{prompt_key}'. Using default: {default_radius}")
-            print(f"Available keys: {list(fixed_params_dict['eval_radius'].keys())}")
+        # Don't print debug messages to stdout - they interfere with bash parsing
+        # if prompt_key in fixed_params_dict['eval_radius']:
+        #     print(f"Prompt-specific eval_radius (prompt, radius): ({prompt_key}, {eval_radius_value})")
+        # else:
+        #     print(f"Warning: No eval_radius found for prompt '{prompt_key}'. Using default: {default_radius}")
+        #     print(f"Available keys: {list(fixed_params_dict['eval_radius'].keys())}")
 
     return merged_config
 
@@ -191,6 +193,7 @@ def create_output_dir_name(sweep_params: Dict[str, Any]) -> str:
     """Create a clean, distinguishable output directory name.
     
     Based on the naming logic from the bash script but implemented in Python.
+    Avoids redundant parameter naming.
     """
     param_pairs = []
     
@@ -215,7 +218,8 @@ def create_output_dir_name(sweep_params: Dict[str, Any]) -> str:
         else:
             param_pairs.append(f'KT_{kt}')
     
-    # Add lambda_repulsion parameter with clear formatting
+    # Add lambda_repulsion parameter with clear formatting (only if not already processed)
+    # Check if lambda_repulsion is a sweep parameter that needs to be included in naming
     if 'lambda_repulsion' in sweep_params:
         lambda_value = sweep_params['lambda_repulsion']
         # Format lambda value with K for thousands
@@ -249,9 +253,12 @@ def create_output_dir_name(sweep_params: Dict[str, Any]) -> str:
     if 'seed' in sweep_params:
         param_pairs.append(f'S{sweep_params["seed"]}')
     
-    # Add other parameters
+    # Add other parameters (excluding already processed ones and lambda_repulsion to avoid redundancy)
     for k, v in sweep_params.items():
-        if k not in ['repulsion_type', 'kernel_type', 'seed'] and not k.startswith('lambda_repulsion_') and not k.startswith('prompt_') and k != 'prompt':
+        if (k not in ['repulsion_type', 'kernel_type', 'seed', 'lambda_repulsion'] and 
+            not k.startswith('lambda_repulsion_') and 
+            not k.startswith('prompt_') and 
+            k != 'prompt'):
             param_pairs.append(f'{k}_{v}')
     
     return '__'.join(param_pairs)
@@ -300,6 +307,95 @@ def get_experiment_configs(base_config_path: str, sweep_config_path: str, experi
     return configs, output_dirs
 
 
+def save_experiment_configs_to_files(base_config_path: str, sweep_config_path: str, experiment_name: str, output_base_dir: str = "exp"):
+    """Save each experiment configuration as a separate YAML file in exp/{experiment_name}/{output_dir_name}/ directory.
+    
+    This function saves individual config files in each experiment's output directory instead of a central location.
+    """
+    try:
+        configs, output_dirs = get_experiment_configs(base_config_path, sweep_config_path, experiment_name)
+        
+        # Create base experiment directory
+        exp_dir = Path(output_base_dir) / experiment_name
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save each config as a separate YAML file in its respective output directory
+        config_paths = []
+        for i, (config, output_dir_name) in enumerate(zip(configs, output_dirs)):
+            # Create the individual experiment output directory
+            output_dir = exp_dir / output_dir_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Save config as config.yaml in the experiment output directory
+            config_path = output_dir / "config.yaml"
+            
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False, indent=2)
+            
+            config_paths.append(str(config_path))
+            print(f"Saved config {i+1}/{len(configs)}: {config_path}")
+        
+        # Save a summary file with all output directory names and config paths
+        summary_path = exp_dir / "experiment_summary.txt"
+        with open(summary_path, 'w') as f:
+            f.write(f"Experiment: {experiment_name}\n")
+            f.write(f"Total configurations: {len(configs)}\n")
+            f.write(f"Generated at: {Path.cwd()}\n\n")
+            f.write("Output directories and config files:\n")
+            for i, (output_dir_name, config_path) in enumerate(zip(output_dirs, config_paths)):
+                f.write(f"{i+1:03d}: {output_dir_name} -> {config_path}\n")
+        
+        print(f"\nSaved {len(configs)} configuration files in experiment directories under: {exp_dir}")
+        print(f"Summary file: {summary_path}")
+        
+        return len(configs), output_dirs, config_paths
+        
+    except Exception as e:
+        # Use stderr for error messages to avoid pipe issues
+        import sys
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def print_experiment_configs(base_config_path: str, sweep_config_path: str, experiment_name: str):
+    """Print experiment configurations in a simple format for bash parsing.
+    
+    Format:
+    CONFIG_COUNT
+    OUTPUT_DIR_1
+    OUTPUT_DIR_2
+    ...
+    ---
+    CONFIG_1_YAML
+    ---
+    CONFIG_2_YAML
+    ...
+    """
+    try:
+        configs, output_dirs = get_experiment_configs(base_config_path, sweep_config_path, experiment_name)
+        
+        # Print count
+        print(len(configs))
+        
+        # Print output directories
+        for output_dir in output_dirs:
+            print(output_dir)
+        
+        # Print separator
+        print("---")
+        
+        # Print each config as YAML
+        for config in configs:
+            print(yaml.dump(config, default_flow_style=False, indent=2))
+            print("---")
+            
+    except Exception as e:
+        # Use stderr for error messages to avoid pipe issues
+        import sys
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def save_config_to_file(config: Dict[str, Any], output_path: str):
     """Save configuration to YAML file."""
     with open(output_path, 'w') as f:
@@ -307,36 +403,31 @@ def save_config_to_file(config: Dict[str, Any], output_path: str):
 
 
 if __name__ == "__main__":
-    # Test the module
+    # Main execution mode for bash script integration
     import sys
+    import os
     
-    if len(sys.argv) != 4:
-        print("Usage: python exp_config.py <base_config> <sweep_config> <experiment_name>")
+    if len(sys.argv) < 3:
+        print("Usage: python exp_config.py <base_config> <sweep_config> <experiment_name> [--save-files]")
+        print("  --save-files: Save each config as separate YAML file in exp/{experiment_name}/")
         sys.exit(1)
     
     base_config_path = sys.argv[1]
     sweep_config_path = sys.argv[2]
     experiment_name = sys.argv[3]
     
+    # Check if --save-files flag is provided
+    save_files = len(sys.argv) > 4 and sys.argv[4] == "--save-files"
+    
     try:
-        configs, output_dirs = get_experiment_configs(base_config_path, sweep_config_path, experiment_name)
-        
-        print(f"Generated {len(configs)} configurations for experiment '{experiment_name}':")
-        print("=" * 80)
-        
-        for i, (config, output_dir) in enumerate(zip(configs, output_dirs)):
-            print(f"\n{i+1}. Output Directory: {output_dir}")
-            print(f"   Key Parameters:")
-            for key in ['repulsion_type', 'kernel_type', 'lambda_repulsion', 'prompt', 'seed']:
-                if key in config:
-                    print(f"     {key}: {config[key]}")
-            print(f"   Full config saved to: test_config_{i+1}.yaml")
-            
-            # Save test config
-            save_config_to_file(config, f"test_config_{i+1}.yaml")
-        
-        print(f"\n✅ Successfully generated {len(configs)} configurations!")
+        if save_files:
+            # Save configs to files instead of printing to stdout
+            save_experiment_configs_to_files(base_config_path, sweep_config_path, experiment_name)
+        else:
+            # Use the print_experiment_configs function for bash script integration
+            print_experiment_configs(base_config_path, sweep_config_path, experiment_name)
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        # Use stderr for error messages to avoid pipe issues
+        print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
