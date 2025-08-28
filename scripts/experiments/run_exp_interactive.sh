@@ -105,15 +105,8 @@ pick_gpu_rr() {
 }
 
 check_cuda_availability() {
-  if python3 - <<'PY' 2>/dev/null; then exit 0; else exit 1; fi
-import torch, sys
-print(torch.cuda.is_available())
-PY
-  then
-    local cnt=$(python3 - <<'PY' 2>/dev/null || echo 0
-import torch; print(torch.cuda.device_count())
-PY
-)
+  if python3 -c "import torch; print(torch.cuda.is_available())" 2>/dev/null; then
+    local cnt=$(python3 -c "import torch; print(torch.cuda.device_count())" 2>/dev/null || echo 0)
     print_info "CUDA available with $cnt GPU(s)"
     return 0
   else
@@ -406,7 +399,7 @@ print_info "Processed:  $CONFIG_COUNT"
 print_info "Successes:  $successful_runs"
 print_info "Failures:   $failed_runs"
 if [[ "$CONFIG_COUNT" =~ ^[0-9]+$ && "$CONFIG_COUNT" -gt 0 ]]; then
-  rate=$(python3 - <<PY 2>/dev/null || echo "0.0"
+  rate=$(python3 - <<'PY' 2>/dev/null || echo "0.0"
 s=$successful_runs; n=$CONFIG_COUNT
 print(f"{(s*100.0/n):.1f}")
 PY
