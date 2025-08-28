@@ -250,7 +250,7 @@ class GUI:
         self.step += 1
         
         with torch.no_grad():
-            if self.step % self.opt.efficiency_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
+            if self.step==1 or self.step % self.opt.efficiency_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
                 starter = torch.cuda.Event(enable_timing=True)
                 ender = torch.cuda.Event(enable_timing=True)
                 starter.record()
