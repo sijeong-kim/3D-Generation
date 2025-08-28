@@ -326,6 +326,10 @@ def save_experiment_configs_to_files(base_config_path: str, sweep_config_path: s
             output_dir = exp_dir / output_dir_name
             output_dir.mkdir(parents=True, exist_ok=True)
             
+            # Override the outdir parameter to point to the correct experiment directory
+            # This ensures main_ours.py saves outputs to exp/experiment_name/configuration/ instead of logs/
+            config['outdir'] = str(output_dir)
+            
             # Save config as config.yaml in the experiment output directory
             config_path = output_dir / "config.yaml"
             

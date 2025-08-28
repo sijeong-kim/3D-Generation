@@ -129,8 +129,8 @@ run_single_experiment() {
     local figures_dir="$output_dir/figures"
     mkdir -p "$figures_dir"
     
-    # Save configuration to output directory
-    cp "$config_file" "$output_dir/config.yaml"
+    # Note: config.yaml is already saved in the output directory by exp_config.py
+    # No need to copy it again
     
     print_info "Running experiment: $output_dir"
     echo "$(printf '%.0s-' {1..80})"
@@ -151,7 +151,7 @@ run_single_experiment() {
     local error_msg=""
     
     if [ "$DRY_RUN" = "true" ]; then
-        print_info "DRY RUN - Would run: python3 main_ours.py --config $config_file --gpu_id $gpu_id"
+        print_info "DRY RUN - Would run: python3 main_ours.py --config $config_file"
         result=0
     else
         print_info "Starting training with main_ours.py..."
