@@ -242,3 +242,7 @@ find exp/ -name "*kernel_type=cosine*" -name "*repulsion_type=rlsd*"  # RLSD + c
     └── run_ours_hp.sh               # 👈 HP: --mem=32G, 48hours
     ```
 
+## Acknowledgements
+
+This project made limited use of AI-assisted coding tools (e.g. GitHub Copilot, Cursor) 
+to accelerate development. All code was reviewed, verified, and maintained by the author.
