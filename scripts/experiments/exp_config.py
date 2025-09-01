@@ -156,7 +156,7 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fix
             print(f"Warning: Skipping dict-valued parameter '{key}' as it's not in allowed mapping parameters: {ALLOWED_MAPPING_PARAMS}")
     
     # Set lambda_repulsion for each method-kernel combination
-    if 'lambda_repulsion' in fixed_params_dict and \
+    if 'lambda_repulsion' in sweep_params and \
         'repulsion_type' in sweep_params and \
         'kernel_type' in sweep_params:
         
@@ -166,10 +166,10 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fix
             merged_config['lambda_repulsion'] = 0
             # print(f"Baseline case (wo): lambda_repulsion set to 0")
         else:
-            method_kernel_key = sweep_params['repulsion_type'] + "_" + sweep_params['kernel_type']
-            method_kernel_value = fixed_params_dict['lambda_repulsion'][method_kernel_key]
-            merged_config['lambda_repulsion'] = method_kernel_value
-            # print(f"Method kernel (key, value): ({method_kernel_key}, {method_kernel_value})")
+            # Use the lambda_repulsion value directly from sweep_params
+            # This value was already set by the generate_parameter_combinations function
+            merged_config['lambda_repulsion'] = sweep_params['lambda_repulsion']
+            # print(f"Method kernel lambda_repulsion: {sweep_params['lambda_repulsion']}")
     
     # Set eval_radius for each prompt with default fallback
     if 'eval_radius' in fixed_params_dict and isinstance(fixed_params_dict['eval_radius'], dict) and \
@@ -222,9 +222,13 @@ def create_output_dir_name(sweep_params: Dict[str, Any]) -> str:
     # Check if lambda_repulsion is a sweep parameter that needs to be included in naming
     if 'lambda_repulsion' in sweep_params:
         lambda_value = sweep_params['lambda_repulsion']
-        # Format lambda value with K for thousands
+        # Format lambda value with K for thousands, but preserve exact values
         if lambda_value >= 1000:
-            lambda_str = f'{lambda_value//1000}K'
+            # Use proper division to preserve exact values, not integer division
+            if lambda_value % 1000 == 0:
+                lambda_str = f'{lambda_value//1000}K'
+            else:
+                lambda_str = f'{lambda_value/1000:.1f}K'
         else:
             lambda_str = str(lambda_value)
         param_pairs.append(f'λ{lambda_str}')
