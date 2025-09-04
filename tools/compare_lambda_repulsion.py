@@ -638,7 +638,8 @@ def main():
     parser.add_argument('--baseline_exp', type=str, default="exp0_baseline",
                         help='Baseline experiment name (default: exp0_baseline)')
     parser.add_argument('--experiment_exps', type=str, nargs='+', 
-                        default=["exp1_lambda_coarse_rlsd", "exp1_lambda_coarse_svgd"],
+                        # default=["exp1_lambda_coarse_rlsd", "exp1_lambda_coarse_svgd"],
+                        default=["exp2_lambda_fine_rlsd_cosine", "exp2_lambda_fine_rlsd_rbf", "exp2_lambda_fine_svgd_cosine", "exp2_lambda_fine_svgd_rbf"],
                         help='Experiment names with lambda_repulsion variations (default: exp1_lambda_coarse_rlsd exp1_lambda_coarse_svgd)')
     parser.add_argument('--base_dir', type=str, default="exp",
                         help='Base directory for experiments (default: exp)')

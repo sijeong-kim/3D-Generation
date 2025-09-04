@@ -179,8 +179,8 @@ exp2_lambda_fine_svgd_cosine:
     repulsion_type: ['svgd']
     kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      svgd_cosine: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [800, 900, 1000, 1100] # [350, 500, 650]
-      
+      # svgd_cosine: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [800, 900, 1000, 1100] # [350, 500, 650]
+      svgd_cosine: [1300]
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
@@ -235,8 +235,8 @@ exp2_lambda_fine_svgd_rbf:
     repulsion_type: ['svgd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      svgd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1400] # [150, 250, 350]
-      
+      # svgd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1400] # [150, 250, 350]
+      svgd_rbf: [1300]
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
@@ -290,7 +290,8 @@ exp2_lambda_fine_rlsd_cosine:
     repulsion_type: ['rlsd']
     kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_cosine: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
+      # rlsd_cosine: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
+      rlsd_cosine: [1300]
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
@@ -345,7 +346,9 @@ exp2_lambda_fine_rlsd_rbf:
     repulsion_type: ['rlsd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
-      rlsd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500] # [900, 1000, 1100, 1200, 1300] # [700, 900, 1100]
+      # rlsd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500]
+      rlsd_rbf: [1300]
+      # 1300 빼고 해버림..ㅜㅠ
     seed: [42, 123, 456] # TODO: add more seeds
     
   fixed_parameters:
