@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-2D Pareto Analysis (row=prompt, col=(kernel, repulsion))
+2D Pareto Analysis for Exp2 (Fine Lambda Sweep) - row=prompt, col=(kernel, repulsion)
 
 - % changes vs baseline at same step
 - Baseline의 plateau 시점 이후 점은 회색으로 표현(남겨둠)
@@ -19,13 +19,51 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator, PercentFormatter
 from matplotlib.patches import Patch, Rectangle
 
+def format_repulsion_type(repulsion_type):
+    """Format repulsion type for display."""
+    if repulsion_type.lower() == 'rlsd':
+        return 'RLSD-F'
+    elif repulsion_type.lower() == 'svgd':
+        return 'SVGD'
+    elif repulsion_type.lower() == 'wo':
+        return 'Baseline'
+    else:
+        return repulsion_type.upper()
+
+def get_prompt_description(prompt_key):
+    """Get full description for prompt abbreviations."""
+    prompt_descriptions = {
+        'hamburger': 'a photo of a hamburger',
+        'icecream': 'a photo of an ice cream', 
+        'cactus': 'a small saguaro cactus planted in a clay pot',
+        'tulip': 'a photo of a tulip'
+    }
+    return prompt_descriptions.get(prompt_key.lower(), prompt_key.title())
+
 
 # ------------------------- global style -------------------------
 plt.rcParams.update({
-    "font.size": 11,
-    "axes.labelsize": 12,
-    "axes.titlesize": 12,
-    "legend.fontsize": 10,
+    'figure.dpi': 300,
+    'savefig.dpi': 300,
+    'savefig.bbox': 'tight',
+    'savefig.pad_inches': 0.1,
+    'font.size': 10,
+    'axes.labelsize': 11,
+    'axes.titlesize': 12,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'legend.fontsize': 9,
+    'figure.titlesize': 14,
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
+    'axes.linewidth': 0.8,
+    'grid.linewidth': 0.5,
+    'lines.linewidth': 1.5,
+    'patch.linewidth': 0.5,
+    'xtick.major.width': 0.8,
+    'ytick.major.width': 0.8,
+    'xtick.minor.width': 0.6,
+    'ytick.minor.width': 0.6,
 })
 
 # ------------------------- plateau config -------------------------
@@ -43,15 +81,25 @@ DIVERSITY_MIN_PCT = 30.0  # ΔD ≥ +30%
 # ------------------------- parsing & loading -------------------------
 
 def parse_config_name(config_name: str):
-    pattern = r'kernel_type=(\w+)_lambda_repulsion=([\de+.-]+)_prompt=(\w+)_repulsion_type=(\w+)_seed=(\d+)'
+    # New pattern: REPULSION__KERNEL__λVALUE__PROMPT__S{SEED}
+    # e.g., RLSD__COS__λ100__CACT__S42
+    pattern = r'(\w+)__(\w+)__λ([\dK.]+)__(\w+)__S(\d+)'
     m = re.match(pattern, config_name)
     if not m:
         return None
+    
+    # Convert lambda value back to numeric format
+    lambda_str = m.group(3)
+    if lambda_str.endswith('K'):
+        lambda_value = str(int(float(lambda_str[:-1]) * 1000))
+    else:
+        lambda_value = lambda_str
+    
     return {
-        "kernel_type": m.group(1),
-        "lambda_repulsion": m.group(2),
-        "prompt": m.group(3),
-        "repulsion_type": m.group(4),
+        "repulsion_type": m.group(1).lower(),  # RLSD -> rlsd
+        "kernel_type": m.group(2).lower(),     # COS -> cosine, RBF -> rbf
+        "lambda_repulsion": lambda_value,
+        "prompt": m.group(4).lower(),          # CACT -> cactus
         "seed": m.group(5),
     }
 
@@ -62,8 +110,20 @@ def load_baseline_data(baseline_dir: Path) -> dict:
             continue
         csv_path = item / "metrics" / "quantitative_metrics.csv"
         if csv_path.exists():
-            out[item.name] = pd.read_csv(csv_path)
-            print(f"Loaded baseline: {item.name}")
+            # New baseline naming: PROMPT__S{SEED} -> prompt=PROMPT_seed=SEED
+            # e.g., CACT__S42 -> prompt=cactus_seed=42
+            if '__S' in item.name:
+                parts = item.name.split('__S')
+                if len(parts) == 2:
+                    prompt_part = parts[0].lower()  # CACT -> cactus
+                    seed_part = parts[1]
+                    key = f"prompt={prompt_part}_seed={seed_part}"
+                else:
+                    key = item.name
+            else:
+                key = item.name
+            out[key] = pd.read_csv(csv_path)
+            print(f"Loaded baseline: {item.name} -> {key}")
     return out
 
 # ------------------------- step alignment & diffs -------------------------
@@ -245,104 +305,6 @@ def create_2d_pareto_subplot(
         return pareto_raw_df, pareto_chain_df, eq_point, cbar
     return pareto_raw_df, pareto_chain_df, eq_point, None
 
-
-    # # Pareto/체인/eq-weight: feasible subset만
-    # feas = data_full[data_full["IsFeasible"]].copy()
-    # pareto_chain = pd.DataFrame()
-    # eq_point = None
-    # if not feas.empty:
-    #     pareto_raw = find_pareto_2d(feas, x_col, y_col)
-    #     if not pareto_raw.empty:
-    #         ax.scatter(pareto_raw[x_col], pareto_raw[y_col], c='red', s=70,
-    #                    alpha=0.95, marker='*', label='Pareto optimal', zorder=4)
-    #         chain = pareto_raw.sort_values(x_col, ascending=False).copy()
-    #         chain['_y_cummax_descx'] = chain[y_col].cummax()
-    #         chain = chain[chain[y_col] >= chain['_y_cummax_descx'] - 1e-12]
-    #         pareto_chain = chain.drop(columns=['_y_cummax_descx']).sort_values(x_col, ascending=True)
-    #         ax.plot(pareto_chain[x_col], pareto_chain[y_col],
-    #                 linestyle='--', linewidth=1.8, alpha=0.95, zorder=5)
-    #     eq = pick_equal_weight_point(feas, x_col, y_col)
-    #     if eq is not None:
-    #         ax.scatter([eq[x_col]], [eq[y_col]], s=120,
-    #                    marker='X', edgecolor='k', linewidths=1.2, c='gold',
-    #                    label='Eq-weight best', zorder=6)
-    #         eq_point = eq
-
-    # # 컬러바는 지정된 패널에서 한 번만
-    # if draw_cbar:
-    #     cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.02)
-    #     cbar.set_label('λ (repulsion)')
-    #     return (pareto_chain if not pareto_chain.empty else feas), eq_point, cbar
-    # return (pareto_chain if not pareto_chain.empty else feas), eq_point, None
-
-# def draw_feasible_region(ax, xlim, ylim):
-#     ax.axvspan(max(FIDELITY_MIN_PCT, xlim[0]), xlim[1], alpha=0.08, zorder=0)
-#     ax.axhspan(max(DIVERSITY_MIN_PCT, ylim[0]), ylim[1], alpha=0.08, zorder=0)
-#     ax.axvline(FIDELITY_MIN_PCT, linestyle='--', linewidth=1.0, alpha=0.65)
-#     ax.axhline(DIVERSITY_MIN_PCT, linestyle='--', linewidth=1.0, alpha=0.65)
-
-# from matplotlib.patches import Rectangle
-# def draw_feasible_region(ax, xlim, ylim):
-#     # hatch로 채우기 (흑백 인쇄 대비)
-#     rect = Rectangle((FIDELITY_MIN_PCT, DIVERSITY_MIN_PCT),
-#                      xlim[1]-FIDELITY_MIN_PCT, ylim[1]-DIVERSITY_MIN_PCT,
-#                      facecolor='none', edgecolor='0.5', hatch='////', linewidth=0.0)
-#     ax.add_patch(rect)
-#     ax.axvline(FIDELITY_MIN_PCT, linestyle='--', linewidth=1.0, color='0.5', alpha=0.8)
-#     ax.axhline(DIVERSITY_MIN_PCT, linestyle='--', linewidth=1.0, color='0.5', alpha=0.8)
-
-# def draw_feasible_region(ax, xlim, ylim):
-#     # 좌측(ΔF < FIDELITY_MIN_PCT) infeasible
-#     left_w = max(0.0, FIDELITY_MIN_PCT - xlim[0])
-#     if left_w > 0:
-#         left = Rectangle((xlim[0], ylim[0]),
-#                          width=left_w, height=ylim[1]-ylim[0],
-#                          facecolor='none', edgecolor='0.5', hatch='////',
-#                          linewidth=0.0, zorder=0)
-#         ax.add_patch(left)
-
-#     # 하단(ΔD < DIVERSITY_MIN_PCT) infeasible
-#     bot_h = max(0.0, DIVERSITY_MIN_PCT - ylim[0])
-#     if bot_h > 0:
-#         bottom = Rectangle((xlim[0], ylim[0]),
-#                            width=xlim[1]-xlim[0], height=bot_h,
-#                            facecolor='none', edgecolor='0.5', hatch='////',
-#                            linewidth=0.0, zorder=0)
-#         ax.add_patch(bottom)
-
-#     # 경계선(ε-제약)
-#     ax.axvline(FIDELITY_MIN_PCT, linestyle='--', linewidth=1.0, color='0.5', alpha=0.85)
-#     ax.axhline(DIVERSITY_MIN_PCT, linestyle='--', linewidth=1.0, color='0.5', alpha=0.85)
-
-# def draw_feasible_region(ax, xlim, ylim):
-#     # feasible 영역 (ΔF ≥ ε, ΔD ≥ δ)
-#     feas_rect = Rectangle((FIDELITY_MIN_PCT, DIVERSITY_MIN_PCT),
-#                           xlim[1]-FIDELITY_MIN_PCT, ylim[1]-DIVERSITY_MIN_PCT,
-#                           facecolor='0.9', alpha=0.15, edgecolor='none', zorder=0,
-#                           label='Feasible region')
-#     ax.add_patch(feas_rect)
-
-#     # infeasible 영역 좌측
-#     left_w = max(0.0, FIDELITY_MIN_PCT - xlim[0])
-#     if left_w > 0:
-#         left = Rectangle((xlim[0], ylim[0]),
-#                          width=left_w, height=ylim[1]-ylim[0],
-#                          facecolor='none', edgecolor='0.5', hatch='////',
-#                          linewidth=0.0, zorder=0, label='Infeasible region')
-#         ax.add_patch(left)
-
-#     # infeasible 영역 하단
-#     bot_h = max(0.0, DIVERSITY_MIN_PCT - ylim[0])
-#     if bot_h > 0:
-#         bottom = Rectangle((xlim[0], ylim[0]),
-#                            width=xlim[1]-xlim[0], height=bot_h,
-#                            facecolor='none', edgecolor='0.5', hatch='////',
-#                            linewidth=0.0, zorder=0)
-#         ax.add_patch(bottom)
-
-#     # 경계선
-#     ax.axvline(FIDELITY_MIN_PCT, linestyle='--', linewidth=1.0, color='0.5', alpha=0.85)
-#     ax.axhline(DIVERSITY_MIN_PCT, linestyle='--', linewidth=1.0, color='0.5', alpha=0.85)
 def draw_feasible_region(ax, xlim, ylim):
     """
     Feasible(연한 회색) + Infeasible(빗금) 동시 표시.
@@ -399,9 +361,15 @@ def detect_plateau_step(series, steps, window=10, tol=1e-3, patience=3):
 
 def main():
     baseline_exp = "exp0_baseline"
-    experiment_exp = "exp1_lambda_coarse"
+    # Exp2 (fine) experiments only
+    experiment_exps = [
+        "exp2_lambda_fine_rlsd_cosine",
+        "exp2_lambda_fine_rlsd_rbf", 
+        "exp2_lambda_fine_svgd_cosine",
+        "exp2_lambda_fine_svgd_rbf"
+    ]
     base_dir = Path("exp")
-    output_dir = Path("analysis/pareto_analysis")
+    output_dir = Path("analysis/pareto_analysis_exp2")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     metrics = {
@@ -414,10 +382,16 @@ def main():
     baseline_dir = base_dir / baseline_exp
     baseline_data = load_baseline_data(baseline_dir)
 
-    experiment_dir = base_dir / experiment_exp
-    exp_configs = [p.name for p in experiment_dir.iterdir()
-                   if p.is_dir() and not p.name.startswith('.') and p.name != "logs"]
-    print(f"Found {len(exp_configs)} experiment configs")
+    # Collect all experiment configs from all experiment directories
+    exp_configs = []
+    for experiment_exp in experiment_exps:
+        experiment_dir = base_dir / experiment_exp
+        if experiment_dir.exists():
+            configs = [p.name for p in experiment_dir.iterdir()
+                      if p.is_dir() and not p.name.startswith('.') and p.name != "logs"]
+            exp_configs.extend(configs)
+            print(f"Found {len(configs)} experiment configs in {experiment_exp}")
+    print(f"Total {len(exp_configs)} experiment configs")
 
     # 수집
     config_data = {}
@@ -427,9 +401,21 @@ def main():
         if not params or params["seed"] != "42":
             continue
         key = (params["kernel_type"].upper(),
-               params["prompt"].title(),
-               params["repulsion_type"].upper())
+               get_prompt_description(params["prompt"]),
+               format_repulsion_type(params["repulsion_type"]))
         config_data.setdefault(key, [])
+        
+        # Find the correct experiment directory for this config
+        experiment_dir = None
+        for exp_name in experiment_exps:
+            exp_dir = base_dir / exp_name
+            if exp_dir.exists() and (exp_dir / cfg_name).exists():
+                experiment_dir = exp_dir
+                break
+        
+        if experiment_dir is None:
+            continue
+            
         metrics_path = experiment_dir / cfg_name / "metrics" / "quantitative_metrics.csv"
         if not metrics_path.exists():
             continue
@@ -451,7 +437,7 @@ def main():
                 p_step = None
         else:
             p_step = None
-        plateau_by_prompt[params["prompt"].title()] = p_step
+        plateau_by_prompt[get_prompt_description(params["prompt"])] = p_step
 
         # Δ 누적 (전체 step에 대해)
         for i in range(len(exp_df)):
@@ -462,8 +448,8 @@ def main():
             is_plateau = (p_step is not None) and (int(step_label) >= int(p_step))
             config_data[key].append({
                 "Kernel": params["kernel_type"].upper(),
-                "Prompt": params["prompt"].title(),
-                "Repulsion": params["repulsion_type"].upper(),
+                "Prompt": get_prompt_description(params["prompt"]),
+                "Repulsion": format_repulsion_type(params["repulsion_type"]),
                 "Lambda": float(params["lambda_repulsion"]),
                 "StepIdx": idx_used,
                 "Step": step_label,
@@ -486,11 +472,11 @@ def main():
     col_pairs = sorted({(k[0], k[2]) for k in config_data.keys()})
 
     n_rows, n_cols = len(prompts), len(col_pairs)
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6*n_cols, 4.9*n_rows), squeeze=False)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6.5*n_cols, 5.5*n_rows), squeeze=False)
 
     # 열 헤더
     for j, (kernel, rep) in enumerate(col_pairs):
-        axes[0, j].set_title(f"{kernel} + {rep}".replace("_", " "), fontsize=12, pad=10)
+        axes[0, j].set_title(f"{kernel} + {rep}".replace("_", " "), fontsize=13, pad=12, fontweight='bold')
 
     # 공통 축 범위
     xmin = np.nanpercentile(all_df[x_col], 1); xmax = np.nanpercentile(all_df[x_col], 99)
@@ -553,6 +539,13 @@ def main():
             ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
             ax.xaxis.set_major_formatter(PercentFormatter(xmax=100))
             ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+            
+            # Enhanced styling
+            ax.tick_params(labelsize=9, direction='in', length=4, width=0.8)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_linewidth(0.8)
+            ax.spines['bottom'].set_linewidth(0.8)
 
             # 가용영역 음영/경계선
             draw_feasible_region(ax, xlim, ylim)
@@ -588,12 +581,12 @@ def main():
 
     # 공통 라벨/레이아웃
     fig.suptitle(
-        f"Pareto Frontier (All steps; Plateau points in gray; Feasible: ΔF ≥ {FIDELITY_MIN_PCT:.0f}% & ΔD ≥ {DIVERSITY_MIN_PCT:.0f}%)\n"
-        "Diversity Improvement (%) vs Fidelity Change (%) (↑ is better; chain is down-right on feasible set)",
-        fontsize=14, y=0.995
+        f"Pareto Frontier Analysis - Exp2 Fine Lambda Sweep (All Steps; Plateau Points in Gray; Feasible: ΔF ≥ {FIDELITY_MIN_PCT:.0f}% & ΔD ≥ {DIVERSITY_MIN_PCT:.0f}%)\n"
+        "Diversity Improvement (%) vs Fidelity Change (%) (↑ is Better; Chain is Down-Right on Feasible Set)",
+        fontsize=16, y=0.98, fontweight='bold'
     )
-    fig.supxlabel("Fidelity Change (%)")
-    fig.supylabel("Diversity Improvement (%)")
+    fig.supxlabel("Fidelity Change (%)", fontsize=12, fontweight='bold')
+    fig.supylabel("Diversity Improvement (%)", fontsize=12, fontweight='bold')
 
     # 범례
     star = mpl.lines.Line2D([], [], color='red', marker='*', linestyle='None', markersize=9, label='Pareto optimal')
@@ -636,9 +629,13 @@ def main():
     )
 
     plt.tight_layout(rect=[0.03, 0.11, 0.99, 0.95])
-    plt.savefig(output_dir / "pareto_2d_analysis.png", dpi=500, bbox_inches="tight")
-    plt.savefig(output_dir / "pareto_2d_analysis.pdf", bbox_inches="tight")   # 벡터
-    plt.savefig(output_dir / "pareto_2d_analysis.svg", bbox_inches="tight")   # 벡터
+    
+    # Save in multiple high-quality formats for dissertation
+    plt.savefig(output_dir / "pareto_2d_analysis_exp2.png", dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / "pareto_2d_analysis_exp2.pdf", bbox_inches="tight", facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / "pareto_2d_analysis_exp2.svg", bbox_inches="tight", facecolor='white', edgecolor='none')
+
+
 
 
     # # 결과 저장
@@ -653,17 +650,20 @@ def main():
     # 결과 저장
     if pareto_raw_all:
         pd.concat(pareto_raw_all, ignore_index=True)\
-        .to_csv(output_dir / "pareto_optimal_points.csv", index=False)
+        .to_csv(output_dir / "pareto_optimal_points_exp2.csv", index=False)
 
     if pareto_chain_all:
         pd.concat(pareto_chain_all, ignore_index=True)\
-        .to_csv(output_dir / "pareto_chain_points.csv", index=False)
+        .to_csv(output_dir / "pareto_chain_points_exp2.csv", index=False)
 
     if eq_best_all:
-        pd.DataFrame(eq_best_all).to_csv(output_dir / "equal_weight_best_points.csv", index=False)
+        pd.DataFrame(eq_best_all).to_csv(output_dir / "equal_weight_best_points_exp2.csv", index=False)
 
     if feasible_summary:
-        pd.DataFrame(feasible_summary).to_csv(output_dir / "feasible_summary_by_panel.csv", index=False)
+        pd.DataFrame(feasible_summary).to_csv(output_dir / "feasible_summary_by_panel_exp2.csv", index=False)
+        
+        
+    plt.close(fig)
 
 if __name__ == "__main__":
     main()

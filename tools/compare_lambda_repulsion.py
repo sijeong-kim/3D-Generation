@@ -7,20 +7,77 @@ of kernel_type, prompt, and repulsion_type.
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import argparse
 from pathlib import Path
 import re
 
+
+# Set high-quality plot parameters for dissertation
+plt.rcParams.update({
+    'figure.dpi': 300,
+    'savefig.dpi': 300,
+    'savefig.bbox': 'tight',
+    'savefig.pad_inches': 0.1,
+    'font.size': 10,
+    'axes.labelsize': 11,
+    'axes.titlesize': 12,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'legend.fontsize': 9,
+    'figure.titlesize': 14,
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
+    'axes.linewidth': 0.8,
+    'grid.linewidth': 0.5,
+    'lines.linewidth': 1.5,
+    'patch.linewidth': 0.5,
+    'xtick.major.width': 0.8,
+    'ytick.major.width': 0.8,
+    'xtick.minor.width': 0.6,
+    'ytick.minor.width': 0.6,
+})
+
+def format_repulsion_type(repulsion_type):
+    """Format repulsion type for display."""
+    if repulsion_type.lower() == 'rlsd':
+        return 'RLSD-F'
+    elif repulsion_type.lower() == 'svgd':
+        return 'SVGD'
+    elif repulsion_type.lower() == 'wo':
+        return 'Baseline'
+    else:
+        return repulsion_type.upper()
+
+def get_prompt_description(prompt_key):
+    """Get full description for prompt abbreviations."""
+    prompt_descriptions = {
+        'hamburger': 'a photo of a hamburger',
+        'icecream': 'a photo of an ice cream', 
+        'cactus': 'a small saguaro cactus planted in a clay pot',
+        'tulip': 'a photo of a tulip'
+    }
+    return prompt_descriptions.get(prompt_key.lower(), prompt_key.title())
+
 def parse_config_name(config_name):
     """Parse config name to extract parameters."""
-    pattern = r'kernel_type=(\w+)_lambda_repulsion=([\de+-]+)_prompt=(\w+)_repulsion_type=(\w+)_seed=(\d+)'
+    # New pattern: REPULSION__KERNEL__λVALUE__PROMPT__S{SEED}
+    # e.g., RLSD__COS__λ100__CACT__S42
+    pattern = r'(\w+)__(\w+)__λ([\dK.]+)__(\w+)__S(\d+)'
     match = re.match(pattern, config_name)
     if match:
+        # Convert lambda value back to numeric format
+        lambda_str = match.group(3)
+        if lambda_str.endswith('K'):
+            lambda_value = str(int(float(lambda_str[:-1]) * 1000))
+        else:
+            lambda_value = lambda_str
+            
         return {
-            'kernel_type': match.group(1),
-            'lambda_repulsion': match.group(2),
-            'prompt': match.group(3),
-            'repulsion_type': match.group(4),
+            'repulsion_type': match.group(1).lower(),  # RLSD -> rlsd
+            'kernel_type': match.group(2).lower(),     # COS -> cosine, RBF -> rbf
+            'lambda_repulsion': lambda_value,
+            'prompt': match.group(4).lower(),          # CACT -> cactus
             'seed': match.group(5)
         }
     return None
@@ -60,7 +117,7 @@ def create_comparison_plot(baseline_data, experiment_data, config_params, output
     n_metrics = len(available_metrics)
     n_lambdas = len(lambda_values)
     
-    fig, axes = plt.subplots(n_metrics, n_lambdas, figsize=(4*n_lambdas, 4*n_metrics))
+    fig, axes = plt.subplots(n_metrics, n_lambdas, figsize=(4.5*n_lambdas, 4.5*n_metrics))
     if n_metrics == 1:
         axes = axes.reshape(1, -1)
     if n_lambdas == 1:
@@ -76,7 +133,7 @@ def create_comparison_plot(baseline_data, experiment_data, config_params, output
                 baseline_plot = baseline_data[["step", metric_col]].dropna().sort_values("step")
                 if len(baseline_plot) > 0:
                     ax.plot(baseline_plot["step"], baseline_plot[metric_col], 
-                           '--', color='gray', linewidth=2, alpha=0.7, label='Baseline')
+                           '--', color='gray', linewidth=2, alpha=0.7, label='Baseline (no repulsion)')
             
             # Plot experiment data
             exp_data = experiment_data[lambda_val]
@@ -84,7 +141,7 @@ def create_comparison_plot(baseline_data, experiment_data, config_params, output
                 exp_plot = exp_data[["step", metric_col]].dropna().sort_values("step")
                 if len(exp_plot) > 0:
                     ax.plot(exp_plot["step"], exp_plot[metric_col], 
-                           '-', linewidth=2, label=f'λ={lambda_val}')
+                           '-', linewidth=2, label=f'λ={lambda_val} (with repulsion)')
             
             # Set labels and title
             if lambda_idx == 0:  # First column
@@ -94,25 +151,35 @@ def create_comparison_plot(baseline_data, experiment_data, config_params, output
             if metric_idx == n_metrics - 1:  # Last row
                 ax.set_xlabel('Step', fontsize=10)
             
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(labelsize=9)
+            # Enhanced grid and styling
+            ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+            ax.tick_params(labelsize=9, direction='in', length=4, width=0.8)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_linewidth(0.8)
+            ax.spines['bottom'].set_linewidth(0.8)
             
             # Add legend only to first subplot
             if metric_idx == 0 and lambda_idx == 0:
-                ax.legend(fontsize=8)
+                ax.legend(fontsize=9, frameon=True, fancybox=True, shadow=False, framealpha=0.9)
     
     # Add overall title
-    title = f"{kernel_type.upper()} Kernel - {prompt.title()} - {repulsion_type.upper()}"
-    fig.suptitle(title, fontsize=14, y=0.98)
+    title = f"{kernel_type.upper()} Kernel - {prompt.title()} - {format_repulsion_type(repulsion_type)}"
+    fig.suptitle(title, fontsize=16, y=0.98, fontweight='bold')
     plt.tight_layout()
     
-    # Save plot
-    filename = f"comparison_{kernel_type}_{prompt}_{repulsion_type}.png"
-    output_path = output_dir / filename
-    plt.savefig(output_path, bbox_inches="tight", dpi=300)
+    # Save plot in multiple formats for dissertation quality
+    base_name = f"comparison_{kernel_type}_{prompt}_{repulsion_type}"
+    output_path_png = output_dir / f"{base_name}.png"
+    output_path_pdf = output_dir / f"{base_name}.pdf"
+    output_path_svg = output_dir / f"{base_name}.svg"
+    
+    plt.savefig(output_path_png, bbox_inches="tight", dpi=300, facecolor='white', edgecolor='none')
+    plt.savefig(output_path_pdf, bbox_inches="tight", facecolor='white', edgecolor='none')
+    plt.savefig(output_path_svg, bbox_inches="tight", facecolor='white', edgecolor='none')
     plt.close()
     
-    return output_path
+    return output_path_png
 
 # ---------- multi-prompt comparison ----------
 def create_comparison_plot_multi_prompt(
@@ -161,12 +228,12 @@ def create_comparison_plot_multi_prompt(
 
     fig, axes = plt.subplots(
         n_metrics, n_lambdas,
-        figsize=(4 * n_lambdas, 3.5 * n_metrics),
+        figsize=(4.5 * n_lambdas, 4 * n_metrics),
         squeeze=False
     )
 
     prompts = list(experiment_data_by_prompt.keys())
-    cmap = plt.cm.get_cmap("tab10", max(1, len(prompts)))
+    cmap = plt.colormaps.get_cmap("tab10")
 
     for m_idx, (metric_col, metric_label) in enumerate(available_metrics):
         for l_idx, lambda_val in enumerate(all_lambda_values):
@@ -183,8 +250,7 @@ def create_comparison_plot_multi_prompt(
                     if len(base_df):
                         ax.plot(
                             base_df["step"], base_df[metric_col],
-                            "--", linewidth=1.8, alpha=0.7, color=color,
-                            label=f"{prompt} baseline" if (m_idx == 0 and l_idx == 0) else None
+                            "--", linewidth=1.8, alpha=0.7, color=color
                         )
 
                 # Experiment
@@ -194,8 +260,7 @@ def create_comparison_plot_multi_prompt(
                     if len(exp_df):
                         ax.plot(
                             exp_df["step"], exp_df[metric_col],
-                            "-", linewidth=2, color=color,
-                            label=f"{prompt} λ={lambda_val}" if (m_idx == 0 and l_idx == 0) else None
+                            "-", linewidth=2, color=color
                         )
 
             # labels
@@ -206,293 +271,365 @@ def create_comparison_plot_multi_prompt(
             if m_idx == n_metrics - 1:
                 ax.set_xlabel("Step", fontsize=10)
 
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(labelsize=8)
+            # Enhanced grid and styling
+            ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+            ax.tick_params(labelsize=9, direction='in', length=4, width=0.8)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_linewidth(0.8)
+            ax.spines['bottom'].set_linewidth(0.8)
 
-    # # add legend once
-    # handles, labels = axes[0, 0].get_legend_handles_labels()
-    # if handles:
-    #     fig.legend(handles, labels, loc="upper center", fontsize=8, ncol=3)
 
-    # fig.suptitle(f"{kernel_type.upper()} Kernel — {repulsion_type.upper()} (all prompts)", fontsize=14, y=0.995)
-    # plt.tight_layout(rect=[0, 0, 1, 0.96])
+    # ---- Legend: 색(프롬프트) / 선스타일(베이스라인 vs 반발) 분리 ----
+    import matplotlib.lines as mlines
 
-    # outpath = output_dir / f"comparison_{kernel_type}_{repulsion_type}_all_prompts_GRID.png"
-    # fig.savefig(outpath, dpi=300, bbox_inches="tight")
-    # plt.close(fig)
-    # return outpath
-
-    # add legend once (아래: 제목과 겹치지 않게 상단 바깥에 배치)
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    if handles:
-        # 중복 라벨 제거(같은 라벨이 반복 수집되는 경우 대비)
-        uniq = {}
-        for h, l in zip(handles, labels):
-            if l not in uniq:
-                uniq[l] = h
-        handles, labels = list(uniq.values()), list(uniq.keys())
-
-        n_items = len(labels)
-
-        # 1) config에서 강제 지정 가능
-        forced_ncol = config_params.get("legend_ncol", None)
-        if forced_ncol is not None:
-            ncol = int(forced_ncol)
-        else:
-            # 2) 자동: 4개면 2x2, 그 외엔 가로로 최대 4개까지
-            ncol = 2 if n_items == 4 else min(n_items, 4)
-
-        fig.legend(
-            handles, labels,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 0.965),  # 제목 바로 아래
-            fontsize=8,
-            ncol=ncol,
-            frameon=True,
-            borderaxespad=0.2
+    # 1) 프롬프트 컬러 전용 핸들 (마커만 써서 선스타일과 혼동 줄이기)
+    prompt_handles = []
+    for p_idx, prompt in enumerate(prompts):
+        color = cmap(p_idx)
+        prompt_handles.append(
+            mlines.Line2D(
+                [], [], marker='o', linestyle='none', markersize=7,
+                markerfacecolor=color, markeredgecolor=color,
+                label=get_prompt_description(prompt)
+            )
         )
 
-    # 제목(맨 위)
+    # 2) 선스타일 설명(회색 한 벌로 충분)
+    style_handles = [
+        mlines.Line2D([], [], color='0.2', linestyle='--', linewidth=2,
+                      label='Dashed: Baseline (no repulsion)'),
+        mlines.Line2D([], [], color='0.2', linestyle='-', linewidth=2,
+                      label='Solid: With repulsion'),
+    ]
+
+    # 먼저 제목을 가장 위에
     fig.suptitle(
-        f"{kernel_type.upper()} Kernel — {repulsion_type.upper()} (all prompts)",
-        fontsize=14, y=0.99
+        f"{kernel_type.upper()} Kernel — {format_repulsion_type(repulsion_type)} (All Prompts)",
+        fontsize=16, y=0.995, fontweight='bold'
     )
 
-    # 상단 10%는 제목+legend 공간으로 비워두기
-    plt.tight_layout(rect=[0, 0, 1, 0.90])
+    # 그 아래 1줄: 프롬프트(색) 레전드
+    ncol_prompt = min(4, max(1, len(prompt_handles)))
+    leg_prompts = fig.legend(
+        handles=prompt_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.955),
+        ncol=ncol_prompt,
+        frameon=False,
+        title="Prompts (color)"
+    )
 
-    outpath = output_dir / f"comparison_{kernel_type}_{repulsion_type}_all_prompts_GRID.png"
-    fig.savefig(outpath, dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    return outpath
+    # 그 아래 1줄: 선스타일 레전드
+    leg_styles = fig.legend(
+        handles=style_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.915),
+        ncol=2,
+        frameon=False,
+        title="Line style"
+    )
 
+    # 타이틀/레전드 영역을 위해 상단 여백을 넉넉히 확보
+    plt.tight_layout(rect=[0, 0, 1, 0.86])
 
-# ###### Pareto Frontier Analysis ######
-# import numpy as np
-# import pandas as pd
-# import matplotlib.pyplot as plt
-# from pathlib import Path
-
-# # ---------- helpers ----------
-# def pareto_efficient_mask(points: np.ndarray, maximize: tuple[bool, ...]) -> np.ndarray:
-#     """
-#     Return a boolean mask for Pareto-efficient points.
-#     points: shape (N, D) array of objective values.
-#     maximize: tuple of booleans, length D. True if that objective is to be maximized.
-#     """
-#     if points.ndim != 2:
-#         raise ValueError("points must be a 2D array (N, D)")
-#     if len(maximize) != points.shape[1]:
-#         raise ValueError("len(maximize) must equal number of columns in points")
-
-#     # Convert maximization to minimization by negating objectives we want to maximize
-#     signed = points.copy()
-#     for j, is_max in enumerate(maximize):
-#         if is_max:
-#             signed[:, j] = -signed[:, j]
-
-#     # A point i is Pareto-efficient if no other point strictly dominates it
-#     N = signed.shape[0]
-#     efficient = np.ones(N, dtype=bool)
-#     for i in range(N):
-#         if not efficient[i]:
-#             continue
-#         # Any point that dominates i? (all <= and at least one <)
-#         dominates = np.all(signed <= signed[i], axis=1) & np.any(signed < signed[i], axis=1)
-#         efficient[dominates] = False  # dominated points cannot be efficient
-#     return efficient
-
-# def build_summary_table(config_groups, baseline_data, experiment_dir) -> pd.DataFrame:
-#     """
-#     Light refactor of your create_tradeoff_analysis_table that RETURNS a DataFrame
-#     (and doesn't print/save). Keeps your plateau logic.
-#     """
-#     key_metrics = [
-#         ("fidelity_mean", "CLIP Fidelity"),
-#         ("inter_particle_diversity_mean", "Inter-Particle Diversity"),
-#         ("cross_view_consistency_mean", "Cross-View Consistency"),
-#     ]
-
-#     rows = []
-#     for (kernel_type, prompt, repulsion_type), lambda_configs in config_groups.items():
-#         baseline_key = f"prompt={prompt}_seed=42"
-#         baseline_final = {}
-#         if baseline_key in baseline_data:
-#             baseline_df = baseline_data[baseline_key]
-#             for metric_col, _ in key_metrics:
-#                 if metric_col in baseline_df.columns and len(baseline_df) > 0:
-#                     baseline_final[metric_col] = baseline_df[metric_col].iloc[-1]
-#                 else:
-#                     baseline_final[metric_col] = np.nan
-#         else:
-#             # If baseline missing, skip this group
-#             continue
-
-#         for lambda_val, config_name in lambda_configs.items():
-#             metrics_path = Path(experiment_dir) / config_name / "metrics" / "quantitative_metrics.csv"
-#             if not metrics_path.exists():
-#                 continue
-#             exp_df = pd.read_csv(metrics_path)
-#             if "fidelity_mean" not in exp_df.columns or len(exp_df) == 0:
-#                 continue
-
-#             plateaued_step = find_plateaued_step(exp_df, "fidelity_mean")
-#             if plateaued_step < 0:
-#                 continue
-
-#             row = {
-#                 "Kernel": kernel_type.upper(),
-#                 "Prompt": str(prompt).title(),
-#                 "Repulsion": repulsion_type.upper(),
-#                 "Lambda": lambda_val,
-#                 "Step": plateaued_step,
-#             }
-
-#             # Compare metrics at the plateau step vs baseline final
-#             for metric_col, metric_name in key_metrics:
-#                 if metric_col in exp_df.columns:
-#                     exp_val = exp_df[metric_col].iloc[min(plateaued_step, len(exp_df) - 1)]
-#                     base_val = baseline_final.get(metric_col, np.nan)
-#                     row[f"{metric_name} (Exp)"] = exp_val
-#                     row[f"{metric_name} (Base)"] = base_val
-#                     if not (np.isnan(exp_val) or np.isnan(base_val)):
-#                         pct = (exp_val - base_val) / (base_val + 1e-12) * 100.0
-#                     else:
-#                         pct = np.nan
-#                     sign = "Improvement" if metric_col == "inter_particle_diversity_mean" else "Change"
-#                     row[f"{metric_name} {sign} (%)"] = pct
-#             rows.append(row)
-
-#     return pd.DataFrame(rows)
-
-
-# # ---------- plotting ----------
-# def plot_pareto_subplots(
-#     df: pd.DataFrame,
-#     x_metric: str = "Inter-Particle Diversity Improvement (%)",
-#     y_metric: str = "CLIP Fidelity Change (%)",
-#     annotate_lambda: bool = True,
-#     annotate_step: bool = False,
-#     group_prompts: bool = True,
-#     title_suffix: str = "",
-#     output_dir: str = "analysis/pareto_analysis"
-# ):
-#     """
-#     Make a 2x2 grid of subplots for (Kernel x Repulsion).
-#     Each subplot: scatter of all points (lambdas, all prompts), highlight Pareto frontier.
-#     x_metric, y_metric: columns of df to use on axes.
-#     """
-#     # Validate
-#     needed = ["Kernel", "Repulsion", "Prompt", "Lambda", "Step", x_metric, y_metric]
-#     for c in needed:
-#         if c not in df.columns:
-#             raise ValueError(f"Missing column: {c}")
-
-#     # Define the 4 panels order
-#     cases = [
-#         ("COSINE", "RLSD"),
-#         ("COSINE", "SVGD"),
-#         ("RBF", "RLSD"),
-#         ("RBF", "SVGD"),
-#     ]
-#     fig, axes = plt.subplots(2, 2, figsize=(14, 10), constrained_layout=True)
-
-#     for ax, (kernel, rep) in zip(axes.ravel(), cases):
-#         sub = df[(df["Kernel"] == kernel) & (df["Repulsion"] == rep)].copy()
-#         ax.set_title(f"{kernel} + {rep}{(' — ' + title_suffix) if title_suffix else ''}")
-#         ax.set_xlabel(x_metric)
-#         ax.set_ylabel(y_metric)
-#         if sub.empty:
-#             ax.text(0.5, 0.5, "No data", ha="center", va="center", alpha=0.6)
-#             continue
-
-#         # Optional: different markers/colors per prompt for readability
-#         if group_prompts:
-#             for prompt, g in sub.groupby("Prompt"):
-#                 ax.scatter(g[x_metric], g[y_metric], label=prompt, alpha=0.7)
-#                 if annotate_lambda:
-#                     for _, r in g.iterrows():
-#                         lbl = f"λ={r['Lambda']}"
-#                         if annotate_step:
-#                             lbl += f"\nS{int(r['Step'])}"
-#                         ax.annotate(lbl, (r[x_metric], r[y_metric]), fontsize=8, xytext=(3, 3), textcoords="offset points")
-#         else:
-#             ax.scatter(sub[x_metric], sub[y_metric], alpha=0.8)
-#             if annotate_lambda:
-#                 for _, r in sub.iterrows():
-#                     lbl = f"λ={r['Lambda']}"
-#                     if annotate_step:
-#                         lbl += f"\nS{int(r['Step'])}"
-#                     ax.annotate(lbl, (r[x_metric], r[y_metric]), fontsize=8, xytext=(3, 3), textcoords="offset points")
-
-#         # Compute Pareto frontier (maximize both axes by default)
-#         pts = sub[[x_metric, y_metric]].to_numpy()
-#         mask = pareto_efficient_mask(pts, maximize=(True, True))
-#         pareto_pts = sub[mask].sort_values([x_metric, y_metric])
-#         # Draw frontier
-#         ax.scatter(pareto_pts[x_metric], pareto_pts[y_metric], s=70, edgecolor="k", linewidth=1.0, zorder=3)
-#         ax.plot(pareto_pts[x_metric], pareto_pts[y_metric], linestyle="--", zorder=2)
-#         # Optional legend for prompts
-#         if group_prompts:
-#             ax.legend(frameon=False, fontsize=8)
-
-#         # Light grid
-#         ax.grid(True, alpha=0.25)
-
-#     fig.suptitle("Pareto Frontier: Diversity vs Fidelity (↑ better on both axes)", fontsize=14)
+    # # Create custom legend with prompt colors and line styles
+    # import matplotlib.lines as mlines
     
-#     # Save figure
-#     if output_dir is not None:
-#         output_dir = Path(output_dir)
-#         output_dir.mkdir(parents=True, exist_ok=True)
-#         fig_path = output_dir / f"pareto_diversity_vs_fidelity_change_{x_metric.replace(' ', '_')}_vs_{y_metric.replace(' ', '_')}.png"
-#         fig.savefig(fig_path, dpi=300)
-#         print(f"Saved Pareto plot → {fig_path}")
+    # # Create legend handles for prompts (colors only)
+    # prompt_handles = []
+    # for p_idx, prompt in enumerate(prompts):
+    #     color = cmap(p_idx)
+    #     prompt_handles.append(
+    #         mlines.Line2D([], [], color=color, linestyle='-', linewidth=2, 
+    #                      label=get_prompt_description(prompt))
+    #     )
+    
+    # # Add line style explanation
+    # style_handles = [
+    #     mlines.Line2D([], [], color='gray', linestyle='--', linewidth=1.8, 
+    #                  label='Dashed lines: Baseline (no repulsion)'),
+    #     mlines.Line2D([], [], color='gray', linestyle='-', linewidth=2, 
+    #                  label='Solid lines: With repulsion')
+    # ]
+    
+    # # Combine all handles
+    # all_handles = style_handles + prompt_handles
+    # all_labels = [h.get_label() for h in all_handles]
+    
+    # n_items = len(all_labels)
+    # ncol = 2 if n_items <= 6 else 3
 
-#         # if save_csv:
-#         #     pareto_all = pd.concat(pareto_rows, ignore_index=True)
-#         #     csv_path = output_dir / f"pareto_points.csv"
-#         #     pareto_all.to_csv(csv_path, index=False)
-#         #     print(f"Saved Pareto-optimal configs → {csv_path}")
-
-#     plt.show()
-
-
-# # ---------- high-level runner ----------
-# def run_pareto_plots(
-#     config_groups,
-#     baseline_data,
-#     experiment_dir,
-#     x_metric="Inter-Particle Diversity Improvement (%)",
-#     y_metric="CLIP Fidelity Change (%)",
-#     output_dir: str = "analysis/pareto_analysis"
-# ):
-#     """
-#     Convenience wrapper: builds the summary df and renders 2x2 Pareto subplots.
-#     """
-#     df = build_summary_table(config_groups, baseline_data, experiment_dir)
-
-#     # Only keep rows with valid x/y
-#     df = df.dropna(subset=[x_metric, y_metric]).copy()
-
-#     # Optional: enforce your criterion (diversity must be > baseline)
-#     df = df[df["Inter-Particle Diversity Improvement (%)"] > 0].copy()
-
-    # # Plot
-    # plot_pareto_subplots(
-    #     df,
-    #     x_metric=x_metric,
-    #     y_metric=y_metric,
-    #     annotate_lambda=True,
-    #     annotate_step=False,
-    #     group_prompts=True,
-    #     title_suffix="(at fidelity plateau step)",
-    #     output_dir=output_dir
+    # fig.legend(
+    #     all_handles, all_labels,
+    #     loc="upper center",
+    #     bbox_to_anchor=(0.5, 0.96),  # 제목 바로 아래
+    #     fontsize=9,
+    #     ncol=ncol,
+    #     frameon=True,
+    #     borderaxespad=0.3,
+    #     fancybox=True,
+    #     shadow=False,
+    #     framealpha=0.9
     # )
 
-    # return df  # so you can inspect/save if you want
+    # # 제목(맨 위)
+    # fig.suptitle(
+    #     f"{kernel_type.upper()} Kernel — {format_repulsion_type(repulsion_type)} (All Prompts)",
+    #     fontsize=16, y=0.98, fontweight='bold'
+    # )
+
+    # # 상단 10%는 제목+legend 공간으로 비워두기
+    # plt.tight_layout(rect=[0, 0, 1, 0.88])
+
+    # Save in multiple formats for dissertation quality
+    base_name = f"comparison_{kernel_type}_{repulsion_type}_all_prompts_GRID"
+    outpath_png = output_dir / f"{base_name}.png"
+    outpath_pdf = output_dir / f"{base_name}.pdf"
+    outpath_svg = output_dir / f"{base_name}.svg"
+    
+    fig.savefig(outpath_png, dpi=300, bbox_inches="tight", facecolor='white', edgecolor='none')
+    fig.savefig(outpath_pdf, bbox_inches="tight", facecolor='white', edgecolor='none')
+    fig.savefig(outpath_svg, bbox_inches="tight", facecolor='white', edgecolor='none')
+    plt.close(fig)
+    return outpath_png
+
+def create_per_prompt_metric_panel(
+    baseline_df: pd.DataFrame,
+    exp_lambda_to_df: dict[str, pd.DataFrame],
+    kernel_type: str,
+    repulsion_type: str,
+    prompt: str,
+    output_dir: Path
+):
+    """
+    For a single prompt, draw three panels (Diversity/Fidelity/Consistency),
+    overlaying ALL lambda curves in each panel.
+    """
+    metrics = [
+        ("inter_particle_diversity_mean", "Inter-Particle Diversity (mean)"),
+        ("fidelity_mean", "CLIP Fidelity (mean)"),
+        ("cross_view_consistency_mean", "Cross-View Consistency (mean)"),
+    ]
+    # 사용 가능한 메트릭만 남기기
+    available = [(c, l) for c, l in metrics
+                 if (baseline_df is not None and c in baseline_df.columns)
+                 or any(c in df.columns for df in exp_lambda_to_df.values())]
+    if not available:
+        return None
+
+    # λ 정렬
+    lambda_values = sorted(exp_lambda_to_df.keys(), key=get_lambda_repulsion_order)
+
+    n = len(available)
+    fig, axes = plt.subplots(1, n, figsize=(5.2*n, 4), squeeze=False)
+    axes = axes[0]
+
+    cmap = plt.colormaps.get_cmap("tab10")
+    color_map = {lv: cmap(i % 10) for i, lv in enumerate(lambda_values)}
+
+    for ax, (metric_col, metric_label) in zip(axes, available):
+        # baseline (프롬프트 고정, 점선 회색)
+        if baseline_df is not None and metric_col in baseline_df.columns:
+            base = baseline_df[["step", metric_col]].dropna().sort_values("step")
+            if len(base):
+                ax.plot(base["step"], base[metric_col], "--", linewidth=2, color="0.35",
+                        alpha=0.9, label="Baseline")
+
+        # 모든 λ (실선, 색상=λ)
+        for lv in lambda_values:
+            df = exp_lambda_to_df[lv]
+            if metric_col not in df.columns:
+                continue
+            cur = df[["step", metric_col]].dropna().sort_values("step")
+            if len(cur):
+                ax.plot(cur["step"], cur[metric_col], "-", linewidth=2,
+                        color=color_map[lv], label=f"λ={lv}")
+
+        ax.set_title(metric_label, fontsize=12, fontweight="bold")
+        ax.set_xlabel("Step")
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax.tick_params(labelsize=9, direction='in', length=4, width=0.8)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(0.8)
+        ax.spines['bottom'].set_linewidth(0.8)
+
+    # 공통 Y라벨은 왼쪽 축에만
+    axes[0].set_ylabel("Value")
+
+    # 제목 + 레전드(위)
+    title = f"{kernel_type.upper()} Kernel — {format_repulsion_type(repulsion_type)} — {get_prompt_description(prompt)}"
+    fig.suptitle(title, fontsize=16, y=0.98, fontweight="bold")
+
+    # λ 컬러 범례(한 줄) + 스타일 설명은 라벨 텍스트에 포함됐으므로 별도 박스 불필요
+    # 중복 라벨 제거한 핸들 구성
+    handles, labels = [], []
+    for ax in axes:
+        h, l = ax.get_legend_handles_labels()
+        for hh, ll in zip(h, l):
+            if ll not in labels:
+                handles.append(hh)
+                labels.append(ll)
+
+    ncol = min(6, max(3, len(labels)))
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.91),
+               ncol=ncol, frameon=False)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.86])
+
+    base = f"panel_{kernel_type}_{repulsion_type}_{prompt}"
+    p_png = output_dir / f"{base}.png"
+    p_pdf = output_dir / f"{base}.pdf"
+    p_svg = output_dir / f"{base}.svg"
+    fig.savefig(p_png, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none")
+    fig.savefig(p_pdf, bbox_inches="tight", facecolor="white", edgecolor="none")
+    fig.savefig(p_svg, bbox_inches="tight", facecolor="white", edgecolor="none")
+    plt.close(fig)
+    return p_png
 
 
+def create_metrics_by_prompts_grid(
+    baseline_data: dict[str, pd.DataFrame],
+    experiment_data_by_prompt: dict[str, dict[str, pd.DataFrame]],
+    kernel_type: str,
+    repulsion_type: str,
+    output_dir: Path,
+    unify_row_ylim: bool = True,
+):
+    """
+    한 장의 그림: 행=3개 메트릭, 열=모든 프롬프트.
+    각 서브플롯에 해당 프롬프트의 베이스라인(점선)과 모든 λ(실선, 색=λ)를 overlay.
+    """
+    # 3개 핵심 메트릭
+    metrics = [
+        ("inter_particle_diversity_mean", "Inter-Particle Diversity (mean)"),
+        ("fidelity_mean", "CLIP Fidelity (mean)"),
+        ("cross_view_consistency_mean", "Cross-View Consistency (mean)"),
+    ]
+
+    prompts = sorted(experiment_data_by_prompt.keys())
+    n_rows, n_cols = len(metrics), len(prompts)
+    if n_cols == 0:
+        print("No prompts to plot.")
+        return None
+
+    # λ 값 모으기(모든 프롬프트 합집합) + 색상 지정
+    all_lambda_values = sorted(
+        {lv for mp in experiment_data_by_prompt.values() for lv in mp.keys()},
+        key=get_lambda_repulsion_order
+    )
+    cmap = plt.colormaps.get_cmap("tab10")
+    lambda_color = {lv: cmap(i % 10) for i, lv in enumerate(all_lambda_values)}
+
+    fig, axes = plt.subplots(
+        n_rows, n_cols,
+        figsize=(4.3 * n_cols, 3.8 * n_rows),
+        squeeze=False
+    )
+
+    # (선택) 같은 행(=같은 메트릭)끼리 y 축 범위 통일
+    row_lims = {i: [np.inf, -np.inf] for i in range(n_rows)} if unify_row_ylim else None
+
+    for c_idx, prompt in enumerate(prompts):
+        # 베이스라인 키
+        base_key = f"prompt={prompt}_seed=42"
+        base_df = baseline_data.get(base_key, None)
+        # λ→DF 맵
+        lambda_map = experiment_data_by_prompt.get(prompt, {})
+
+        for r_idx, (metric_col, metric_label) in enumerate(metrics):
+            ax = axes[r_idx, c_idx]
+
+            # baseline (점선 회색)
+            if base_df is not None and metric_col in base_df.columns:
+                base = base_df[["step", metric_col]].dropna().sort_values("step")
+                if len(base):
+                    ax.plot(base["step"], base[metric_col], "--", linewidth=2, color="0.35", label="Baseline")
+
+            # 모든 λ (실선, 색=λ)
+            for lv in all_lambda_values:
+                df = lambda_map.get(lv, None)
+                if df is None or metric_col not in df.columns:
+                    continue
+                cur = df[["step", metric_col]].dropna().sort_values("step")
+                if len(cur):
+                    ax.plot(cur["step"], cur[metric_col], "-", linewidth=2,
+                            color=lambda_color[lv], label=f"λ={lv}")
+
+            # 라벨/타이틀
+            if c_idx == 0:
+                ax.set_ylabel(metric_label, fontsize=10)
+            if r_idx == 0:
+                ax.set_title(get_prompt_description(prompt), fontsize=12, fontweight="bold")
+            if r_idx == n_rows - 1:
+                ax.set_xlabel("Step", fontsize=10)
+
+            # 스타일
+            ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+            ax.tick_params(labelsize=9, direction='in', length=4, width=0.8)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_linewidth(0.8)
+            ax.spines['bottom'].set_linewidth(0.8)
+
+            # (선택) y-lim 집계
+            if unify_row_ylim:
+                ydata = []
+                if base_df is not None and metric_col in base_df.columns:
+                    ydata.append(base[metric_col].values)
+                for lv in all_lambda_values:
+                    df = lambda_map.get(lv, None)
+                    if df is not None and metric_col in df.columns:
+                        ydata.append(df[metric_col].dropna().values)
+                if len(ydata):
+                    ymin = np.nanmin(np.concatenate(ydata))
+                    ymax = np.nanmax(np.concatenate(ydata))
+                    row_lims[r_idx][0] = min(row_lims[r_idx][0], ymin)
+                    row_lims[r_idx][1] = max(row_lims[r_idx][1], ymax)
+
+    # 행별 y축 통일 적용
+    if unify_row_ylim:
+        for r_idx in range(n_rows):
+            ymin, ymax = row_lims[r_idx]
+            if np.isfinite(ymin) and np.isfinite(ymax):
+                pad = 0.03 * (ymax - ymin + 1e-12)
+                for c_idx in range(n_cols):
+                    axes[r_idx, c_idx].set_ylim(ymin - pad, ymax + pad)
+
+    # 제목 & 레전드
+    fig.suptitle(
+        f"{kernel_type.upper()} Kernel — {format_repulsion_type(repulsion_type)} (Rows: Metrics, Cols: Prompts)",
+        fontsize=16, y=0.995, fontweight="bold"
+    )
+
+    # 상단 레전드: 색=λ, 선스타일=베이스라인/반발
+    import matplotlib.lines as mlines
+    lambda_handles = [
+        mlines.Line2D([], [], color=lambda_color[lv], linestyle='-', linewidth=2, label=f"λ={lv}")
+        for lv in all_lambda_values
+    ]
+    style_handles = [
+        mlines.Line2D([], [], color='0.35', linestyle='--', linewidth=2, label='Baseline (no repulsion)'),
+        mlines.Line2D([], [], color='0.35', linestyle='-', linewidth=2, label='With repulsion'),
+    ]
+    handles = style_handles + lambda_handles
+    ncol = min(6, max(3, len(handles)))
+    fig.legend(handles, [h.get_label() for h in handles],
+               loc="upper center", bbox_to_anchor=(0.5, 0.93),
+               ncol=ncol, frameon=False)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.86])
+
+    base = f"grid_metrics_by_prompts_{kernel_type}_{repulsion_type}"
+    p_png = output_dir / f"{base}.png"
+    p_pdf = output_dir / f"{base}.pdf"
+    p_svg = output_dir / f"{base}.svg"
+    fig.savefig(p_png, dpi=300, bbox_inches="tight", facecolor="white", edgecolor="none")
+    fig.savefig(p_pdf, bbox_inches="tight", facecolor="white", edgecolor="none")
+    fig.savefig(p_svg, bbox_inches="tight", facecolor="white", edgecolor="none")
+    plt.close(fig)
+    return p_png
 
 
 
@@ -500,8 +637,9 @@ def main():
     parser = argparse.ArgumentParser(description='Compare lambda_repulsion results against baseline')
     parser.add_argument('--baseline_exp', type=str, default="exp0_baseline",
                         help='Baseline experiment name (default: exp0_baseline)')
-    parser.add_argument('--experiment_exp', type=str, default="exp1_lambda_coarse",
-                        help='Experiment name with lambda_repulsion variations (default: exp1_lambda_coarse)')
+    parser.add_argument('--experiment_exps', type=str, nargs='+', 
+                        default=["exp1_lambda_coarse_rlsd", "exp1_lambda_coarse_svgd"],
+                        help='Experiment names with lambda_repulsion variations (default: exp1_lambda_coarse_rlsd exp1_lambda_coarse_svgd)')
     parser.add_argument('--base_dir', type=str, default="exp",
                         help='Base directory for experiments (default: exp)')
     parser.add_argument('--output_dir', type=str, default="analysis",
@@ -512,17 +650,23 @@ def main():
                         help='Whether to generate comparison plots (default: True)')
     parser.add_argument('--pareto_plots', action='store_true', default=False,
                         help='Whether to generate Pareto plots (default: True)')
+    parser.add_argument('--compare_plots_per_prompt', action='store_true', default=False,
+                    help='Per prompt: 3 panels (Div/Fid/Cons) overlaying all lambdas')
+    parser.add_argument('--grid_metrics_by_prompts', action='store_true', default=False,
+                    help='Make a single figure: rows=3 metrics, cols=prompts; overlay all lambdas.')
+
+
     
     args = parser.parse_args()
     
     # Create output directory
     if args.compare_plots_multi_prompts or args.compare_plots_single_prompt:
         comparison_plots_output_dir = Path(args.output_dir) / "comparison_plots"
-        comparison_plots_output_dir.mkdir(exist_ok=True)
+        comparison_plots_output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.pareto_plots:
         pareto_analysis_output_dir = Path(args.output_dir) / "pareto_analysis"
-        pareto_analysis_output_dir.mkdir(exist_ok=True)
+        pareto_analysis_output_dir.mkdir(parents=True, exist_ok=True)
     
     # Get baseline configs
     baseline_dir = Path(f"{args.base_dir}/{args.baseline_exp}")
@@ -533,14 +677,19 @@ def main():
     
     print(f"Found baseline configs: {baseline_configs}")
     
-    # Get experiment configs
-    experiment_dir = Path(f"{args.base_dir}/{args.experiment_exp}")
+    # Get experiment configs from all experiment directories
     experiment_configs = []
-    for item in experiment_dir.iterdir():
-        if item.is_dir() and not item.name.startswith('.') and item.name != 'logs':
-            experiment_configs.append(item.name)
+    for experiment_exp in args.experiment_exps:
+        experiment_dir = Path(f"{args.base_dir}/{experiment_exp}")
+        if experiment_dir.exists():
+            configs = []
+            for item in experiment_dir.iterdir():
+                if item.is_dir() and not item.name.startswith('.') and item.name != 'logs':
+                    configs.append(item.name)
+            experiment_configs.extend(configs)
+            print(f"Found {len(configs)} experiment configs in {experiment_exp}")
     
-    print(f"Found experiment configs: {len(experiment_configs)}")
+    print(f"Total experiment configs: {len(experiment_configs)}")
     
     # Parse experiment configs
     config_groups = {}
@@ -559,8 +708,20 @@ def main():
     for config_name in baseline_configs:
         metrics_path = baseline_dir / config_name / "metrics" / "quantitative_metrics.csv"
         if metrics_path.exists():
-            baseline_data[config_name] = pd.read_csv(metrics_path)
-            print(f"Loaded baseline data for {config_name}")
+            # New baseline naming: PROMPT__S{SEED} -> prompt=PROMPT_seed=SEED
+            # e.g., CACT__S42 -> prompt=cactus_seed=42
+            if '__S' in config_name:
+                parts = config_name.split('__S')
+                if len(parts) == 2:
+                    prompt_part = parts[0].lower()  # CACT -> cactus
+                    seed_part = parts[1]
+                    key = f"prompt={prompt_part}_seed={seed_part}"
+                else:
+                    key = config_name
+            else:
+                key = config_name
+            baseline_data[key] = pd.read_csv(metrics_path)
+            print(f"Loaded baseline data for {config_name} -> {key}")
  
     if args.compare_plots_multi_prompts:
         saved_plots = []
@@ -577,6 +738,17 @@ def main():
                 lambda_configs = config_groups[(kernel_type, prompt, repulsion_type)]
                 lambda_to_df = {}
                 for lambda_val, config_name in lambda_configs.items():
+                    # Find the correct experiment directory for this config
+                    experiment_dir = None
+                    for exp_name in args.experiment_exps:
+                        exp_dir = Path(f"{args.base_dir}/{exp_name}")
+                        if exp_dir.exists() and (exp_dir / config_name).exists():
+                            experiment_dir = exp_dir
+                            break
+                    
+                    if experiment_dir is None:
+                        continue
+                        
                     metrics_path = experiment_dir / config_name / "metrics" / "quantitative_metrics.csv"
                     if metrics_path.exists():
                         lambda_to_df[lambda_val] = pd.read_csv(metrics_path)
@@ -597,6 +769,98 @@ def main():
 
         print(f"\nGenerated {len(saved_plots)} multi-prompt grid plots in {comparison_plots_output_dir}")
 
+    if args.compare_plots_per_prompt:
+        saved = []
+        # (kernel, prompt, repulsion) 별로 묶여있는 config_groups 재사용
+        pairs = sorted({(k, p, r) for (k, p, r) in config_groups.keys()})
+        for (kernel_type, prompt, repulsion_type) in pairs:
+            # baseline
+            base_key = f"prompt={prompt}_seed=42"
+            baseline_df = baseline_data.get(base_key, None)
+
+            # 해당 조합의 모든 λ 데이터 로드
+            lambda_configs = config_groups[(kernel_type, prompt, repulsion_type)]
+            exp_map = {}
+            for lv, cfg in lambda_configs.items():
+                # 어느 실험 폴더에 있는지 탐색
+                exp_dir = None
+                for exp_name in args.experiment_exps:
+                    ed = Path(f"{args.base_dir}/{exp_name}")
+                    if ed.exists() and (ed / cfg).exists():
+                        exp_dir = ed
+                        break
+                if exp_dir is None:
+                    continue
+                mp = exp_dir / cfg / "metrics" / "quantitative_metrics.csv"
+                if mp.exists():
+                    exp_map[lv] = pd.read_csv(mp)
+
+            if not exp_map:
+                continue
+
+            outdir = Path(args.output_dir) / "comparison_plots"
+            outdir.mkdir(parents=True, exist_ok=True)
+            p = create_per_prompt_metric_panel(
+                baseline_df=baseline_df,
+                exp_lambda_to_df=exp_map,
+                kernel_type=kernel_type,
+                repulsion_type=repulsion_type,
+                prompt=prompt,
+                output_dir=outdir
+            )
+            if p:
+                saved.append(p)
+                print(f"Generated per-prompt panel: {p.name}")
+        print(f"\nGenerated {len(saved)} per-prompt panels in {Path(args.output_dir) / 'comparison_plots'}")
+
+    if args.grid_metrics_by_prompts:
+        saved = []
+        # (kernel, repulsion) 페어별로 모든 프롬프트를 모아 전달
+        pairs = sorted({(k, r) for (k, _p, r) in config_groups.keys()})
+        for (kernel_type, repulsion_type) in pairs:
+            # prompt -> {lambda -> df} 구성
+            prompt_map: dict[str, dict[str, pd.DataFrame]] = {}
+            prompts_for_pair = sorted({p for (k, p, r) in config_groups.keys()
+                                       if k == kernel_type and r == repulsion_type})
+            for prompt in prompts_for_pair:
+                lambda_cfgs = config_groups[(kernel_type, prompt, repulsion_type)]
+                lm = {}
+                for lv, cfg in lambda_cfgs.items():
+                    exp_dir = None
+                    for exp_name in args.experiment_exps:
+                        ed = Path(f"{args.base_dir}/{exp_name}")
+                        if ed.exists() and (ed / cfg).exists():
+                            exp_dir = ed
+                            break
+                    if exp_dir is None:
+                        continue
+                    mp = exp_dir / cfg / "metrics" / "quantitative_metrics.csv"
+                    if mp.exists():
+                        lm[lv] = pd.read_csv(mp)
+                if lm:
+                    prompt_map[prompt] = lm
+
+            if not prompt_map:
+                continue
+
+            outdir = Path(args.output_dir) / "comparison_plots"
+            outdir.mkdir(parents=True, exist_ok=True)
+            p = create_metrics_by_prompts_grid(
+                baseline_data=baseline_data,
+                experiment_data_by_prompt=prompt_map,
+                kernel_type=kernel_type,
+                repulsion_type=repulsion_type,
+                output_dir=outdir,
+                unify_row_ylim=True,   # 필요 없으면 False
+            )
+            if p:
+                saved.append(p)
+                print(f"Generated metrics×prompts grid: {p.name}")
+
+        print(f"\nGenerated {len(saved)} grids in {Path(args.output_dir) / 'comparison_plots'}")
+
+
+
     # Create comparison plots for each combination
     
     if args.compare_plots_single_prompt:
@@ -616,6 +880,18 @@ def main():
             # Load experiment data for all lambda values
             experiment_data = {}
             for lambda_val, config_name in lambda_configs.items():
+                # Find the correct experiment directory for this config
+                experiment_dir = None
+                for exp_name in args.experiment_exps:
+                    exp_dir = Path(f"{args.base_dir}/{exp_name}")
+                    if exp_dir.exists() and (exp_dir / config_name).exists():
+                        experiment_dir = exp_dir
+                        break
+                
+                if experiment_dir is None:
+                    print(f"  Warning: No experiment directory found for {config_name}")
+                    continue
+                    
                 metrics_path = experiment_dir / config_name / "metrics" / "quantitative_metrics.csv"
                 if metrics_path.exists():
                     experiment_data[lambda_val] = pd.read_csv(metrics_path)
@@ -641,52 +917,6 @@ def main():
                 print(f"  Generated comparison plot: {plot_path.name}")
         
         print(f"\nGenerated {len(saved_plots)} comparison plots in {comparison_plots_output_dir}")
-    
-    # # Create summary table
-    # # create_tradeoff_analysis_table(config_groups, baseline_data, experiment_dir, tradeoff_analysis_output_dir)
-    
-    # if args.pareto_plots:    
-    #     # 1) Pareto for Diversity ↑ vs Fidelity change ↑
-    #     pareto_df = run_pareto_plots(
-    #         config_groups=config_groups,
-    #         baseline_data=baseline_data,
-    #         experiment_dir=experiment_dir,
-    #         x_metric="Inter-Particle Diversity Improvement (%)",
-    #         y_metric="CLIP Fidelity Change (%)",
-    #         output_dir=pareto_analysis_output_dir
-    #     )
-
-    #     # 2) If you also want Diversity ↑ vs Consistency change ↑
-    #     plot_pareto_subplots(
-    #         pareto_df,
-    #         x_metric="Inter-Particle Diversity Improvement (%)",
-    #         y_metric="Cross-View Consistency Change (%)",
-    #         annotate_lambda=True,
-    #         annotate_step=False,
-    #         group_prompts=True,
-    #         title_suffix="(Consistency axis)",
-    #         output_dir=pareto_analysis_output_dir
-    #     )
-
-
-# def detect_plateau(metric_series, window_size=5, threshold=0.01):
-#     """
-#     Detect if a metric has plateaued by checking if the last window_size values
-#     have a standard deviation below threshold.
-    
-#     Args:
-#         metric_series: Series of metric values
-#         window_size: Number of last values to check for plateau
-#         threshold: Maximum allowed std dev for plateau detection
-    
-#     Returns:
-#         bool: True if plateaued, False otherwise
-#     """
-#     if len(metric_series) < window_size:
-#         return False
-    
-#     last_values = metric_series.tail(window_size)
-#     return last_values.std() < threshold
 
 def find_plateaued_step(exp_df, metric_col, window_size=5, threshold=0.01):
     """
@@ -715,163 +945,6 @@ def find_plateaued_step(exp_df, metric_col, window_size=5, threshold=0.01):
     # If no plateau found, return the last step
     return len(metric_series) - 1
 
-# def create_tradeoff_analysis_table(config_groups, baseline_data, experiment_dir, output_dir):
-#     """Create a summary table comparing final metrics with focus on diversity vs fidelity trade-offs."""
-#     print("\nCreating summary table...")
-    
-#     # Define key metrics for analysis
-#     key_metrics = [
-#         ("fidelity_mean", "CLIP Fidelity"),
-#         ("inter_particle_diversity_mean", "Inter-Particle Diversity"),
-#         ("cross_view_consistency_mean", "Cross-View Consistency"),
-#     ]
-    
-#     summary_data = []
-#     valid_configs = []  # Store configurations that meet criteria
-    
-#     for (kernel_type, prompt, repulsion_type), lambda_configs in config_groups.items():
-#         # Get baseline final values
-#         baseline_key = f"prompt={prompt}_seed=42"
-#         baseline_final = {}
-#         if baseline_key in baseline_data:
-#             baseline_df = baseline_data[baseline_key]
-#             for metric_col, metric_name in key_metrics:
-#                 if metric_col in baseline_df.columns:
-#                     final_val = baseline_df[metric_col].iloc[-1] if len(baseline_df) > 0 else np.nan
-#                     baseline_final[metric_col] = final_val
-        
-#         # Get experiment final values
-#         for lambda_val, config_name in lambda_configs.items():
-#             metrics_path = experiment_dir / config_name / "metrics" / "quantitative_metrics.csv"
-#             if metrics_path.exists():
-#                 exp_df = pd.read_csv(metrics_path)
-                
-#                 # Find plateaued step for fidelity
-#                 plateaued_step = find_plateaued_step(exp_df, "fidelity_mean")
-                
-#                 if plateaued_step >= 0:
-#                     row = {
-#                         'Kernel': kernel_type.upper(),
-#                         'Prompt': prompt.title(),
-#                         'Repulsion Type': repulsion_type.upper(),
-#                         'Lambda': lambda_val,
-#                         'Plateaued_Step': plateaued_step,
-#                     }
-                    
-#                     # Calculate percentage changes for key metrics at plateaued step
-#                     for metric_col, metric_name in key_metrics:
-#                         if metric_col in exp_df.columns and metric_col in baseline_final:
-#                             exp_val = exp_df[metric_col].iloc[plateaued_step] if len(exp_df) > plateaued_step else np.nan
-#                             baseline_val = baseline_final[metric_col]
-                            
-#                             if not np.isnan(exp_val) and not np.isnan(baseline_val):
-#                                 pct_change = ((exp_val - baseline_val) / baseline_val) * 100
-                                
-#                                 if metric_col == "inter_particle_diversity_mean":
-#                                     # For diversity, positive is improvement
-#                                     row[f'{metric_name} Improvement (%)'] = pct_change
-#                                 else:
-#                                     # For fidelity and consistency, allow both positive and negative changes
-#                                     row[f'{metric_name} Change (%)'] = pct_change
-#                             else:
-#                                 if metric_col == "inter_particle_diversity_mean":
-#                                     row[f'{metric_name} Improvement (%)'] = np.nan
-#                                 else:
-#                                     row[f'{metric_name} Change (%)'] = np.nan
-                    
-#                     # Check if diversity exceeds baseline (main objective)
-#                     diversity_improvement = row.get('Inter-Particle Diversity Improvement (%)', np.nan)
-#                     if not np.isnan(diversity_improvement) and diversity_improvement > 0:
-#                         valid_configs.append(row)
-                    
-#                     summary_data.append(row)
-    
-#     if summary_data:
-#         summary_df = pd.DataFrame(summary_data)
-        
-#         # Filter for valid configurations (diversity > baseline)
-#         valid_df = pd.DataFrame(valid_configs)
-        
-#         if len(valid_df) > 0:
-#             # Select the configuration with maximum diversity improvement among valid ones
-#             best_config = valid_df.loc[valid_df['Inter-Particle Diversity Improvement (%)'].idxmax()]
-            
-#             print("\n" + "="*80)
-#             print("ROBUST DIVERSITY vs FIDELITY/CONSISTENCY ANALYSIS")
-#             print("="*80)
-#             print("Criteria applied:")
-#             print("1. Only points where fidelity has plateaued (excludes early false peaks)")
-#             print("2. Allows realistic drops in fidelity and consistency compared to baseline")
-#             print("3. Requires diversity to exceed baseline (main objective)")
-#             print("4. Selects λ·step with maximum Δdiversity among valid configurations")
-#             print("-"*80)
-            
-#             # Display the best configuration
-#             print("BEST CONFIGURATION (Maximum Diversity Improvement):")
-#             print(f"Kernel: {best_config['Kernel']}")
-#             print(f"Prompt: {best_config['Prompt']}")
-#             print(f"Repulsion Type: {best_config['Repulsion Type']}")
-#             print(f"Lambda: {best_config['Lambda']}")
-#             print(f"Plateaued Step: {best_config['Plateaued_Step']}")
-#             print(f"Diversity Improvement: {best_config['Inter-Particle Diversity Improvement (%)']:.2f}%")
-#             print(f"Fidelity Change: {best_config['CLIP Fidelity Change (%)']:.2f}%")
-#             print(f"Consistency Change: {best_config['Cross-View Consistency Change (%)']:.2f}%")
-            
-#             # Display all valid configurations sorted by diversity improvement
-#             print("\n" + "="*80)
-#             print("ALL VALID CONFIGURATIONS (Diversity > Baseline)")
-#             print("="*80)
-#             print("Sorted by diversity improvement (highest first)")
-#             print("Positive values for diversity = improvement over baseline")
-#             print("Positive values for fidelity/consistency = improvement, negative = degradation")
-#             print("-"*80)
-            
-#             # Sort valid configurations by diversity improvement
-#             valid_df_sorted = valid_df.sort_values('Inter-Particle Diversity Improvement (%)', ascending=False)
-            
-#             display_columns = [
-#                 'Kernel', 'Prompt', 'Repulsion Type', 'Lambda', 'Plateaued_Step',
-#                 'Inter-Particle Diversity Improvement (%)',
-#                 'CLIP Fidelity Change (%)',
-#                 'Cross-View Consistency Change (%)'
-#             ]
-            
-#             print(valid_df_sorted[display_columns].to_string(index=False, float_format='%.2f'))
-            
-#             # Save the robust analysis
-#             robust_path = output_dir / "robust_diversity_vs_fidelity_tradeoffs.csv"
-#             valid_df_sorted.to_csv(robust_path, index=False)
-#             print(f"\nRobust trade-off analysis saved to: {robust_path}")
-            
-#             # Also save the complete analysis for reference
-#             summary_path = output_dir / "diversity_vs_fidelity_tradeoffs.csv"
-#             summary_df.to_csv(summary_path, index=False)
-#             print(f"Complete analysis saved to: {summary_path}")
-            
-#         else:
-#             print("No configurations meet the criteria (diversity > baseline)")
-#             print("Saving complete analysis without filtering...")
-#             summary_path = output_dir / "diversity_vs_fidelity_tradeoffs.csv"
-#             summary_df.to_csv(summary_path, index=False)
-#             print(f"Analysis saved to: {summary_path}")
-            
-#             # Display top configurations anyway
-#             print("\n" + "="*80)
-#             print("TOP CONFIGURATIONS (All Data)")
-#             print("="*80)
-#             display_columns = [
-#                 'Kernel', 'Prompt', 'Repulsion Type', 'Lambda', 'Plateaued_Step',
-#                 'Inter-Particle Diversity Improvement (%)',
-#                 'CLIP Fidelity Change (%)',
-#                 'Cross-View Consistency Change (%)'
-#             ]
-            
-#             # Sort by diversity improvement
-#             summary_df_sorted = summary_df.sort_values('Inter-Particle Diversity Improvement (%)', ascending=False)
-#             print(summary_df_sorted[display_columns].to_string(index=False, float_format='%.2f'))
-    
-#     else:
-#         print("No data available for summary table")
 
 if __name__ == "__main__":
     main()
