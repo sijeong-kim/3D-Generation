@@ -563,8 +563,8 @@ exp3_num_pts:
       # svgd_rbf: [1150]
       # svgd_cosine: [1150]
       # 1300 빼고 해버림..ㅜㅠ
-    seed: [42] # TODO: add more seeds
     num_pts: [1000, 2000, 3000, 4000, 5000]
+    seed: [42] # TODO: add more seeds
     
     
   fixed_parameters:
