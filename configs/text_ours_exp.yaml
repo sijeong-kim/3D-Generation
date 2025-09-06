@@ -391,74 +391,141 @@ exp2_lambda_fine_rlsd_rbf:
     enable_lpips: False # disable lpips for faster training
 
 
-### START SPOTCHECK ### 
-exp2b_beta_spotcheck_rbf:
-  name: exp2b_beta_spotcheck_rbf
-  method: grid
-  sweep_parameters:
-    prompt:
-      hamburger: "a photo of a hamburger"
-      cactus: "a small saguaro cactus planted in a clay pot"
-    repulsion_type: ['svgd', 'rlsd']
-    kernel_type: ['rbf']
-    lambda_repulsion:
-      rlsd_rbf: [500]   # 각자 sweet-spot 중앙값 하나만
-      svgd_rbf: [250]
-    rbf_beta: [0.5, 1.0]   # ← 여기만 스팟체크
-    seed: [42]
-  fixed_parameters: { ...exp2와 동일... }
-  settings: { ...exp2와 동일... }
+# ### START SPOTCHECK ### 
+# exp2b_beta_spotcheck_rbf:
+#   name: exp2b_beta_spotcheck_rbf
+#   method: grid
+#   sweep_parameters:
+#     prompt:
+#       hamburger: "a photo of a hamburger"
+#       cactus: "a small saguaro cactus planted in a clay pot"
+#     repulsion_type: ['svgd', 'rlsd']
+#     kernel_type: ['rbf']
+#     lambda_repulsion:
+#       rlsd_rbf: [500]   # 각자 sweet-spot 중앙값 하나만
+#       svgd_rbf: [250]
+#     rbf_beta: [0.5, 1.0]   # ← 여기만 스팟체크
+#     seed: [42]
+#   fixed_parameters: { ...exp2와 동일... }
+#   settings: { ...exp2와 동일... }
 
-exp2b_beta_spotcheck_cosine:
-  name: exp2b_beta_spotcheck_cosine
-  method: grid
-  sweep_parameters:
-    prompt:
-      hamburger: "a photo of a hamburger"
-      cactus: "a small saguaro cactus planted in a clay pot"
-    repulsion_type: ['rlsd']
-    kernel_type: ['cosine']
-    lambda_repulsion:
-      rlsd_cosine: [900]    # 중앙값 하나
-    cosine_beta: [1.0, 2.0] # 스팟체크
-    seed: [42]
-  fixed_parameters: { ... }
-  settings: { ... }
+# exp2b_beta_spotcheck_cosine:
+#   name: exp2b_beta_spotcheck_cosine
+#   method: grid
+#   sweep_parameters:
+#     prompt:
+#       hamburger: "a photo of a hamburger"
+#       cactus: "a small saguaro cactus planted in a clay pot"
+#     repulsion_type: ['rlsd']
+#     kernel_type: ['cosine']
+#     lambda_repulsion:
+#       rlsd_cosine: [900]    # 중앙값 하나
+#     cosine_beta: [1.0, 2.0] # 스팟체크
+#     seed: [42]
+#   fixed_parameters: { ... }
+#   settings: { ... }
 
-### END SPOTCHECK ###   
+# ### END SPOTCHECK ###   
 
-exp3_beta:
-  name: exp3_beta
+# exp3_beta:
+#   name: exp3_beta
+#   method: grid
+#   sweep_parameters:
+#     prompt: 
+#       hamburger: "a photo of a hamburger" # simple prompt
+#       icecream: "a photo of an ice cream" # complex prompt
+#       cactus: "a small saguaro cactus planted in a clay pot" # complex prompt
+#       tulip: "a photo of a tulip" # simple prompt
+#     repulsion_type: ['rlsd', 'svgd']
+#     kernel_type: ['rbf', 'cosine']
+#     lambda_repulsion: # TODO: λ* from exp2_lambda_fine
+#       rlsd_rbf: 1000
+#       svgd_rbf: 1000
+#       rlsd_cosine: 1000
+#       svgd_cosine: 1000 
+#     seed: [42, 123, 456]
+#     rbf_beta: [0.5, 1.0, 2.0, 4.0] # β for RBF kernel
+#     cosine_beta: [0.1, 0.3, 1.0, 3.0, 10.0] # β for cosine kernel
+    
+#   fixed_parameters:
+    
+#     num_particles: 8
+#     feature_extractor_model_name: "facebook/dinov2-base"
+#     feature_layer: 11
+#     iters: 1500
+#     cosine_eps_shift: 1e-3
+#     use_sigma_weight: True
+#     rep_sigma_power: 0.5
+#     use_cosine_decay: True
+#     rep_cosine_warmup: 0.2
+#     invert_bg_prob: 0.5
+
+#   settings:
+#     # visualize
+#     visualize: True
+#     save_iid: False
+#     visualize_fixed_viewpoint: True
+#     visualize_fixed_viewpoint_interval: 100
+
+#     eval_W: 800
+#     eval_H: 800
+    
+#     # metrics
+#     metrics: True
+#     quantitative_metrics_interval: 50
+#     kernel_metrics_interval: 50
+#     losses_interval: 10
+#     efficiency_interval: 10 
+#     num_views: 8
+#     enable_lpips: False # disable lpips for faster trainings
+
+
+
+
+exp3_scheduler:
+  name: exp3_scheduler
   method: grid
   sweep_parameters:
     prompt: 
-      hamburger: "a photo of a hamburger" # simple prompt
-      icecream: "a photo of an ice cream" # complex prompt
-      cactus: "a small saguaro cactus planted in a clay pot" # complex prompt
-      tulip: "a photo of a tulip" # simple prompt
-    repulsion_type: ['rlsd', 'svgd']
-    kernel_type: ['rbf', 'cosine']
-    lambda_repulsion: # TODO: λ* from exp2_lambda_fine
-      rlsd_rbf: 1000
-      svgd_rbf: 1000
-      rlsd_cosine: 1000
-      svgd_cosine: 1000 
-    seed: [42, 123, 456]
-    rbf_beta: [0.5, 1.0, 2.0, 4.0] # β for RBF kernel
-    cosine_beta: [0.1, 0.3, 1.0, 3.0, 10.0] # β for cosine kernel
+      # hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
+      # rlsd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500]
+      rlsd_rbf: [1000]
+      # rlsd_cosine: [1150]
+      # svgd_rbf: [1150]
+      # svgd_cosine: [1150]
+      # 1300 빼고 해버림..ㅜㅠ
+    seed: [42] # TODO: add more seeds
+    guidance_scale: [20, 50, 100]
+    use_sigma_weight: [True, False]
+    use_cosine_decay: [True, False]
+    gamma_base: [200.0]
     
   fixed_parameters:
-    
+    cosine_decay_floor: 0.3 # floor for cosine decay
+    force_same_t: True
+    num_pts: 5000
     num_particles: 8
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 11
-    iters: 1500
+    cosine_beta: 1.0
     cosine_eps_shift: 1e-3
-    use_sigma_weight: True
-    rep_sigma_power: 0.5
-    use_cosine_decay: True
+    iters: 1500
+    # rep_sigma_power: 0.5
+    rep_sigma_power: 1.0 # not used
     rep_cosine_warmup: 0.2
     invert_bg_prob: 0.5
+    
+    eval_radius:
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
 
   settings:
     # visualize
@@ -467,8 +534,8 @@ exp3_beta:
     visualize_fixed_viewpoint: True
     visualize_fixed_viewpoint_interval: 100
 
-    eval_W: 800
-    eval_H: 800
+    eval_W: 256
+    eval_H: 256
     
     # metrics
     metrics: True
@@ -477,4 +544,4 @@ exp3_beta:
     losses_interval: 10
     efficiency_interval: 10 
     num_views: 8
-    enable_lpips: False # disable lpips for faster trainings
+    enable_lpips: False # disable lpips for faster training

@@ -238,13 +238,11 @@ class StableDiffusion(nn.Module):
         self,
         pred_rgb,
         step_ratio=None,
-        guidance_scale=20,# 100 -> 20
+        guidance_scale=100,
         as_latent=False,
         vers=None, hors=None,
-        use_sigma_weight=False, # γ 사용 여부
-        rep_sigma_power=1.0, # not used
-        gamma_base: float = 200.0, # ★ γ = gamma_base * σ_t
-        force_same_t: bool = True, # 모든 파티클 동일 t
+        use_sigma_weight=False,
+        rep_sigma_power=1.0,
     ):
         
         batch_size = pred_rgb.shape[0]
@@ -261,41 +259,24 @@ class StableDiffusion(nn.Module):
         assert latents.shape[1:] == (4, 64, 64), f"latents.shape: {latents.shape}"
 
         with torch.no_grad():
-            # if step_ratio is not None:
-            #     # dreamtime-like
-            #     # t = self.max_step - (self.max_step - self.min_step) * np.sqrt(step_ratio)
-            #     t = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
-            #     t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
-            # else:
-            #     t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
-            
-            # ===== t 샘플링: 동일 t + (선형) 어닐링 =====
             if step_ratio is not None:
-                t_scalar = np.round((1 - step_ratio) * self.num_train_timesteps)
-                t_scalar = int(np.clip(t_scalar, self.min_step, self.max_step))
-                if force_same_t:
-                    t = torch.full((batch_size,), t_scalar, dtype=torch.long, device=self.device)
-                else:
-                    t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+                # dreamtime-like
+                # t = self.max_step - (self.max_step - self.min_step) * np.sqrt(step_ratio)
+                t = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
+                t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
             else:
-                if force_same_t:
-                    t_scalar = torch.randint(self.min_step, self.max_step + 1, (1,), dtype=torch.long, device=self.device)
-                    t = t_scalar.expand(batch_size)
-                else:
-                    t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+                t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
 
-            # ===== w(t)와 σ_t =====
-            # 안정성을 위해 float32로 계산
-            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1).to(torch.float32)
-            sigma_t = torch.sqrt(w).view(batch_size)  # [N], float32
-
-            # ===== γ = 200 · σ_t  (정규화 없음) =====
+            # w(t), sigma_t^2
+            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
+            
             if use_sigma_weight:
-                w_sigma = (gamma_base * sigma_t).to(torch.float32)  # [N]
+                sigma_t = torch.sqrt(w).view(batch_size)
+                sigma_norm = sigma_t / (sigma_t.mean() + 1e-8)
+                w_sigma = sigma_norm.pow(rep_sigma_power) # gamma
             else:
-                w_sigma = torch.ones(batch_size, device=self.device, dtype=torch.float32)
+                w_sigma = torch.ones(batch_size, device=self.device, dtype=torch.float32) # [N]
 
-            # ===== U-Net 예측 =====
             # predict the noise residual with unet, NO grad!
             # add noise
             noise = torch.randn_like(latents)
@@ -324,11 +305,10 @@ class StableDiffusion(nn.Module):
                 noise_pred_cond - noise_pred_uncond
             )
 
-            grad = (w * (noise_pred - noise)).to(torch.float32)  # [N,4,64,64], float32로 반환
+            grad = w * (noise_pred - noise)
             grad = torch.nan_to_num(grad)
-
    
-        return grad.detach(), latents.to(torch.float32), w_sigma.detach()
+        return grad.detach().to(torch.float32), latents.to(torch.float32), w_sigma.detach().to(torch.float32)
     
     @torch.no_grad()
     def produce_latents(
