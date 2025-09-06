@@ -6,8 +6,8 @@ set -e  # Stop on error
 # -----------------------------
 BASE_DIR=/workspace/3D-Generation   
 VENV_DIR="${BASE_DIR}/venv"
-CUDA_VERSION="12.1"
-CUDA_HOME="/usr/local/cuda-${CUDA_VERSION}"
+# CUDA_VERSION="12.1"
+# CUDA_HOME="/usr/local/cuda-${CUDA_VERSION}"
 
 export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
 
@@ -25,28 +25,28 @@ cd "${BASE_DIR}"
 echo "[Step 2] Locating CUDA toolkit..."
 
 # If a default CUDA_HOME is set and valid, use it; otherwise, try to auto-detect
-if [ -x "${CUDA_HOME}/bin/nvcc" ]; then
-	echo "Using CUDA at ${CUDA_HOME}"
+# if [ -x "${CUDA_HOME}/bin/nvcc" ]; then
+# 	echo "Using CUDA at ${CUDA_HOME}"
+# else
+# Try to find nvcc in PATH first
+if command -v nvcc >/dev/null 2>&1; then
+	NVCC_PATH="$(command -v nvcc)"
+	CUDA_HOME="$(dirname "$(dirname "${NVCC_PATH}")")"
+	export CUDA_HOME
+	echo "Detected CUDA at ${CUDA_HOME}"
 else
-	# Try to find nvcc in PATH first
-	if command -v nvcc >/dev/null 2>&1; then
-		NVCC_PATH="$(command -v nvcc)"
-		CUDA_HOME="$(dirname "$(dirname "${NVCC_PATH}")")"
-		export CUDA_HOME
-		echo "Detected CUDA at ${CUDA_HOME}"
-	else
-		# Probe common installation locations (prefer highest version)
-		CANDIDATES=$(ls -d /usr/local/cuda-*/ 2>/dev/null | sort -V -r; ls -d /usr/local/cuda/ 2>/dev/null || true)
-		for dir in $CANDIDATES; do
-			if [ -x "${dir%/}/bin/nvcc" ]; then
-				CUDA_HOME="${dir%/}"
-				export CUDA_HOME
-				echo "Detected CUDA at ${CUDA_HOME}"
-				break
-			fi
-		done
-	fi
+	# Probe common installation locations (prefer highest version)
+	CANDIDATES=$(ls -d /usr/local/cuda-*/ 2>/dev/null | sort -V -r; ls -d /usr/local/cuda/ 2>/dev/null || true)
+	for dir in $CANDIDATES; do
+		if [ -x "${dir%/}/bin/nvcc" ]; then
+			CUDA_HOME="${dir%/}"
+			export CUDA_HOME
+			echo "Detected CUDA at ${CUDA_HOME}"
+			break
+		fi
+	done
 fi
+# fi
 
 # If still not found, stop with guidance
 if [ ! -x "${CUDA_HOME}/bin/nvcc" ]; then
