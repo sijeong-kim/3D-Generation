@@ -55,18 +55,254 @@ exp0_baseline:
     enable_lpips: False # disable lpips for faster training
 
 
-# Experiment 1: (Repulsion type x kernel type) & lambda sweep
-exp1_repulsion_kernel_lambda:
-  name: exp1_repulsion_kernel_lambda
+# # Experiment 1: (Repulsion type x kernel type) & lambda sweep
+# exp1_repulsion_kernel_lambda:
+#   name: exp1_repulsion_kernel_lambda
+#   method: grid
+#   sweep_parameters:
+#     repulsion_type: ['svgd', 'rlsd']
+#     kernel_type: ['rbf', 'cosine']
+#     lambda_repulsion: # TODO: add more values
+#       svgd_cosine: [600, 800, 1000, 1200, 1400, 1600]
+#       svgd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+#       rlsd_cosine: [600, 800, 1000, 1200, 1400, 1600]
+#       rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+#     prompt: 
+#       # hamburger: "a photo of a hamburger"
+#       icecream: "a photo of an ice cream"
+#       cactus: "a small saguaro cactus planted in a clay pot"
+#       # tulip: "a photo of a tulip"
+
+#   # fixed parameters
+#   fixed_parameters:
+#     seed: 42
+#     num_particles: 8
+#     force_same_t: True
+#     anneal_timestep: True
+
+#     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+#     rbf_beta: 1.0
+#     cosine_beta: 1.0
+#     cosine_eps_shift: 1e-3
+
+#     use_cosine_decay: False
+#     # rep_cosine_warmup: 0.2
+    
+#     iters: 1500
+#     invert_bg_prob: 0.5
+
+#     eval_radius: # not to crop the object adjust the radius
+#       # hamburger: 3.0
+#       icecream: 4.0
+#       cactus: 4.0
+#       # tulip: 4.0
+
+#   settings:
+#     # visualize
+#     visualize: True
+#     save_iid: False
+#     visualize_fixed_viewpoint: True
+#     visualize_fixed_viewpoint_interval: 100
+
+#     # metrics
+#     metrics: True
+#     quantitative_metrics_interval: 50
+#     num_views: 8
+
+#     # options
+#     kernel_metrics_interval: 50
+#     losses_interval: 10
+#     efficiency_interval: 10 
+#     enable_lpips: False # disable lpips for faster training
+
+
+# Experiment 1a: (Repulsion type x kernel type) & lambda sweep - rlsd rbf
+exp1a_repulsion_kernel_lambda_rlsd_rbf:
+  name: exp1a_repulsion_kernel_lambda
   method: grid
   sweep_parameters:
-    repulsion_type: ['svgd', 'rlsd']
-    kernel_type: ['rbf', 'cosine']
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: add more values
+      rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+    
+    iters: 1500
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      # hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      # tulip: 4.0
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+
+
+# Experiment 1b: (Repulsion type x kernel type) & lambda sweep - rlsd cosine
+exp1b_repulsion_kernel_lambda_rlsd_cosine:
+  name: exp1b_repulsion_kernel_lambda_rlsd_cosine
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['rlsd']
+    kernel_type: ['cosine']
+    lambda_repulsion: # TODO: add more values
+      rlsd_cosine: [600, 800, 1000, 1200, 1400, 1600]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+    
+    iters: 1500
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      # hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      # tulip: 4.0
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+
+# Experiment 1c: (Repulsion type x kernel type) & lambda sweep - svgd rbf
+exp1c_repulsion_kernel_lambda_svgd_rbf:
+  name: exp1c_repulsion_kernel_lambda_svgd_rbf
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: add more values
+      svgd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+    
+    iters: 1500
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      # hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      # tulip: 4.0
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+# Experiment 1d: (Repulsion type x kernel type) & lambda sweep - svgd cosine
+exp1d_repulsion_kernel_lambda_svgd_cosine:
+  name: exp1d_repulsion_kernel_lambda_svgd_cosine
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['svgd']
+    kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values
       svgd_cosine: [600, 800, 1000, 1200, 1400, 1600]
-      svgd_rbf: [600, 800, 1000, 1200, 1400, 1600]
-      rlsd_cosine: [600, 800, 1000, 1200, 1400, 1600]
-      rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
