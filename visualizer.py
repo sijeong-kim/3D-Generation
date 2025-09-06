@@ -26,6 +26,13 @@ class GaussianVisualizer:
         self.eval_radius = getattr(self.opt, 'eval_radius', self.cam.radius) # TODO: remove this
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
+        # Grid layout parameters
+        self.grid_rows = 2  # Default to 2 rows
+        self.grid_cols = 4  # Default to 4 columns
+        
+        # Auto-adjust grid layout based on number of particles
+        self.auto_adjust_grid = True
+        
         
         ### Pre-compute camera positions for efficient rendering
         if self.opt.visualize_multi_viewpoints or self.opt.metrics:
@@ -72,6 +79,76 @@ class GaussianVisualizer:
             os.makedirs(self.fixed_viewpoint_dir, exist_ok=True)
         else:
             self.fixed_viewpoint_dir = None
+    
+    def arrange_particles_in_grid(self, particle_images):
+        """
+        Arrange particle images in a grid layout (2x4 by default, auto-adjusts for different numbers).
+        
+        Args:
+            particle_images: List of tensors [N, 3, H, W] where N is number of particles
+            
+        Returns:
+            Grid tensor [3, grid_rows*H, grid_cols*W]
+        """
+        if not particle_images:
+            return None
+            
+        num_particles = len(particle_images)
+        if num_particles == 0:
+            return None
+            
+        # Get image dimensions from first particle
+        _, channels, height, width = particle_images[0].shape
+        
+        # Calculate grid dimensions
+        if self.auto_adjust_grid:
+            # Auto-adjust grid to be as square as possible
+            if num_particles <= 4:
+                grid_rows = 2
+                grid_cols = 2
+            elif num_particles <= 6:
+                grid_rows = 2
+                grid_cols = 3
+            elif num_particles <= 8:
+                grid_rows = 2
+                grid_cols = 4
+            elif num_particles <= 9:
+                grid_rows = 3
+                grid_cols = 3
+            elif num_particles <= 12:
+                grid_rows = 3
+                grid_cols = 4
+            else:
+                # For more than 12 particles, use a reasonable default
+                grid_rows = 3
+                grid_cols = 4
+        else:
+            # Use fixed grid dimensions
+            grid_rows = min(self.grid_rows, num_particles)
+            grid_cols = min(self.grid_cols, (num_particles + grid_rows - 1) // grid_rows)
+        
+        # Create grid tensor
+        grid_height = grid_rows * height
+        grid_width = grid_cols * width
+        grid_tensor = torch.zeros(channels, grid_height, grid_width, device=particle_images[0].device)
+        
+        # Place each particle in the grid
+        for i, particle_img in enumerate(particle_images):
+            if i >= grid_rows * grid_cols:
+                break
+                
+            row = i // grid_cols
+            col = i % grid_cols
+            
+            start_h = row * height
+            end_h = start_h + height
+            start_w = col * width
+            end_w = start_w + width
+            
+            # Place the particle image in the grid
+            grid_tensor[:, start_h:end_h, start_w:end_w] = particle_img[0]  # Remove batch dimension
+        
+        return grid_tensor
     
     # Set viewpoints around object
     @torch.no_grad()
@@ -183,14 +260,17 @@ class GaussianVisualizer:
                     output_path = os.path.join(save_iid_paths[particle_id], f'view_{i:03d}.png')
                     vutils.save_image(image, output_path, normalize=False)
             
-            # Combine all particle images for current viewpoint
-            particle_images = torch.cat(particle_images, dim=0)  # [N, 3, H, W]
-            multi_viewpoint_images.append(particle_images)
+            # Combine all particle images for current viewpoint using grid layout
+            particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for metrics
+            multi_viewpoint_images.append(particle_images_tensor)
+            
+            # Create grid layout for visualization
+            grid_image = self.arrange_particles_in_grid(particle_images)
             
             # 📥 Save combined view of all particles if multiple particles exist
             if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and multi_viewpoints_dir is not None:
                 output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
-                vutils.save_image(particle_images, output_path, normalize=False)
+                vutils.save_image(grid_image, output_path, normalize=False)
         
         # Stack all viewpoints into final tensor
         multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0)  # [V, N, 3, H, W]
@@ -221,14 +301,15 @@ class GaussianVisualizer:
                 output_path = os.path.join(viewpoint_dir, filename)
                 vutils.save_image(image, output_path, normalize=False)
                 
-        # Combine all particle images
-        particle_images = torch.cat(particle_images, dim=0)  # [N, 3, H, W]
+        # Combine all particle images using grid layout
+        particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for return
+        grid_image = self.arrange_particles_in_grid(particle_images)
         
         # Save combined view of all particles if visualization is enabled
         if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
             filename = f'all_particles.png'
             output_path = os.path.join(viewpoint_dir, filename)
-            vutils.save_image(particle_images, output_path, normalize=False)
+            vutils.save_image(grid_image, output_path, normalize=False)
         
-        return particle_images
+        return particle_images_tensor
     
