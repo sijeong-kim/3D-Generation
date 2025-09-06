@@ -500,8 +500,8 @@ exp3_cfg:
       # svgd_rbf: [1150]
       # svgd_cosine: [1150]
       # 1300 빼고 해버림..ㅜㅠ
+    guidance_scale: [20, 30, 40, 50, 100]
     seed: [42] # TODO: add more seeds
-    guidance_scale: [20, 50, 100]
     
   fixed_parameters:
     force_same_t: True
@@ -516,7 +516,8 @@ exp3_cfg:
     iters: 1500
     # rep_sigma_power: 0.5
     # rep_sigma_power: 1.0 # not used
-    # rep_cosine_warmup: 0.2
+    use_cosine_decay: False
+    rep_cosine_warmup: 0.2
     invert_bg_prob: 0.5
     
     eval_radius:
@@ -543,8 +544,6 @@ exp3_cfg:
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
-
-
 
 exp3_num_pts:
   name: exp3_num_pts
@@ -565,23 +564,27 @@ exp3_num_pts:
       # svgd_cosine: [1150]
       # 1300 빼고 해버림..ㅜㅠ
     seed: [42] # TODO: add more seeds
+    num_pts: [1000, 2000, 3000, 4000, 5000]
     
     
   fixed_parameters:
     guidance_scale: 20
     force_same_t: True
     anneal_timestep: True
-    num_pts: 5000
+
+    use_cosine_decay: False
+    rep_cosine_warmup: 0.0
+    cosine_decay_floor: 0.3 # floor for cosine decay
+    
+    iters: 2000
+
+    # num_pts: 5000
     num_particles: 8
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 11
     cosine_beta: 1.0
     rbf_beta: 1.0
-    # cosine_eps_shift: 1e-3
-    iters: 1500
-    # rep_sigma_power: 0.5
-    # rep_sigma_power: 1.0 # not used
-    # rep_cosine_warmup: 0.2
+
     invert_bg_prob: 0.5
     
     eval_radius:
@@ -608,3 +611,6 @@ exp3_num_pts:
     efficiency_interval: 10 
     num_views: 8
     enable_lpips: False # disable lpips for faster training
+
+
+

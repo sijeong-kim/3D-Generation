@@ -11,17 +11,21 @@ kernel_type: "rbf" # "rbf" or "cosine"
 rbf_beta: 1.0 # beta for rbf kernel
 cosine_beta: 1.0 # beta for cosine kernel
 cosine_eps_shift: 1e-3 # eps shift for cosine kernel
-# guidance_scale: 20 # should be lower like 20
-# gamma_base: 200.0 # ★ γ = gamma_base * σ_t
+
+# guidance
+guidance_scale: 20 # should be lower like 20
 force_same_t: True # 모든 파티클 동일 t
 
+
+# cosine decay
+use_cosine_decay: False # use cosine decay for sigma_t
+rep_cosine_warmup: 0.0 # 0.0: no warmup, 0.1: warmup
+cosine_decay_floor: 0.3 # floor for cosine decay
 
 # sigma_t
 # use_sigma_weight: False
 # rep_sigma_power: 0.5 # 0.5: sqrt, 1.0: linear, 2.0: square
-# use_cosine_decay: False # use cosine decay for sigma_t
-# rep_cosine_warmup: 0.0 # 0.0: no warmup, 0.1: warmup
-# cosine_decay_floor: 0.3 # floor for cosine decay
+# gamma_base: 200.0 # ★ γ = gamma_base * σ_t
 
 # visualize
 visualize: True

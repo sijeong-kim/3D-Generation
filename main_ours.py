@@ -382,14 +382,12 @@ class GUI:
             attraction_loss = attraction_loss_per_particle.mean() # [N] -> [1]
             
             
-            # # Cosine decay for repulsion weight
-            # if self.opt.use_cosine_decay:
-            #     s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
-            #     w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
-                
-            #     w_cos = torch.clamp(w_cos, min=self.opt.cosine_decay_floor)
-            # else:
-            #     w_cos = 1.0
+            w_cos = 1.0
+            # Cosine decay for repulsion weight
+            if self.opt.use_cosine_decay:
+                s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
+                w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
+                w_cos = torch.clamp(w_cos, min=self.opt.cosine_decay_floor)
                 
             # w_rep = w_sigma * w_cos
                 
@@ -397,7 +395,8 @@ class GUI:
             # repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
             # repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
-            repulsion_loss = repulsion_loss_per_particle.mean() # [N] -> [1]
+            # repulsion_loss = repulsion_loss_per_particle.mean() # [N] -> [1]
+            repulsion_loss = (w_cos * repulsion_loss_per_particle).mean() # [N] -> [1]
             
             
         
