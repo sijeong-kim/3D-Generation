@@ -310,12 +310,14 @@ class GUI:
         
         self.seed_everything(self.seed + self.step)
         # 2.1. Get gradients and latents from SD (latent space) and repulsion weight
-        score_gradients, latents, w_sigma = self.guidance_sd.train_step_gradient(
+        # score_gradients, latents, w_sigma = self.guidance_sd.train_step_gradient(
+
+        score_gradients, latents = self.guidance_sd.train_step_gradient(
             images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-            use_sigma_weight=self.opt.use_sigma_weight,
-            rep_sigma_power=self.opt.rep_sigma_power,
+            # use_sigma_weight=self.opt.use_sigma_weight,
+            # rep_sigma_power=self.opt.rep_sigma_power,
             guidance_scale=self.opt.guidance_scale,
-            gamma_base=self.opt.gamma_base,
+            # gamma_base=self.opt.gamma_base,
             force_same_t=self.opt.force_same_t,
         )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64], w_sigma: [N]
 
@@ -380,21 +382,23 @@ class GUI:
             attraction_loss = attraction_loss_per_particle.mean() # [N] -> [1]
             
             
-            # Cosine decay for repulsion weight
-            if self.opt.use_cosine_decay:
-                s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
-                w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
+            # # Cosine decay for repulsion weight
+            # if self.opt.use_cosine_decay:
+            #     s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
+            #     w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
                 
-                w_cos = torch.clamp(w_cos, min=self.opt.cosine_decay_floor)
-            else:
-                w_cos = 1.0
+            #     w_cos = torch.clamp(w_cos, min=self.opt.cosine_decay_floor)
+            # else:
+            #     w_cos = 1.0
                 
-            w_rep = w_sigma * w_cos
+            # w_rep = w_sigma * w_cos
                 
             # 6. Repulsion loss
             # repulsion_loss = (kernel_grad * features).sum(dim=1).mean() # [N, D_feature] * [N, D_feature] -> [N] -> [1]
             repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
-            repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
+            # repulsion_loss = (w_rep * repulsion_loss_per_particle).mean() # [N] -> [1]
+            repulsion_loss = repulsion_loss_per_particle.mean() # [N] -> [1]
+            
             
         
         # 7. Scale losses

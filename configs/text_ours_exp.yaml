@@ -482,8 +482,8 @@ exp2_lambda_fine_rlsd_rbf:
 
 
 
-exp3_scheduler:
-  name: exp3_scheduler
+exp3_cfg:
+  name: exp3_cfg
   method: grid
   sweep_parameters:
     prompt: 
@@ -502,23 +502,86 @@ exp3_scheduler:
       # 1300 빼고 해버림..ㅜㅠ
     seed: [42] # TODO: add more seeds
     guidance_scale: [20, 50, 100]
-    use_sigma_weight: [True, False]
-    use_cosine_decay: [True, False]
-    gamma_base: [200.0]
     
   fixed_parameters:
-    cosine_decay_floor: 0.3 # floor for cosine decay
     force_same_t: True
+    anneal_timestep: True
     num_pts: 5000
     num_particles: 8
     feature_extractor_model_name: "facebook/dinov2-base"
     feature_layer: 11
     cosine_beta: 1.0
-    cosine_eps_shift: 1e-3
+    rbf_beta: 1.0
+    # cosine_eps_shift: 1e-3
     iters: 1500
     # rep_sigma_power: 0.5
-    rep_sigma_power: 1.0 # not used
-    rep_cosine_warmup: 0.2
+    # rep_sigma_power: 1.0 # not used
+    # rep_cosine_warmup: 0.2
+    invert_bg_prob: 0.5
+    
+    eval_radius:
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    eval_W: 256
+    eval_H: 256
+    
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    num_views: 8
+    enable_lpips: False # disable lpips for faster training
+
+
+
+exp3_num_pts:
+  name: exp3_num_pts
+  method: grid
+  sweep_parameters:
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+    lambda_repulsion: # TODO: add more values # ±(×/÷)1.5–2 배
+      # rlsd_rbf: [500, 600, 700, 800, 900, 1000, 1100, 1200, 1400, 1500]
+      rlsd_rbf: [1000]
+      # rlsd_cosine: [1150]
+      # svgd_rbf: [1150]
+      # svgd_cosine: [1150]
+      # 1300 빼고 해버림..ㅜㅠ
+    seed: [42] # TODO: add more seeds
+    
+    
+  fixed_parameters:
+    guidance_scale: 20
+    force_same_t: True
+    anneal_timestep: True
+    num_pts: 5000
+    num_particles: 8
+    feature_extractor_model_name: "facebook/dinov2-base"
+    feature_layer: 11
+    cosine_beta: 1.0
+    rbf_beta: 1.0
+    # cosine_eps_shift: 1e-3
+    iters: 1500
+    # rep_sigma_power: 0.5
+    # rep_sigma_power: 1.0 # not used
+    # rep_cosine_warmup: 0.2
     invert_bg_prob: 0.5
     
     eval_radius:
