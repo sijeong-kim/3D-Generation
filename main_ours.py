@@ -217,11 +217,11 @@ class GUI:
             if isinstance(fl, str):
                 fl = fl.lower()
                 if fl == 'early':
-                    self.opt.feature_layer = max(0, int(0.25 * n_layers) - 1)
+                    self.opt.feature_layer = max(0, int(0.25 * n_layers) - 1) # 12 / 4 - 1 = 2 -> 2
                 elif fl == 'mid':
-                    self.opt.feature_layer = max(0, int(0.50 * n_layers) - 1)
-                elif fl in ['last', 'final']:
-                    self.opt.feature_layer = n_layers - 1
+                    self.opt.feature_layer = max(0, int(0.50 * n_layers) - 1) # 12 / 2 - 1 = 5 -> 5
+                elif fl in ['last', 'final', 'late']:
+                    self.opt.feature_layer = n_layers - 1 # 12 - 1 = 11 -> 11
                 else:
                     raise ValueError(f"Unknown feature_layer '{self.opt.feature_layer}' — use early|mid|last or an integer")
                 
