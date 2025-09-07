@@ -314,8 +314,8 @@ class GUI:
 
         score_gradients, latents = self.guidance_sd.train_step_gradient(
             images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-            # use_sigma_weight=self.opt.use_sigma_weight,
-            # rep_sigma_power=self.opt.rep_sigma_power,
+            use_sigma_weight=self.opt.use_sigma_weight,
+            rep_sigma_power=self.opt.rep_sigma_power,
             guidance_scale=self.opt.guidance_scale,
             # gamma_base=self.opt.gamma_base,
             force_same_t=self.opt.force_same_t,

@@ -23,8 +23,8 @@ rep_cosine_warmup: 0.0 # 0.0: no warmup, 0.1: warmup
 cosine_decay_floor: 0.3 # floor for cosine decay
 
 # sigma_t
-# use_sigma_weight: False
-# rep_sigma_power: 0.5 # 0.5: sqrt, 1.0: linear, 2.0: square
+use_sigma_weight: False
+rep_sigma_power: 0.5 # 0.5: sqrt, 1.0: linear, 2.0: square
 # gamma_base: 200.0 # ★ γ = gamma_base * σ_t
 
 # visualize

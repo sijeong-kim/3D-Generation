@@ -241,8 +241,8 @@ class StableDiffusion(nn.Module):
         guidance_scale=20,# 100 -> 20
         as_latent=False,
         vers=None, hors=None,
-        # use_sigma_weight=False, # γ 사용 여부
-        # rep_sigma_power=1.0, # not used
+        use_sigma_weight=False, # γ 사용 여부
+        rep_sigma_power=0.5, # not used
         # gamma_base: float = 200.0, # ★ γ = gamma_base * σ_t
         force_same_t: bool = True, # 모든 파티클 동일 t
     ):
@@ -289,11 +289,13 @@ class StableDiffusion(nn.Module):
             w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1).to(torch.float32)
             sigma_t = torch.sqrt(w).view(batch_size)  # [N], float32
 
-            # ===== γ = 200 · σ_t  (정규화 없음) ===== # it make things too strong.
-            # if use_sigma_weight:
-            #     w_sigma = (gamma_base * sigma_t).to(torch.float32)  # [N]
-            # else:
-            #     w_sigma = torch.ones(batch_size, device=self.device, dtype=torch.float32)
+            if use_sigma_weight:
+                sigma_t = torch.sqrt(w).view(batch_size)
+                sigma_norm = sigma_t / (sigma_t.mean() + 1e-8)
+                w_sigma = sigma_norm.pow(rep_sigma_power) # gamma
+                w_sigma = w_sigma.to(torch.float32)  # [N]
+            else:
+                w_sigma = torch.ones(batch_size, device=self.device, dtype=torch.float32)
 
             # ===== U-Net 예측 =====
             # predict the noise residual with unet, NO grad!
@@ -329,7 +331,7 @@ class StableDiffusion(nn.Module):
 
    
         # return grad.detach(), latents.to(torch.float32), w_sigma.detach()
-        return grad.detach(), latents.to(torch.float32)
+        return grad.detach(), latents.to(torch.float32), w_sigma.detach()
     
     @torch.no_grad()
     def produce_latents(
