@@ -67,7 +67,7 @@ def download_dino_models():
     try:
         import timm
         print("  Downloading DINO via timm...")
-        model = timm.create_model("vit_base_patch16_224_dino", pretrained=True)
+        model = timm.create_model("vit_base_patch16_224.dino", pretrained=True)
         print("    ✅ DINO (timm) downloaded")
     except Exception as e:
         print(f"    ❌ Failed to download DINO via timm: {e}")

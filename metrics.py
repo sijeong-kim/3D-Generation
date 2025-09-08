@@ -177,7 +177,7 @@ class MetricsModel:
         try:
             import timm  # type: ignore
 
-            self.dino_model = timm.create_model("vit_base_patch16_224_dino", pretrained=True)
+            self.dino_model = timm.create_model("vit_base_patch16_224.dino", pretrained=True)
             self.dino_model.to(self.device).eval()
             if _HAS_TORCHVISION:
                 cfg = getattr(timm.data, "resolve_data_config")({}, model=self.dino_model)

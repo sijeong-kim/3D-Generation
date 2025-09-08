@@ -304,7 +304,14 @@ class GUI:
             images.append(image)
             
             # Store output for each particle
-            outputs.append(out)
+            # 필요한 키만 저장
+            outputs.append({
+                "viewspace_points": out["viewspace_points"],
+                "visibility_filter": out["visibility_filter"],
+                "radii": out["radii"],
+            })
+            # out["image"]는 images에 복사됐으니 out 전체는 버림
+            del out
         
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         
