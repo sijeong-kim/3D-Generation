@@ -8,300 +8,364 @@ import torchvision.utils as vutils
 import matplotlib.pyplot as plt
 
 class GaussianVisualizer:
+    
     def __init__(self, opt=None, renderers=None, cam=None, debug=False):
-        # Validate opt parameter
+
+        # Validate required parameters
         if opt is None:
-            raise ValueError("opt parameter cannot be None")
+            raise ValueError("Configuration object 'opt' cannot be None")
         self.opt = opt
         
-        if self.opt.visualize:
-            self.save_dir = os.path.join(self.opt.outdir, 'visualizations')
-            os.makedirs(self.save_dir, exist_ok=True)
-            
-        self.renderers = renderers
-        # Handle both single camera and list of cameras for backward compatibility
+        # Create copies of renderers for visualization to avoid affecting training
+        self.renderers = []
+        for renderer in renderers:
+            # Create a deep copy of the renderer for visualization
+            import copy
+            renderer_copy = copy.deepcopy(renderer)
+            self.renderers.append(renderer_copy)
+        
         self.cam = cam
         
-        self.device = torch.device("cuda")
+        # Evaluation parameters
+        self.eval_W = getattr(self.opt, 'eval_W', self.opt.W) 
+        self.eval_H = getattr(self.opt, 'eval_H', self.opt.H)
+        self.eval_radius = getattr(self.opt, 'eval_radius', self.cam.radius) # TODO: remove this
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # viewpoints for multi-viewpoints
-        self.multi_viewpoints = self.set_viewpoints(opt.num_views)
+        # Grid layout parameters
+        self.grid_rows = 2  # Default to 2 rows
+        self.grid_cols = 4  # Default to 4 columns
+        
+        # Auto-adjust grid layout based on number of particles
+        self.auto_adjust_grid = True
+        
+        
+        ### Pre-compute camera positions for efficient rendering
+        if self.opt.visualize_multi_viewpoints or self.opt.metrics:
+            self.multi_viewpoints_cameras = self.get_multi_view_cameras(self.opt.num_views)
+        else:
+            self.multi_viewpoints_cameras = None
+            
+        if self.opt.visualize_fixed_viewpoint:
+            self.fixed_viewpoint_camera = self.get_front_view_camera()
+        else:
+            self.fixed_viewpoint_camera = None
+        
+        
+        ### Initialize visualization directories
+        # Initialize visualization directory for all images
+        self.save_dir = os.path.join(self.opt.outdir, 'visualizations')
+        if self.opt.visualize:
+            os.makedirs(self.save_dir, exist_ok=True)
+            
+        # Initialize visualization directory for rendered images
+        if self.opt.save_rendered_images:
+            self.rendered_images_dir = os.path.join(self.save_dir, "rendered_images")
+            os.makedirs(self.rendered_images_dir, exist_ok=True)
+        else:
+            self.rendered_images_dir = None
+            
+        # Initialize visualization directory for multi-viewpoints
+        if self.opt.visualize_multi_viewpoints:
+            self.multi_viewpoints_dir = os.path.join(self.save_dir, "multi_viewpoints")
+            os.makedirs(self.multi_viewpoints_dir, exist_ok=True)
+        else:
+            self.multi_viewpoints_dir = None
+        
+        # Initialize visualization directory for iid images
+        if self.opt.save_iid:
+            self.iid_dir = os.path.join(self.save_dir, "iid")
+            os.makedirs(self.iid_dir, exist_ok=True)
+        else:
+            self.iid_dir = None
+            
+        # Initialize visualization directory for fixed viewpoint
+        if self.opt.visualize_fixed_viewpoint:
+            self.fixed_viewpoint_dir = os.path.join(self.save_dir, "fixed_viewpoint")
+            os.makedirs(self.fixed_viewpoint_dir, exist_ok=True)
+        else:
+            self.fixed_viewpoint_dir = None
+    
+    def update_renderers(self, training_renderers):
+        """
+        Update visualizer's renderers with the latest training state.
+        This ensures visualization shows the current training progress.
+        Properly discards old copies to prevent memory leaks.
+        """
+        import copy
+        import gc
+        
+        # Explicitly delete old renderers to free memory
+        if hasattr(self, 'renderers') and self.renderers:
+            for old_renderer in self.renderers:
+                del old_renderer
+            del self.renderers
+        
+        # Force garbage collection
+        gc.collect()
+        
+        # Create new copies
+        self.renderers = []
+        for renderer in training_renderers:
+            renderer_copy = copy.deepcopy(renderer)
+            self.renderers.append(renderer_copy)
+    
+    def cleanup_renderers(self):
+        """
+        Explicitly clean up visualizer renderers to free memory.
+        Call this after visualization is complete.
+        """
+        import gc
+        
+        if hasattr(self, 'renderers') and self.renderers:
+            for renderer in self.renderers:
+                del renderer
+            del self.renderers
+            self.renderers = []
+        
+        # Force garbage collection
+        gc.collect()
     
     @torch.no_grad()
+    def arrange_particles_in_grid(self, particle_images):
+        """
+        Arrange particle images in a grid layout (2x4 by default, auto-adjusts for different numbers).
+        
+        Args:
+            particle_images: List of tensors [N, 3, H, W] where N is number of particles
+            
+        Returns:
+            Grid tensor [3, grid_rows*H, grid_cols*W]
+        """
+        if not particle_images:
+            return None
+            
+        num_particles = len(particle_images)
+        if num_particles == 0:
+            return None
+            
+        # Get image dimensions from first particle
+        _, channels, height, width = particle_images[0].shape
+        
+        # Calculate grid dimensions
+        if self.auto_adjust_grid:
+            # Auto-adjust grid to be as square as possible
+            if num_particles <= 4:
+                grid_rows = 2
+                grid_cols = 2
+            elif num_particles <= 6:
+                grid_rows = 2
+                grid_cols = 3
+            elif num_particles <= 8:
+                grid_rows = 2
+                grid_cols = 4
+            elif num_particles <= 9:
+                grid_rows = 3
+                grid_cols = 3
+            elif num_particles <= 12:
+                grid_rows = 3
+                grid_cols = 4
+            else:
+                # For more than 12 particles, use a reasonable default
+                grid_rows = 3
+                grid_cols = 4
+        else:
+            # Use fixed grid dimensions
+            grid_rows = min(self.grid_rows, num_particles)
+            grid_cols = min(self.grid_cols, (num_particles + grid_rows - 1) // grid_rows)
+        
+        # Create grid tensor
+        grid_height = grid_rows * height
+        grid_width = grid_cols * width
+        grid_tensor = torch.zeros(channels, grid_height, grid_width, device=particle_images[0].device)
+        
+        # Place each particle in the grid
+        for i, particle_img in enumerate(particle_images):
+            if i >= grid_rows * grid_cols:
+                break
+                
+            row = i // grid_cols
+            col = i % grid_cols
+            
+            start_h = row * height
+            end_h = start_h + height
+            start_w = col * width
+            end_w = start_w + width
+            
+            # Place the particle image in the grid
+            grid_tensor[:, start_h:end_h, start_w:end_w] = particle_img[0]  # Remove batch dimension
+        
+        return grid_tensor
+    
+    # Set viewpoints around object
+    @torch.no_grad()
     def set_viewpoints(self, num_views=8):
-        vers = [0.0] * num_views
-        hors = np.linspace(0, 360, num_views)
-        return [(vers[i], hors[i]) for i in range(num_views)]
+        elevations = [0.0] * num_views  # All viewpoints at zero elevation
+        azimuths = np.linspace(0, 360, num_views, endpoint=False)  # Evenly distributed azimuth angles
+        return [(elevations[i], azimuths[i]) for i in range(num_views)]
 
+    # Save rendered images
     @torch.no_grad()
     def save_rendered_images(self, step, images):
-        # Create output directories for rendered images and visualizations
-        if not os.path.exists(os.path.join(self.save_dir, 'rendered_images')):
-            os.makedirs(os.path.join(self.save_dir, 'rendered_images'), exist_ok=True)
+        """
+        Save rendered images for visualization only. This method does NOT affect training.
+        """
+        if self.rendered_images_dir is not None:
+            output_path = os.path.join(self.rendered_images_dir, f'step_{step}.png')
+            # Ensure images are in [0,1] range before saving
+            vutils.save_image(images, output_path, normalize=False)
         
-        vutils.save_image(
-            images,
-            os.path.join(self.save_dir, 'rendered_images', f'step_{step}.png'),
-            normalize=False
-        )
-
-    # TODO: refactor this function to include legend and labels
+        
+    # Set specific viewpoint camera
     @torch.no_grad()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize=None, save_iid=None): # [V, N, 3, H, W]
+    def get_fixed_view_camera(self, elevation, horizontal, radius):
         """
-        Render images from specific viewpoints.
-        
-        Args:
-            step: Current training step
-            num_views: Number of viewpoints to render
-            save_iid: Whether to save individual particle images
-        
-        Returns:
-            multi_viewpoint_images: [V, N, 3, H, W]
+        Compute camera pose for specified angles
         """
-        # Create multi-viewpoints surrounding the object horizontally
-        if num_views is None:
-            num_views = self.opt.num_views # for evaluation use default number of view points
-        multi_viewpoints = self.set_viewpoints(num_views) # for visualization, customizable number of view points
+        pose = orbit_camera(elevation, horizontal, radius)
         
-        if save_iid is None:
-            save_iid = self.opt.save_iid
-            
-        if visualize is None:
-            visualize = self.opt.visualize
-            
-        # Create output directory
-        if visualize:
-            if self.opt.num_particles > 1:
-                multi_viewpoints_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_all_particles')
-                os.makedirs(multi_viewpoints_dir, exist_ok=True)
-            
-            if save_iid:
-                save_paths = []
-                for particle_id in range(self.opt.num_particles):
-                    path = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_particle_{particle_id}')
-                    os.makedirs(path, exist_ok=True)
-                    save_paths.append(path)
-        
-        # Render images from each viewpoint
-        multi_viewpoint_images = []
-        for i, (ver, hor) in enumerate(multi_viewpoints):
-            
-            # Get camera pose using orbit_camera function
-            pose = orbit_camera(ver, hor, self.cam.radius)
-            
-            # Create MiniCam with current camera state
-            camera = MiniCam(
-                pose,
-                self.opt.W,
-                self.opt.H,
-                self.cam.fovy,
-                self.cam.fovx,
-                self.cam.near,
-                self.cam.far
-            )
-            
-            # Render each particle from this viewpoint
-            particle_images = []
-            for particle_id in range(self.opt.num_particles):
-
-                # Render with white background
-                bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
-                out = self.renderers[particle_id].render(camera, bg_color=bg_color)
-                image = out["image"].unsqueeze(0)  # [1, 3, H, W]
-                particle_images.append(image)
-                
-                # Save individual particle images
-                # TODO: refactor this to include legend and labels
-                if visualize and save_iid:
-                    vutils.save_image(
-                        image,
-                        os.path.join(save_paths[particle_id], f'view_{i:03d}.png'),  # Use 3-digit padding for proper ordering
-                        normalize=False
-                    )
-            
-            # save all particles images in one image in parallel
-            particle_images = torch.cat(particle_images, dim=0) # [N, 3, H, W]            
-            multi_viewpoint_images.append(particle_images) # [V, N, 3, H, W]
-            
-            # Save combined image of all particles
-            # TODO: refactor this to include legend and labels
-            if visualize and self.opt.num_particles > 1:
-                vutils.save_image(
-                    particle_images, # [N, 3, H, W]
-                        os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png'),
-                        normalize=False
-                    )
-        
-        multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0) # [V, N, 3, H, W]
-        
-        return multi_viewpoint_images
-
-    @torch.no_grad()
-    def visualize_fixed_viewpoint(self, step, elevation, horizontal):
-        """
-        Render images from a custom viewpoint with specific angles.
-        
-        Args:
-            step: Current training step
-            elevation: Vertical angle in degrees (-90 to 90, where 90 is top, -90 is bottom)
-            horizontal: Horizontal angle in degrees (0 to 360, where 0 is front, 90 is right)
-        """
-        
-        # Create output directory
-        if self.opt.visualize:
-            viewpoint_dir = os.path.join(self.save_dir, f'step_{step}_view_{elevation}_{horizontal}')
-            os.makedirs(viewpoint_dir, exist_ok=True)
-        
-        # Get camera pose
-        pose = orbit_camera(elevation, horizontal, self.cam.radius)
-        
-        # Create camera
+        # Create camera object with computed pose
         camera = MiniCam(
             pose,
-            self.opt.W,
-            self.opt.H,
+            self.eval_W,
+            self.eval_H,
             self.cam.fovy,
             self.cam.fovx,
             self.cam.near,
             self.cam.far
         )
-        # Render each particle from this viewpoint
-        particle_images = []
-        for particle_id in range(self.opt.num_particles):
-            
-            # Render with white background
-            bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
-            out = self.renderers[particle_id].render(camera, bg_color=bg_color)
-            image = out["image"].unsqueeze(0)  # [1, 3, H, W]
-            particle_images.append(image)
-        
-            # Save individual particle images
-            if self.opt.visualize:
-                filename = f'particle_{particle_id}.png'
-                vutils.save_image(
-                    image,
-                    os.path.join(viewpoint_dir, filename),
-                    normalize=False
-                )
-                
-        particle_images = torch.cat(particle_images, dim=0) # [N, 3, H, W]
-        
-        # Save combined image of all particles
-        if self.opt.visualize:
-            filename = f'all_particles.png'
-            vutils.save_image(
-                particle_images,
-                os.path.join(viewpoint_dir, filename),
-                normalize=False
-            )
-        
-        return particle_images
+        return camera
+    
+    # Set front view camera
+    @torch.no_grad()
+    def get_front_view_camera(self):
+        """
+        Generate a camera viewpoint for front view rendering.
+        """
+        return self.get_fixed_view_camera(0.0, 0.0, self.eval_radius)
+
+    # Set multi-viewpoints around object
+    @torch.no_grad()
+    def set_multi_viewpoints_around_object(self, num_views=8):
+        elevations = [0.0] * num_views  # All viewpoints at zero elevation
+        azimuths = np.linspace(0, 360, num_views, endpoint=False)  # Evenly distributed azimuth angles
+        return [(elevations[i], azimuths[i]) for i in range(num_views)]
     
     @torch.no_grad()
-    def _debug_rendering_configurations(self, step):
-        """Test different rendering configurations to help debug visibility issues"""
-        
-        
-        print(f"[DEBUG] Starting visualization for step {step}")
-        print(f"[DEBUG] Number of particles: {self.opt.num_particles}")
-        
-        # Enhanced debugging - Print Gaussian stats for debugging
-        for particle_id in range(self.opt.num_particles):
-            gaussians = self.renderers[particle_id].gaussians
-            num_gaussians = gaussians.get_xyz.shape[0]
-            xyz = gaussians.get_xyz
-            opacity = gaussians.get_opacity
-            scaling = gaussians.get_scaling
+    def get_multi_view_cameras(self, num_views=8):
+        """
+        Generate a set of camera viewpoints for multi-view rendering.
+        """
+        viewpoints = self.set_multi_viewpoints_around_object(num_views)
+        cameras = []
+        for elevation, azimuth in viewpoints:
+            camera = self.get_fixed_view_camera(elevation, azimuth, self.eval_radius)
+            cameras.append(camera)
             
-            print(f"[DEBUG] Particle {particle_id}: {num_gaussians} Gaussians")
-            print(f"[DEBUG] Particle {particle_id}: XYZ mean={xyz.mean(dim=0)}, std={xyz.std(dim=0)}")
-            print(f"[DEBUG] Particle {particle_id}: XYZ min={xyz.min(dim=0)[0]}, max={xyz.max(dim=0)[0]}")
-            print(f"[DEBUG] Particle {particle_id}: Opacity mean={opacity.mean():.6f}, min={opacity.min():.6f}, max={opacity.max():.6f}")
-            print(f"[DEBUG] Particle {particle_id}: Scaling mean={scaling.mean(dim=0)}, min={scaling.min(dim=0)[0]}, max={scaling.max(dim=0)[0]}")
-            
-            # Check if any Gaussians are visible (opacity > threshold)
-            visible_gaussians = (opacity > 0.01).sum()
-            print(f"[DEBUG] Particle {particle_id}: Visible Gaussians (opacity > 0.01): {visible_gaussians}")
-            
-            # Check distance from origin
-            distances = torch.norm(xyz, dim=1)
-            print(f"[DEBUG] Particle {particle_id}: Distance from origin - mean={distances.mean():.3f}, min={distances.min():.3f}, max={distances.max():.3f}")
-        
-        print(f"[DEBUG] Camera radius: {self.cam.radius}")
-        print(f"[DEBUG] Camera fovy: {self.cam.fovy}")
-        
-        # Test rendering with different configurations first
-        print(f"[DEBUG] Testing rendering configurations...")
-        
-        test_output_dir = os.path.join(self.save_dir, f'debug_renders_step_{step}')
-        os.makedirs(test_output_dir, exist_ok=True)
-        
-        # Test different camera distances
-        test_radii = [2.0, 2.5, 3.0, 3.5]
-        # test_backgrounds = [
-        #     torch.tensor([1.0, 1.0, 1.0], device=self.device),  # white
-        #     torch.tensor([0.0, 0.0, 0.0], device=self.device),  # black
-        #     torch.tensor([0.5, 0.5, 0.5], device=self.device),  # gray
-        # ]
-        # bg_names = ['white', 'black', 'gray']
-        
-        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device) # white
-        
-        for particle_id in range(min(2, self.opt.num_particles)):  # Test first 2 particles only
-            print(f"[DEBUG] Testing particle {particle_id}")
-            
-            for radius_idx, test_radius in enumerate(test_radii):
-            # for bg_idx, bg_color in enumerate(test_backgrounds):
-                # Create camera at different distances
-                pose = orbit_camera(0, 0, test_radius)  # Front view
-                camera = MiniCam(
-                    pose,
-                    512, 512,  # Fixed resolution for testing
-                    self.cam.fovy,
-                    self.cam.fovx,
-                    self.cam.near,
-                    self.cam.far
-                )
-                
-                out = self.renderers[particle_id].render(camera, bg_color=bg_color)
-                image = out["image"]
-                
-                # Save test image
-                filename = f'test_particle_{particle_id}_radius_{test_radius}.png'
-                vutils.save_image(
-                    image.unsqueeze(0),
-                    os.path.join(test_output_dir, filename),
-                    normalize=False
-                )
-                
-                # Log statistics
-                # non_bg_pixels = 0
-                # if bg_idx == 0:  # white background
-                #     non_bg_pixels = (image.sum(dim=0) < 2.9).sum().item()
-                # elif bg_idx == 1:  # black background
-                #     non_bg_pixels = (image.sum(dim=0) > 0.1).sum().item()
-                non_bg_pixels = (image.sum(dim=0) < 2.9).sum().item()
-                print(f"[DEBUG]   Radius {test_radius}, BG: white, non-bg pixels = {non_bg_pixels}")
+        return cameras
+    
 
     @torch.no_grad()
-    def _debug_rendered_images(self, step, image, out, particle_id):
-        image_stats = {
-            'min': image.min().item(),
-            'max': image.max().item(), 
-            'mean': image.mean().item(),
-            'non_white_pixels': (image.sum(dim=1) < 2.9).sum().item(),  # Pixels that aren't white
-            'unique_values': len(torch.unique(image.view(-1))),
-            'shape': image.shape
-        }
-        print(f"[DEBUG] Step {step}, Particle {particle_id}: {image_stats}")
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize_multi_viewpoints=None, save_iid=None):
+        # 📥 Use default values if parameters are not provided
+        if num_views is None:
+            num_views = self.opt.num_views
+        if save_iid is None:
+            save_iid = self.opt.save_iid
+        if visualize_multi_viewpoints is None:
+            visualize_multi_viewpoints = self.opt.visualize_multi_viewpoints
         
-        # Additional render output analysis
-        if 'depth' in out:
-            depth = out['depth']
-            print(f"[DEBUG] Step {step}, Particle {particle_id}: Depth - min={depth.min():.3f}, max={depth.max():.3f}, mean={depth.mean():.3f}")
-        if 'alpha' in out:
-            alpha = out['alpha'] 
-            print(f"[DEBUG] Step {step}, Particle {particle_id}: Alpha - min={alpha.min():.3f}, max={alpha.max():.3f}, mean={alpha.mean():.3f}")
+        # 📥 Create directory for combined particle views
+        multi_viewpoints_dir = None
+        save_iid_paths = None
+        
+        if visualize_multi_viewpoints and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0):
+            # Create directory for combined particle views
+            if self.opt.num_particles > 1:
+                multi_viewpoints_dir = os.path.join(self.multi_viewpoints_dir, f'step_{step}_view_{num_views}_all_particles')
+                os.makedirs(multi_viewpoints_dir, exist_ok=True)
+                
+            # Create directories for individual particle views
+            if save_iid:
+                save_iid_paths = []
+                for particle_id in range(self.opt.num_particles):
+                    particle_dir = os.path.join(self.iid_dir, f'step_{step}_view_{num_views}_particle_{particle_id}')
+                    os.makedirs(particle_dir, exist_ok=True)
+                    save_iid_paths.append(particle_dir)
+        
+        # Render images from each viewpoint
+        multi_viewpoint_images = []
+        for i, camera in enumerate(self.multi_viewpoints_cameras):
+            # Render each particle from current viewpoint
+            particle_images = []
+            for particle_id in range(self.opt.num_particles):
+                # Render with white background for consistent visualization
+                bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+                out = self.renderers[particle_id].render(camera, bg_color=bg_color)
+                image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
+                particle_images.append(image)
+                
+                # 📥 Save individual particle image if enabled
+                if visualize_multi_viewpoints and save_iid and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and save_iid_paths is not None:
+                    output_path = os.path.join(save_iid_paths[particle_id], f'view_{i:03d}.png')
+                    # Ensure images are in [0,1] range before saving
+                    vutils.save_image(image, output_path, normalize=False)
+            
+            # Combine all particle images for current viewpoint using grid layout
+            particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for metrics
+            multi_viewpoint_images.append(particle_images_tensor)
+            
+            # Create grid layout for visualization
+            grid_image = self.arrange_particles_in_grid(particle_images)
+            
+            # 📥 Save combined view of all particles if multiple particles exist
+            if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and multi_viewpoints_dir is not None:
+                output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
+                # Ensure images are in [0,1] range before saving
+                vutils.save_image(grid_image, output_path, normalize=False)
+        
+        # Stack all viewpoints into final tensor
+        multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0)  # [V, N, 3, H, W]
+        
+        return multi_viewpoint_images
 
+    @torch.no_grad()
+    def visualize_fixed_viewpoint(self, step):
+        # Create output directory for this specific viewpoint
+        if self.fixed_viewpoint_dir is not None:
+            viewpoint_dir = os.path.join(self.fixed_viewpoint_dir, f'step_{step}')
+            os.makedirs(viewpoint_dir, exist_ok=True)
         
+        camera = self.fixed_viewpoint_camera
+        
+        # Render each particle from the fixed viewpoint
+        particle_images = []
+        for particle_id in range(self.opt.num_particles):
+            # Render with white background for consistent visualization
+            bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+            out = self.renderers[particle_id].render(camera, bg_color=bg_color)
+            image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
+            particle_images.append(image)
+        
+            # Save individual particle image if visualization is enabled
+            if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
+                filename = f'step_{step}_particle_{particle_id}.png'
+                output_path = os.path.join(viewpoint_dir, filename)
+                # Ensure images are in [0,1] range before saving
+
+                vutils.save_image(image, output_path, normalize=False)
+                
+        # Combine all particle images using grid layout
+        particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for return
+        grid_image = self.arrange_particles_in_grid(particle_images)
+        
+        # Save combined view of all particles if visualization is enabled
+        if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
+            filename = f'all_particles.png'
+            output_path = os.path.join(viewpoint_dir, filename)
+            # Ensure images are in [0,1] range before saving
+
+            vutils.save_image(grid_image, output_path, normalize=False)
+        
+        return particle_images_tensor
+    
