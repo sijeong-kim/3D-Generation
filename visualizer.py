@@ -126,7 +126,7 @@ class GaussianVisualizer:
         # Force garbage collection
         gc.collect()
     
-    @torch.no_grad()
+    @torch.inference_mode()
     def arrange_particles_in_grid(self, particle_images):
         """
         Arrange particle images in a grid layout (2x4 by default, auto-adjusts for different numbers).
@@ -198,14 +198,14 @@ class GaussianVisualizer:
         return grid_tensor
     
     # Set viewpoints around object
-    @torch.no_grad()
+    @torch.inference_mode()
     def set_viewpoints(self, num_views=8):
         elevations = [0.0] * num_views  # All viewpoints at zero elevation
         azimuths = np.linspace(0, 360, num_views, endpoint=False)  # Evenly distributed azimuth angles
         return [(elevations[i], azimuths[i]) for i in range(num_views)]
 
     # Save rendered images
-    @torch.no_grad()
+    @torch.inference_mode()
     def save_rendered_images(self, step, images):
         """
         Save rendered images for visualization only. This method does NOT affect training.
@@ -217,7 +217,7 @@ class GaussianVisualizer:
         
         
     # Set specific viewpoint camera
-    @torch.no_grad()
+    @torch.inference_mode()
     def get_fixed_view_camera(self, elevation, horizontal, radius):
         """
         Compute camera pose for specified angles
@@ -237,7 +237,7 @@ class GaussianVisualizer:
         return camera
     
     # Set front view camera
-    @torch.no_grad()
+    @torch.inference_mode()
     def get_front_view_camera(self):
         """
         Generate a camera viewpoint for front view rendering.
@@ -245,13 +245,13 @@ class GaussianVisualizer:
         return self.get_fixed_view_camera(0.0, 0.0, self.eval_radius)
 
     # Set multi-viewpoints around object
-    @torch.no_grad()
+    @torch.inference_mode()
     def set_multi_viewpoints_around_object(self, num_views=8):
         elevations = [0.0] * num_views  # All viewpoints at zero elevation
         azimuths = np.linspace(0, 360, num_views, endpoint=False)  # Evenly distributed azimuth angles
         return [(elevations[i], azimuths[i]) for i in range(num_views)]
     
-    @torch.no_grad()
+    @torch.inference_mode()
     def get_multi_view_cameras(self, num_views=8):
         """
         Generate a set of camera viewpoints for multi-view rendering.
@@ -265,7 +265,7 @@ class GaussianVisualizer:
         return cameras
     
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize_multi_viewpoints=None, save_iid=None):
         # 📥 Use default values if parameters are not provided
         if num_views is None:
@@ -295,12 +295,16 @@ class GaussianVisualizer:
         
         # Render images from each viewpoint
         multi_viewpoint_images = []
+        
+        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        
         for i, camera in enumerate(self.multi_viewpoints_cameras):
             # Render each particle from current viewpoint
             particle_images = []
+            
+            
             for particle_id in range(self.opt.num_particles):
-                # Render with white background for consistent visualization
-                bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+                # Render with white background for consistent visualization    
                 out = self.renderers[particle_id].render(camera, bg_color=bg_color)
                 image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
                 particle_images.append(image)
@@ -329,7 +333,7 @@ class GaussianVisualizer:
         
         return multi_viewpoint_images
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def visualize_fixed_viewpoint(self, step):
         # Create output directory for this specific viewpoint
         if self.fixed_viewpoint_dir is not None:
@@ -337,12 +341,13 @@ class GaussianVisualizer:
             os.makedirs(viewpoint_dir, exist_ok=True)
         
         camera = self.fixed_viewpoint_camera
+        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
         
         # Render each particle from the fixed viewpoint
         particle_images = []
         for particle_id in range(self.opt.num_particles):
             # Render with white background for consistent visualization
-            bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+            
             out = self.renderers[particle_id].render(camera, bg_color=bg_color)
             image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
             particle_images.append(image)

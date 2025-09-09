@@ -44,6 +44,8 @@ torchmetrics[image]
 torch-fidelity
 torchviz
 lpips
+PyMCubes
+
 
 # Development tools
 notebook

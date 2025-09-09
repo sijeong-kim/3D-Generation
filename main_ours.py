@@ -116,13 +116,11 @@ class GUI:
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = True
-        
-        # torch.backends.cudnn.benchmark = False
-        # torch.use_deterministic_algorithms(True)
-        # os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-        # torch.backends.cuda.matmul.allow_tf32 = False
-        # torch.backends.cudnn.allow_tf32 = False
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True)
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
 
     def prepare_train(self):
 
@@ -227,11 +225,10 @@ class GUI:
         ver = np.random.randint(min_ver, max_ver)
         hor = np.random.randint(-180, 180)
         radius = 0
-        
-        pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
-        
+        pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)        
+        cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
         bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
-        
+
         for j in range(self.opt.num_particles):
             
             # set seed for each particle + iteration step for different viewpoints each iter
@@ -244,7 +241,6 @@ class GUI:
             # radii.append(radius)
             # poses.append(pose)
 
-            cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
 
             out = self.renderers[j].render(cur_cam, bg_color=bg_color)
 
@@ -288,35 +284,27 @@ class GUI:
 
         # attraction loss (latent space)
         attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
+    
+        score_gradients, latents = self.guidance_sd.train_step_gradient(
+            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+            guidance_scale=self.opt.guidance_scale,
+            force_same_t=self.opt.force_same_t,
+            force_same_noise=self.opt.force_same_noise,
+        )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
+        
+        score_gradients = score_gradients.to(torch.float32)
+        latents = latents.to(torch.float32)
         
         if self.opt.repulsion_type == 'svgd':
-            score_gradients, latents = self.guidance_sd.train_step_gradient(
-                images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-                guidance_scale=self.opt.guidance_scale,
-                force_same_t=self.opt.force_same_t,
-            )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
-            
-            score_gradients = score_gradients.to(torch.float32)
-            latents = latents.to(torch.float32)
-            
             v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)  # [N,4,64,64]  
             target = (latents - v).detach()
-            attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
-            attraction_loss = attraction_loss.mean()
-            
         elif self.opt.repulsion_type in ['rlsd', 'wo']:
-            score_gradients, latents = self.guidance_sd.train_step_gradient(
-                images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-                guidance_scale=self.opt.guidance_scale,
-                force_same_t=self.opt.force_same_t,
-            )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
-            
-            score_gradients = score_gradients.to(torch.float32)
-            latents = latents.to(torch.float32)
-            
             target = (latents - score_gradients).detach()
-            attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
-            attraction_loss = attraction_loss.mean()
+        else:
+            raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
+            
+        attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+        attraction_loss = attraction_loss.mean()
             
         # elif self.opt.repulsion_type in ['rlsd', 'wo']:
         #     for j in range(self.opt.num_particles):
@@ -355,44 +343,6 @@ class GUI:
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
         
-        # # log metrics and visualize
-        # with torch.no_grad():
-        #     if self.opt.metrics and self.metrics_calculator is not None:
-        #         # time
-        #         ender.record()
-        #         torch.cuda.synchronize()
-        #         t = starter.elapsed_time(ender)
-                
-        #         # memory usage
-        #         memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
-        #         max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
-                
-        #         # losses
-        #         attraction_loss_val = attraction_loss.item()
-        #         scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
-        #         repulsion_loss_val = repulsion_loss.item()
-        #         scaled_repulsion_loss_val = self.opt.lambda_repulsion * repulsion_loss_val
-        #         total_loss_val = total_loss.item()
-            
-        #         # quantitative metrics
-        #         multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=self.opt.num_views, visualize=False, save_iid=False) # [V, N, 3, H, W]
-        #         representative_images, clip_similarities = self.metrics_calculator.select_best_views_by_clip_fidelity(multi_view_images) # [V, N, 3, H, W]
-
-        #         fidelity = clip_similarities.mean().item()
-        #         features = self.feature_extractor(representative_images) # [V, N, D_featture]
-        #         diversity = self.metrics_calculator.compute_rlsd_diversity(features)
-
-        #         # log
-        #         self.metrics_calculator.log_metrics(step=self.step, diversity=diversity, fidelity=fidelity, attraction_loss=attraction_loss_val, repulsion_loss=repulsion_loss_val, scaled_repulsion_loss = scaled_repulsion_loss_val, total_loss=total_loss_val, time=t, memory_allocated_mb=memory_allocated, max_memory_allocated_mb=max_memory_allocated)
-
-        #     # visualize
-        #     if self.opt.visualize and self.visualizer is not None:
-        #         # save rendered images (save at the end of each interval)
-        #         if self.step % self.opt.save_rendered_images_interval == 0:
-        #             self.visualizer.save_rendered_images(self.step, images)
-        #             # self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=4, save_iid=True) 
-
-
 
         #########################################################
         # Log metrics and visualize
@@ -477,19 +427,79 @@ class GUI:
                     
             # visualize
             if self.opt.visualize and self.visualizer is not None:
-                # Update visualizer with current training state
-                self.visualizer.update_renderers(self.renderers)
-                
                 # save rendered images (save at the end of each interval)
                 if self.opt.save_rendered_images and (self.step==1 or self.step % self.opt.save_rendered_images_interval == 0):
+                    self.visualizer.update_renderers(self.renderers)
                     self.visualizer.save_rendered_images(self.step, images)
+                    self.visualizer.cleanup_renderers()
                     
                 if self.opt.visualize_fixed_viewpoint and (self.step==1 or self.step % self.opt.visualize_fixed_viewpoint_interval == 0):
+                    self.visualizer.update_renderers(self.renderers)
                     self.visualizer.visualize_fixed_viewpoint(self.step)
+                    self.visualizer.cleanup_renderers()
                 
                 # Clean up visualizer renderers to free memory
-                self.visualizer.cleanup_renderers()
-
+                
+                
+                
+        # Periodic GPU memory cleanup
+        if self.step % self.opt.efficiency_interval == 0:
+            try:
+                del images
+            except NameError:
+                pass
+            try:
+                del outputs
+            except NameError:
+                pass
+            try:
+                del score_gradients
+            except NameError:
+                pass
+            try:
+                del latents
+            except NameError:
+                pass
+            try:
+                del w_sigma
+            except NameError:
+                pass
+            try:
+                del features
+            except NameError:
+                pass
+            try:
+                del kernel
+            except NameError:
+                pass
+            try:
+                del kernel_grad
+            except NameError:
+                pass
+            try:
+                del attraction_loss_per_particle
+            except NameError:
+                pass
+            try:
+                del repulsion_loss_per_particle
+            except NameError:
+                pass
+            try:
+                del scaled_attraction_loss
+            except NameError:
+                pass
+            try:
+                del scaled_repulsion_loss
+            except NameError:
+                pass
+            try:
+                del total_loss
+            except NameError:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
         path = os.path.join(self.opt.outdir, f'saved_models')
@@ -499,6 +509,14 @@ class GUI:
             path = os.path.join(path, f'particle_{particle_id}_mesh.ply')
             mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
             mesh.write_ply(path)
+            # Cleanup heavy objects and CUDA cache
+            try:
+                del mesh
+            except NameError:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         elif mode == 'geo+tex':
             path = os.path.join(path, f'particle_{particle_id}_mesh.' + self.opt.mesh_format)
@@ -619,11 +637,32 @@ class GUI:
             mesh.albedo = torch.from_numpy(albedo).to(self.device)
             mesh.write(path)
 
+            # Cleanup heavy objects and CUDA cache
+            try:
+                del albedo
+            except NameError:
+                pass
+            try:
+                del cnt
+            except NameError:
+                pass
+            try:
+                del mesh
+            except NameError:
+                pass
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
         else:
             path = os.path.join(path, f'particle_{particle_id}_model.ply')
             self.renderers[particle_id].gaussians.save_ply(path)
 
             print(f"[INFO] particle {particle_id} save model to {path}.")
+            # Cleanup CUDA cache after saving
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
     
     # no gui mode
     def train(self, iters=500):
@@ -644,10 +683,10 @@ class GUI:
             self.visualizer.cleanup_renderers()
 
         # save model
-        for j in range(self.opt.num_particles):
-            self.save_model(mode='model', particle_id=j)
-            self.save_model(mode='geo+tex', particle_id=j)
-        
+        if self.opt.save_model:
+            for j in range(self.opt.num_particles):
+                self.save_model(mode='model', particle_id=j)
+                self.save_model(mode='geo+tex', particle_id=j)   
 
 if __name__ == "__main__":
     import argparse

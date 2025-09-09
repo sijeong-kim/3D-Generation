@@ -216,6 +216,7 @@ class StableDiffusion(nn.Module):
         as_latent=False,
         vers=None, hors=None,
         force_same_t: bool = True,  # 모든 파티클 동일 t
+        force_same_noise: bool = True,  # 모든 파티클 동일 noise
     ):
         batch_size = pred_rgb.shape[0]
         pred_rgb = pred_rgb.to(self.dtype)
@@ -252,7 +253,14 @@ class StableDiffusion(nn.Module):
             w = (1 - alpha_t).view(batch_size, 1, 1, 1)         # broadcast-ready
 
             # --- 3) 노이즈 추가 / U-Net 호출 ---
-            noise = torch.randn_like(latents)
+            
+            if force_same_noise:
+                base = torch.randn_like(latents[:1]) # [1, 4, 64, 64]
+                noise = base.expand_as(latents).contiguous() # [N, 4, 64, 64] 배치 전원 동일한 노이즈
+
+            else:
+                noise = torch.randn_like(latents)
+
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
 
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
@@ -296,6 +304,7 @@ class StableDiffusion(nn.Module):
         as_latent=False,
         vers=None, hors=None,
         force_same_t: bool = True,  # 모든 파티클 동일 t
+        force_same_noise: bool = True,  # 모든 파티클 동일 noise
     ):
         batch_size = pred_rgb.shape[0]
         pred_rgb = pred_rgb.to(self.dtype)
@@ -332,7 +341,13 @@ class StableDiffusion(nn.Module):
             w = (1 - alpha_t).view(batch_size, 1, 1, 1)         # broadcast-ready
 
             # --- 3) 노이즈 추가 / U-Net 호출 ---
-            noise = torch.randn_like(latents)
+            if force_same_noise:
+                base = torch.randn_like(latents[:1]) # [1, 4, 64, 64]
+                noise = base.expand_as(latents).contiguous() # [N, 4, 64, 64] 배치 전원 동일한 노이즈
+
+            else:
+                noise = torch.randn_like(latents)
+
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
 
             latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
