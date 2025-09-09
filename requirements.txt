@@ -44,3 +44,5 @@ lpips
 # Development tools
 notebook
 ipykernel
+
+trimesh
