@@ -427,7 +427,7 @@ exp3_num_pts:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
     lambda_repulsion: 1000
-    guidance_scale: 20
+    guidance_scale: 100
     seed: 42
     num_particles: 8
     force_same_t: True
@@ -487,7 +487,7 @@ exp4a_cosine_decay_on:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
     lambda_repulsion: 1000
-    guidance_scale: 20
+    guidance_scale: 100
     seed: 42
     num_particles: 8
     force_same_t: True
@@ -542,7 +542,7 @@ exp4b_cosine_decay_off:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
     lambda_repulsion: 1000
-    guidance_scale: 20
+    guidance_scale: 100
     seed: 42
     num_particles: 8
     force_same_t: True
@@ -596,7 +596,7 @@ exp5_feature_layer:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
     lambda_repulsion: 1000 
-    guidance_scale: 20
+    guidance_scale: 100
     seed: 42
     num_particles: 8
     force_same_t: True
@@ -651,7 +651,7 @@ exp6_rbf_beta:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
     lambda_repulsion: 1000 
-    guidance_scale: 20
+    guidance_scale: 100
     seed: 42
     num_particles: 8
     force_same_t: True
