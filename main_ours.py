@@ -257,12 +257,72 @@ class GUI:
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         # poses = torch.from_numpy(np.stack(poses, axis=0)).to(self.device) # TODO: Check if this is correct
         
+        repulsion_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
+        
+        # repulsion loss (feature space)
         if self.opt.repulsion_type in ['rlsd', 'svgd']:
-            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]    
+            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature] 
+            
+            # 4. Kernel computation (feature space)
+            if self.opt.kernel_type == 'rbf':
+                kernel, kernel_grad = rbf_kernel_and_grad(
+                    features, 
+                    repulsion_type=self.opt.repulsion_type, 
+                    beta=self.opt.rbf_beta,
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+            elif self.opt.kernel_type == 'cosine':
+                kernel, kernel_grad = cosine_kernel_and_grad(
+                    features, 
+                    repulsion_type=self.opt.repulsion_type,
+                    beta=self.opt.cosine_beta,
+                    eps_shift=self.opt.cosine_eps_shift,
+                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+            else:
+                raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
+            
+            kernel = kernel.detach().to(torch.float32)
+            kernel_grad = kernel_grad.detach().to(torch.float32)
+            
+            repulsion_loss = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
+            repulsion_loss = repulsion_loss.mean() # [N] -> [1]
 
-        for j in range(self.opt.num_particles):
-            attraction_loss = attraction_loss + self.opt.lambda_sd * self.guidance_sd.train_step(images, step_ratio=step_ratio if self.opt.anneal_timestep else None)
-            # TODO: Add guidance loss for each particle
+        # attraction loss (latent space)
+        attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
+        
+        if self.opt.repulsion_type == 'svgd':
+            score_gradients, latents = self.guidance_sd.train_step_gradient(
+                images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+                guidance_scale=self.opt.guidance_scale,
+                force_same_t=self.opt.force_same_t,
+            )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
+            
+            score_gradients = score_gradients.to(torch.float32)
+            latents = latents.to(torch.float32)
+            
+            v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)  # [N,4,64,64]  
+            target = (latents - v).detach()
+            attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+            attraction_loss = attraction_loss.mean()
+            
+        elif self.opt.repulsion_type in ['rlsd', 'wo']:
+            score_gradients, latents = self.guidance_sd.train_step_gradient(
+                images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+                guidance_scale=self.opt.guidance_scale,
+                force_same_t=self.opt.force_same_t,
+            )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
+            
+            score_gradients = score_gradients.to(torch.float32)
+            latents = latents.to(torch.float32)
+            
+            target = (latents - score_gradients).detach()
+            attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+            attraction_loss = attraction_loss.mean()
+            
+        # elif self.opt.repulsion_type in ['rlsd', 'wo']:
+        #     for j in range(self.opt.num_particles):
+        #         sds_loss = self.guidance_sd.train_step(images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None)
+        #         attraction_loss = attraction_loss + sds_loss
+            
 
         ### optimize step ### 
         

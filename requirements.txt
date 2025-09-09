@@ -13,13 +13,14 @@ imageio-ffmpeg
 omegaconf
 
 # Deep learning dependencies
-torch>=2.0.0
+# torch>=2.0.0
 einops
 plyfile
 pygltflib
 
 # GUI dependencies
 dearpygui
+trimesh
 
 # Stable Diffusion related
 huggingface_hub
@@ -27,7 +28,9 @@ diffusers
 accelerate
 transformers
 timm
-torchvision
+
+# torchvision
+# xformers
 
 # 3D mesh processing
 xatlas 
@@ -39,10 +42,11 @@ psutil
 seaborn
 torchmetrics[image]
 torch-fidelity
+torchviz
 lpips
 
 # Development tools
 notebook
 ipykernel
+pytest
 
-trimesh
