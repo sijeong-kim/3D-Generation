@@ -44,8 +44,8 @@ exp0_baseline:
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -103,16 +103,16 @@ exp0_repulsion_kernel:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
 
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -176,8 +176,8 @@ exp1a_repulsion_kernel_lambda_rlsd_rbf:
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -235,16 +235,16 @@ exp1b_repulsion_kernel_lambda_rlsd_cosine:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
 
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -301,10 +301,10 @@ exp1c_repulsion_kernel_lambda_svgd_rbf:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
 
     eval_H: 512
     eval_W: 512
@@ -366,16 +366,16 @@ exp1d_repulsion_kernel_lambda_svgd_cosine:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
 
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -438,8 +438,8 @@ exp2_guidance_scale:
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -504,8 +504,8 @@ exp3_num_pts:
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
 
   settings:
@@ -563,16 +563,16 @@ exp4a_cosine_decay_on:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
 
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -627,16 +627,16 @@ exp4b_cosine_decay_off:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
       
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
 
   settings:
@@ -689,16 +689,16 @@ exp5_feature_layer:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
 
     eval_H: 512
     eval_W: 512
 
-    # video_snapshot: False
-    # save_model: False
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
@@ -752,10 +752,16 @@ exp6_rbf_beta:
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
-      # hamburger: 3.0
+      hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
-      # tulip: 4.0
+      tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    video_snapshot: False
+    save_model: False
 
   settings:
     # visualize
