@@ -58,7 +58,7 @@ num_views: 8
 multi_view_type: "average_views" # "best_views", "average_views", "cross_attention_views"
 
 # save model
-save_model: True
+save_model: False
 
 ### Input
 # input rgba image path (default to None, can be load in GUI too)

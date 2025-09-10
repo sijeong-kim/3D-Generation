@@ -17,9 +17,9 @@ exp0_baseline:
     repulsion_type: ['wo']
     prompt: 
       hamburger: "a photo of a hamburger"
-      # icecream: "a photo of an ice cream"
-      # cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:

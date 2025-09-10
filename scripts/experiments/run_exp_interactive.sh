@@ -60,7 +60,7 @@ THREADS=""
 MEM_SOFT_MB=""
 TIMEOUT="7200"
 BASE_CONFIG="configs/text_ours.yaml"
-SWEEP_CONFIG="configs/text_ours_exp_v1.yaml"
+SWEEP_CONFIG="configs/text_ours_exp.yaml"
 SWEEP_NAME=""
 SLEEP_BETWEEN="60"
 
