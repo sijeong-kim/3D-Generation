@@ -66,9 +66,75 @@ exp0_baseline:
     enable_lpips: False # disable lpips for faster training
 
 
+
+# Experiment 0: (Repulsion type x kernel type)
+exp0_repulsion_kernel:
+  name: exp0_repulsion_kernel
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['rlsd', 'svgd']
+    kernel_type: ['rbf', 'cosine']
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    lambda_repulsion: 1000
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+    
+    iters: 1500
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      # hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      # tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
 # Experiment 1a: (Repulsion type x kernel type) & lambda sweep - rlsd rbf
 exp1a_repulsion_kernel_lambda_rlsd_rbf:
-  name: exp1a_repulsion_kernel_lambda
+  name: exp1a_repulsion_kernel_lambda_rlsd_rbf
   method: grid
   sweep_parameters:
     repulsion_type: ['rlsd']
