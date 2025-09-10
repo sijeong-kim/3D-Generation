@@ -60,6 +60,9 @@ multi_view_type: "average_views" # "best_views", "average_views", "cross_attenti
 # save model
 save_model: False
 
+# save video snapshot
+video_snapshot: False
+
 ### Input
 # input rgba image path (default to None, can be load in GUI too)
 input: 

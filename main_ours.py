@@ -24,6 +24,47 @@ from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 
+
+
+
+def seed_global(seed: int):
+    os.environ["PYTHONHASHSEED"] = str(seed)          # 가능하면 셸에서 미리 export
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8" # or ":16:8" (프로세스 시작 전이 가장 안전)
+
+    import random
+    random.seed(seed)
+
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # multi-GPU 대비
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True)
+
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+
+
+class RNGPack:
+    def __init__(self, base_seed: int, device="cuda"):
+        # 공통(공유) 생성기: 모든 파티클이 동일 노이즈를 쓰는 CRN용
+        self.gen_shared_cuda = torch.Generator(device=device)
+        self.gen_shared_cuda.manual_seed(base_seed)
+
+        # 독립 생성기(원하면 소량 독립성 부여용)
+        self.gen_ind_cuda = torch.Generator(device=device)
+        self.gen_ind_cuda.manual_seed(base_seed + 1)
+
+        # CPU/NumPy/py random도 분리
+        self.gen_cpu = torch.Generator(device="cpu")
+        self.gen_cpu.manual_seed(base_seed + 2)
+
+        self.np_rng = np.random.Generator(np.random.PCG64(base_seed + 3))
+        random.seed(base_seed + 4)
+
+
 class GUI:
     def __init__(self, opt):
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -61,7 +102,6 @@ class GUI:
         self.renderers = []
         for i in range(self.opt.num_particles):
             self.renderers.append(Renderer(sh_degree=self.opt.sh_degree))
-            
 
         self.gaussain_scale_factor = 1
 
@@ -90,25 +130,37 @@ class GUI:
         if self.opt.negative_prompt is not None:
             self.negative_prompt = self.opt.negative_prompt
 
-        self.seeds = []
+        # self.seeds = []
         # override if provide a checkpoint
         for i in range(self.opt.num_particles):
-            # Set different seed for each particle during initialization
-            init_seed = self.seed + i * self.opt.iters
-            self.seeds.append(init_seed)
-            self.seed_everything(init_seed)
+            # # Set different seed for each particle during initialization
+            # init_seed = self.seed + i * self.opt.iters
+            # self.seeds.append(init_seed)
+            # self.seed_everything(init_seed)
             
-            if self.opt.load is not None:
-                self.renderers[i].initialize(self.opt.load) # TODO: load from different checkpoints for each particle
-            else:
-                # initialize gaussians to a blob
-                self.renderers[i].initialize(num_pts=self.opt.num_pts)
+            particle_seed = int(self.seed + self.opt.iters * i)
+            # devices 인자는 "GPU index" 리스트여야 함
+            fork_devices = [self.device.index] if (self.device.type == "cuda" and self.device.index is not None) else []
+            with torch.random.fork_rng(devices=fork_devices):
+                torch.manual_seed(particle_seed)
+                torch.cuda.manual_seed_all(particle_seed)
+                np.random.seed(particle_seed)
+                random.seed(particle_seed)
+
+                if self.opt.load is not None:
+                    self.renderers[i].initialize(self.opt.load)
+                else:
+                    self.renderers[i].initialize(num_pts=self.opt.num_pts)
+
                 
         # visualizer
         if self.opt.visualize or self.opt.metrics:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
+            
+        # after self.visualizer init
+        self.rng = RNGPack(self.seed, device=self.device.type if self.device.type=='cuda' else 'cpu')
             
     def __del__(self):
         pass
@@ -171,22 +223,23 @@ class GUI:
             self.device = torch.device("cpu")
             return False
 
-    def seed_everything(self, seed):
-        try:
-            seed = int(seed)
-        except:
-            seed = np.random.randint(0, 1000000)
 
-        os.environ["PYTHONHASHSEED"] = str(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        torch.use_deterministic_algorithms(True)
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cudnn.allow_tf32 = False
+    # def seed_everything(self, seed):
+    #     try:
+    #         seed = int(seed)
+    #     except:
+    #         seed = np.random.randint(0, 1000000)
+
+    #     os.environ["PYTHONHASHSEED"] = str(seed)
+    #     np.random.seed(seed)
+    #     torch.manual_seed(seed)
+    #     torch.cuda.manual_seed(seed)
+    #     torch.backends.cudnn.deterministic = True
+    #     torch.backends.cudnn.benchmark = False
+    #     torch.use_deterministic_algorithms(True)
+    #     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    #     torch.backends.cuda.matmul.allow_tf32 = False
+    #     torch.backends.cudnn.allow_tf32 = False
 
     def prepare_train(self):
 
@@ -258,7 +311,7 @@ class GUI:
             self.guidance_sd.get_text_embeds([self.prompt], [self.negative_prompt])
 
     def train_step(self):
-    # 1. Forward pass
+        # 1. Forward pass
         self.step += 1
         
         with torch.no_grad():
@@ -286,15 +339,26 @@ class GUI:
         
         # render random view
         
-        self.seed_everything(self.seed + self.step)
+
         
-        ver = np.random.randint(min_ver, max_ver)
-        hor = np.random.randint(-180, 180)
+        # ver = np.random.randint(min_ver, max_ver)
+        # hor = np.random.randint(-180, 180)
+        # radius = 0
+        
+        # pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)        
+        # bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+
+        # rng-driven, deterministic
+        ver = int(self.rng.np_rng.integers(min_ver, max_ver))
+        hor = int(self.rng.np_rng.integers(-180, 180))
         radius = 0
-        
-        pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)        
+
+        pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
         cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
-        bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+
+        bg_white = bool(self.rng.np_rng.random() > self.opt.invert_bg_prob)
+        bg_color_np = np.array([1,1,1] if bg_white else [0,0,0], dtype=np.float32)
+        bg_color = torch.from_numpy(bg_color_np).to(self.device).to(torch.float32)
 
         for j in range(self.opt.num_particles):
             
@@ -302,12 +366,6 @@ class GUI:
             # self.seed_everything(self.seeds[j] + self.step)
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
-
-            # vers.append(ver)
-            # hors.append(hor)
-            # radii.append(radius)
-            # poses.append(pose)
-
 
             out = self.renderers[j].render(cur_cam, bg_color=bg_color)
 
@@ -353,10 +411,14 @@ class GUI:
         attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
     
         score_gradients, latents = self.guidance_sd.train_step_gradient(
-            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+            images, 
+            step_ratio=step_ratio if self.opt.anneal_timestep else None, 
             guidance_scale=self.opt.guidance_scale,
             force_same_t=self.opt.force_same_t,
             force_same_noise=self.opt.force_same_noise,
+            shared_cuda_gen=getattr(self.rng, "gen_shared_cuda", None), # for CRN
+            cpu_gen=getattr(self.rng, "gen_cpu", None), # t sampling
+            # alt_cuda_gen=getattr(self.rng, "gen_ind_cuda", None), # for independent noise (not used in this paper)
         )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
         
         score_gradients = score_gradients.to(torch.float32)
@@ -525,10 +587,10 @@ class GUI:
                 del latents
             except NameError:
                 pass
-            try:
-                del w_sigma
-            except NameError:
-                pass
+            # try:
+            #     del w_sigma
+            # except NameError:
+            #     pass
             try:
                 del features
             except NameError:
@@ -541,14 +603,14 @@ class GUI:
                 del kernel_grad
             except NameError:
                 pass
-            try:
-                del attraction_loss_per_particle
-            except NameError:
-                pass
-            try:
-                del repulsion_loss_per_particle
-            except NameError:
-                pass
+            # try:
+            #     del attraction_loss_per_particle
+            # except NameError:
+            #     pass
+            # try:
+            #     del repulsion_loss_per_particle
+            # except NameError:
+            #     pass
             try:
                 del scaled_attraction_loss
             except NameError:
@@ -731,6 +793,7 @@ class GUI:
     
     # no gui mode
     def train(self, iters=500):
+
         if iters > 0:
             self.prepare_train()
             for i in tqdm.trange(iters):
@@ -739,8 +802,9 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
+        #[OPTIONAL]
         # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters:
+        if self.opt.video_snapshot:
             # Update visualizer with final training state
             self.visualizer.update_renderers(self.renderers)
             self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
@@ -763,6 +827,8 @@ if __name__ == "__main__":
 
     # override default config from cli
     opt = OmegaConf.merge(OmegaConf.load(args.config), OmegaConf.from_cli(extras))
+    
+    seed_global(int(opt.seed))
 
     gui = GUI(opt)
 

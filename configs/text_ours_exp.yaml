@@ -16,9 +16,9 @@ exp0_baseline:
   sweep_parameters:
     repulsion_type: ['wo']
     prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
+      # hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      # cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
 
   # fixed parameters
@@ -30,11 +30,18 @@ exp0_baseline:
     
     iters: 1500
     invert_bg_prob: 0.5
+
     eval_radius: # not to crop the object adjust the radius
       hamburger: 3.0
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
