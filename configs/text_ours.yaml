@@ -1,13 +1,13 @@
 # training
 seed: 42
-num_particles: 4
+num_particles: 8
 feature_extractor_model_name: facebook/dinov2-base
 feature_layer: 11 # 2: early, 5: mid, 11: last
 
 # repulsive loss
 lambda_repulsion: 1000 # weight for repulsive loss
 repulsion_type: "wo" # "svgd" or "rlsd" or "wo"
-kernel_type: None # "rbf" or "cosine" (default: None)
+kernel_type: None # "rbf" or "cosine"
 rbf_beta: 1.0 # beta for rbf kernel
 cosine_beta: 1.0 # beta for cosine kernel
 cosine_eps_shift: 1e-3 # eps shift for cosine kernel
@@ -32,6 +32,7 @@ visualize: True
 save_rendered_images: False # for visualization
 save_rendered_images_interval: 100 # for debugging
 save_iid: False # for visualization
+step_real_time_video_snapshot: -1 # for visualization
 visualize_multi_viewpoints: False # for visualization
 visualize_multi_viewpoints_interval: 500 # for debugging
 visualize_fixed_viewpoint: True # for visualization
@@ -57,7 +58,7 @@ num_views: 8
 multi_view_type: "average_views" # "best_views", "average_views", "cross_attention_views"
 
 # save model
-save_model: False
+save_model: True
 
 ### Input
 # input rgba image path (default to None, can be load in GUI too)

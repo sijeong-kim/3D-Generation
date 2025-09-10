@@ -500,14 +500,12 @@ class GUI:
                     self.visualizer.save_rendered_images(self.step, images)
                     self.visualizer.cleanup_renderers()
                     
+                # if self.opt.visualize_fixed_viewpoint and (self.step in [500, 600, 700, 800, 900, 1000, 1100, 1200, 1300]):
                 if self.opt.visualize_fixed_viewpoint and (self.step==1 or self.step % self.opt.visualize_fixed_viewpoint_interval == 0):
                     self.visualizer.update_renderers(self.renderers)
                     self.visualizer.visualize_fixed_viewpoint(self.step)
                     self.visualizer.cleanup_renderers()
-                
                 # Clean up visualizer renderers to free memory
-                
-                
                 
         # Periodic GPU memory cleanup
         if self.step % self.opt.efficiency_interval == 0:

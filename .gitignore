@@ -217,3 +217,18 @@ outputs/
 *.jpg
 *.jpeg
 *.gif
+
+# backups
+backups/
+backup/
+*/backups/
+*/backup/
+
+logs/
+exp/
+debug/
+
+*.out
+
+
+analysis/
