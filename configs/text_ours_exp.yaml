@@ -16,17 +16,21 @@ exp0_baseline:
   sweep_parameters:
     repulsion_type: ['wo']
     prompt: 
-      # hamburger: "a photo of a hamburger"
-      # icecream: "a photo of an ice cream"
-      # cactus: "a small saguaro cactus planted in a clay pot"
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:
     seed: 42
     num_particles: 8
+
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
+
+    guidance_scale: 100
     
     iters: 1500
     invert_bg_prob: 0.5
@@ -62,68 +66,6 @@ exp0_baseline:
     enable_lpips: False # disable lpips for faster training
 
 
-# # Experiment 1: (Repulsion type x kernel type) & lambda sweep
-# exp1_repulsion_kernel_lambda:
-#   name: exp1_repulsion_kernel_lambda
-#   method: grid
-#   sweep_parameters:
-#     repulsion_type: ['svgd', 'rlsd']
-#     kernel_type: ['rbf', 'cosine']
-#     lambda_repulsion: # TODO: add more values
-#       svgd_cosine: [600, 800, 1000, 1200, 1400, 1600]
-#       svgd_rbf: [600, 800, 1000, 1200, 1400, 1600]
-#       rlsd_cosine: [600, 800, 1000, 1200, 1400, 1600]
-#       rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600]
-#     prompt: 
-#       # hamburger: "a photo of a hamburger"
-#       icecream: "a photo of an ice cream"
-#       cactus: "a small saguaro cactus planted in a clay pot"
-#       # tulip: "a photo of a tulip"
-
-#   # fixed parameters
-#   fixed_parameters:
-#     seed: 42
-#     num_particles: 8
-#     force_same_t: True
-#     anneal_timestep: True
-
-#     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-#     rbf_beta: 1.0
-#     cosine_beta: 1.0
-#     cosine_eps_shift: 1e-3
-
-#     use_cosine_decay: False
-#     # rep_cosine_warmup: 0.2
-    
-#     iters: 1500
-#     invert_bg_prob: 0.5
-
-#     eval_radius: # not to crop the object adjust the radius
-#       # hamburger: 3.0
-#       icecream: 4.0
-#       cactus: 4.0
-#       # tulip: 4.0
-
-#   settings:
-#     # visualize
-#     visualize: True
-#     save_iid: False
-#     visualize_fixed_viewpoint: True
-#     visualize_fixed_viewpoint_interval: 100
-
-#     # metrics
-#     metrics: True
-#     quantitative_metrics_interval: 50
-#     num_views: 8
-
-#     # options
-#     kernel_metrics_interval: 50
-#     losses_interval: 10
-#     efficiency_interval: 10 
-#     enable_lpips: False # disable lpips for faster training
-
-
 # Experiment 1a: (Repulsion type x kernel type) & lambda sweep - rlsd rbf
 exp1a_repulsion_kernel_lambda_rlsd_rbf:
   name: exp1a_repulsion_kernel_lambda
@@ -132,7 +74,7 @@ exp1a_repulsion_kernel_lambda_rlsd_rbf:
     repulsion_type: ['rlsd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values
-      rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+      rlsd_rbf: [600, 800, 1000, 1200, 1400]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -144,6 +86,7 @@ exp1a_repulsion_kernel_lambda_rlsd_rbf:
     seed: 42
     num_particles: 8
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
@@ -163,6 +106,12 @@ exp1a_repulsion_kernel_lambda_rlsd_rbf:
       icecream: 4.0
       cactus: 4.0
       # tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
@@ -192,7 +141,7 @@ exp1b_repulsion_kernel_lambda_rlsd_cosine:
     repulsion_type: ['rlsd']
     kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values
-      rlsd_cosine: [600, 800, 1000, 1200, 1400, 1600]
+      rlsd_cosine: [600, 800, 1000, 1200, 1400]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -204,6 +153,7 @@ exp1b_repulsion_kernel_lambda_rlsd_cosine:
     seed: 42
     num_particles: 8
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
@@ -223,6 +173,12 @@ exp1b_repulsion_kernel_lambda_rlsd_cosine:
       icecream: 4.0
       cactus: 4.0
       # tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
@@ -251,7 +207,7 @@ exp1c_repulsion_kernel_lambda_svgd_rbf:
     repulsion_type: ['svgd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values
-      svgd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+      svgd_rbf: [600, 800, 1000, 1200, 1400]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -263,6 +219,7 @@ exp1c_repulsion_kernel_lambda_svgd_rbf:
     seed: 42
     num_particles: 8
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
@@ -282,6 +239,12 @@ exp1c_repulsion_kernel_lambda_svgd_rbf:
       icecream: 4.0
       cactus: 4.0
       # tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
@@ -309,7 +272,7 @@ exp1d_repulsion_kernel_lambda_svgd_cosine:
     repulsion_type: ['svgd']
     kernel_type: ['cosine']
     lambda_repulsion: # TODO: add more values
-      svgd_cosine: [600, 800, 1000, 1200, 1400, 1600]
+      svgd_cosine: [600, 800, 1000, 1200, 1400]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -321,6 +284,7 @@ exp1d_repulsion_kernel_lambda_svgd_cosine:
     seed: 42
     num_particles: 8
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
@@ -340,6 +304,12 @@ exp1d_repulsion_kernel_lambda_svgd_cosine:
       icecream: 4.0
       cactus: 4.0
       # tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
@@ -380,8 +350,9 @@ exp2_guidance_scale:
     seed: 42
     num_particles: 8
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
-    
+
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
     rbf_beta: 1.0
@@ -397,6 +368,12 @@ exp2_guidance_scale:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
@@ -437,8 +414,11 @@ exp3_num_pts:
     guidance_scale: 100
     seed: 42
     num_particles: 8
+
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
+
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
     rbf_beta: 1.0
@@ -454,6 +434,13 @@ exp3_num_pts:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
+
 
   settings:
     # visualize
@@ -497,8 +484,11 @@ exp4a_cosine_decay_on:
     guidance_scale: 100
     seed: 42
     num_particles: 8
+
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
+
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
     
     rbf_beta: 1.0
@@ -511,6 +501,12 @@ exp4a_cosine_decay_on:
       icecream: 4.0
       cactus: 4.0
       # tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
 
   settings:
     # visualize
@@ -552,8 +548,11 @@ exp4b_cosine_decay_off:
     guidance_scale: 100
     seed: 42
     num_particles: 8
+
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
+
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
     
     rbf_beta: 1.0
@@ -566,6 +565,13 @@ exp4b_cosine_decay_off:
       icecream: 4.0
       cactus: 4.0
       # tulip: 4.0
+      
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
+
 
   settings:
     # visualize
@@ -622,6 +628,12 @@ exp5_feature_layer:
       cactus: 4.0
       # tulip: 4.0
 
+    eval_H: 512
+    eval_W: 512
+
+    # video_snapshot: False
+    # save_model: False
+
   settings:
     # visualize
     visualize: True
@@ -661,8 +673,11 @@ exp6_rbf_beta:
     guidance_scale: 100
     seed: 42
     num_particles: 8
+
     force_same_t: True
+    force_same_noise: True
     anneal_timestep: True
+
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
     use_cosine_decay: False
