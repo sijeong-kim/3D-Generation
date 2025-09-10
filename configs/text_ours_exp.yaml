@@ -75,10 +75,10 @@ exp0_repulsion_kernel:
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['rbf', 'cosine']
     prompt: 
-      # hamburger: "a photo of a hamburger"
-      # icecream: "a photo of an ice cream"
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
+      tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:
