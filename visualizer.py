@@ -31,6 +31,7 @@ class GaussianVisualizer:
         self.eval_H = getattr(self.opt, 'eval_H', self.opt.H)
         self.eval_radius = getattr(self.opt, 'eval_radius', self.cam.radius) # TODO: remove this
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
         
         # Grid layout parameters
         self.grid_rows = 2  # Default to 2 rows
@@ -296,7 +297,7 @@ class GaussianVisualizer:
         # Render images from each viewpoint
         multi_viewpoint_images = []
         
-        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        
         
         for i, camera in enumerate(self.multi_viewpoints_cameras):
             # Render each particle from current viewpoint
@@ -305,7 +306,7 @@ class GaussianVisualizer:
             
             for particle_id in range(self.opt.num_particles):
                 # Render with white background for consistent visualization    
-                out = self.renderers[particle_id].render(camera, bg_color=bg_color)
+                out = self.renderers[particle_id].render(camera, bg_color=self.bg_color)
                 image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
                 particle_images.append(image)
                 
@@ -341,14 +342,13 @@ class GaussianVisualizer:
             os.makedirs(viewpoint_dir, exist_ok=True)
         
         camera = self.fixed_viewpoint_camera
-        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
         
         # Render each particle from the fixed viewpoint
         particle_images = []
         for particle_id in range(self.opt.num_particles):
             # Render with white background for consistent visualization
             
-            out = self.renderers[particle_id].render(camera, bg_color=bg_color)
+            out = self.renderers[particle_id].render(camera, bg_color=self.bg_color)
             image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
             particle_images.append(image)
         
