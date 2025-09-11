@@ -528,10 +528,6 @@ class GUI:
             except NameError:
                 pass
             try:
-                del w_sigma
-            except NameError:
-                pass
-            try:
                 del features
             except NameError:
                 pass
@@ -541,14 +537,6 @@ class GUI:
                 pass
             try:
                 del kernel_grad
-            except NameError:
-                pass
-            try:
-                del attraction_loss_per_particle
-            except NameError:
-                pass
-            try:
-                del repulsion_loss_per_particle
             except NameError:
                 pass
             try:
@@ -742,7 +730,7 @@ class GUI:
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
         # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.step == self.opt.iters:
+        if self.opt.video_snapshot:
             # Update visualizer with final training state
             self.visualizer.update_renderers(self.renderers)
             self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
