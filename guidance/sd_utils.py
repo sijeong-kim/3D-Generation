@@ -423,11 +423,11 @@ class StableDiffusion(nn.Module):
                 # step_ratio가 없을 때만 난수로 t 샘플
                 if force_same_t:
                     t0 = torch.randint(self.min_step, self.max_step + 1, (1,),
-                                    dtype=torch.long, device=self.device, generator=cpu_gen)
+                                    dtype=torch.long, device=self.device)
                     t = t0.expand(batch_size)
                 else:
                     t = torch.randint(self.min_step, self.max_step + 1, (batch_size,),
-                                    dtype=torch.long, device=self.device, generator=cpu_gen)
+                                    dtype=torch.long, device=self.device)
 
             # 2) w(t) 계산
             alpha_t = self.alphas.to(self.device)[t]            # [B]

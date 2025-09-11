@@ -33,6 +33,7 @@ EVAL_RADIUS=(
 
 # ITERS=500
 ITERS=800
+SCHEDULE_ITERS=1000
 
 REPULSION_TYPE="wo" # "rlsd" "svgd"
 KERNEL_TYPE="none" # "rbf" "cosine"
@@ -42,7 +43,7 @@ for PROMPT_IDX in "${!PROMPTS[@]}"; do
     PROMPT=${PROMPTS[${PROMPT_IDX}]}
     EVAL_RADIUS=${EVAL_RADIUS[${PROMPT_IDX}]}
     
-    TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${ITERS}"
+    TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${SCHEDULE_ITERS}"
     # OUTPUT_DIR="${BASE_DIR}/outputs/${SLURM_JOB_ID}/${TASK_NAME}"
     OUTPUT_DIR="${BASE_DIR}/exp/exp0_baseline/${TASK_NAME}"
     mkdir -p ${OUTPUT_DIR}
@@ -65,6 +66,7 @@ for PROMPT_IDX in "${!PROMPTS[@]}"; do
         outdir=${OUTPUT_DIR} \
         seed=${SEED} \
         iters=${ITERS} \
+        schedule_iters=${SCHEDULE_ITERS} \
         eval_radius=${EVAL_RADIUS}"
         # stderr, stdout to file
 
