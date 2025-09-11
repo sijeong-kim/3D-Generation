@@ -1,4 +1,4 @@
-export BASE_DIR=/workspace/3D-Generation-fixed
+export BASE_DIR=/workspace/3D-Generation-debug
 export WORKING_DIR=${BASE_DIR}
 export VENV_DIR=${BASE_DIR}/venv
 
@@ -29,7 +29,7 @@ PROMPT_IDX=1
 PROMPT=${PROMPTS[${PROMPT_IDX}]}
 EVAL_RADIUS=${EVAL_RADIUS[${PROMPT_IDX}]}
 
-ITERS=800
+ITERS=1000
 
 REPULSION_TYPES=("svgd" "rlsd")
 KERNEL_TYPES=("cosine" "rbf")
