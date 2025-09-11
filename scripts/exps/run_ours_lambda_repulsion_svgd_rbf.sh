@@ -9,14 +9,27 @@ export VENV_DIR=${BASE_DIR}/venv
 # Run Parameters
 # --------------------------------
 SEED=42
-# PROMPT="a photo of a hamburger"
-PROMPT="a small saguaro cactus planted in a clay pot"
-# PROMPT="a photo of a tulip"
-# PROMPT="a photo of an ice cream"
 
-# PROMPT_KEY="hamburger"
+PROMPTS=(
+    "a photo of a hamburger"
+    "a small saguaro cactus planted in a clay pot"
+    "a photo of a tulip"
+    "a photo of an ice cream"
+)
 
-ITERS=500
+EVAL_RADIUS=(
+    3.0
+    4.0
+    4.0
+    4.0
+)
+
+PROMPT_IDX=1
+
+PROMPT=${PROMPTS[${PROMPT_IDX}]}
+EVAL_RADIUS=${EVAL_RADIUS[${PROMPT_IDX}]}
+
+ITERS=800
 
 
 REPULSION_TYPES=("svgd")
