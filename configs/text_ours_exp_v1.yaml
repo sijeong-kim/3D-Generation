@@ -118,17 +118,18 @@ exp1_repulsion_kernel:
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
+    
 
 
 # Experiment 2: (Repulsion type x kernel type) & lambda sweep 
-exp2_repulsion_kernel_lambda:
-  name: exp2_repulsion_kernel_lambda
+exp2_lambda:
+  name: exp2_lambda
   method: grid
   sweep_parameters:
     repulsion_type: ['rlsd']
     kernel_type: ['rbf']
     lambda_repulsion: # TODO: add more values
-      rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600]
+      rlsd_rbf: [600, 800, 1000, 1200, 1400]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -188,7 +189,7 @@ exp3_guidance_scale:
   name: exp3_guidance_scale
   method: grid
   sweep_parameters:
-    guidance_scale: [20, 40, 50, 60, 100]
+    guidance_scale: [40, 50, 60, 70]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -244,10 +245,71 @@ exp3_guidance_scale:
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
 
+# Experiment 3: guidance scale sweep
+exp3_feature_layer:
+  name: exp3_feature_layer
+  method: grid
+  sweep_parameters:
+    feature_layer: ['early', 'mid', 'last']
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+    lambda_repulsion: 1000
+    iters: 1000
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+    
+    # feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+  
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
 
 # Experiment 3: num_pts sweep
-exp3_num_pts:
-  name: exp3_num_pts
+exp4_num_pts:
+  name: exp4_num_pts
   method: grid
   sweep_parameters:
     num_pts: [1000, 3000, 5000]
@@ -308,9 +370,9 @@ exp3_num_pts:
     enable_lpips: False # disable lpips for faster training
 
 
-# Experiment 4a: cosine decay sweep
-exp4a_cosine_decay_on:
-  name: exp4a_cosine_decay_on
+# Experiment 5: cosine decay sweep
+exp5_cosine_decay_on:
+  name: exp5_cosine_decay_on
   method: grid
   sweep_parameters:
     prompt: 
@@ -372,8 +434,8 @@ exp4a_cosine_decay_on:
 
 
 # Experiment 4b: cosine decay sweep
-exp4b_cosine_decay_off:
-  name: exp4b_cosine_decay_off
+exp5_cosine_decay_off:
+  name: exp5_cosine_decay_off
   method: grid
   sweep_parameters:
     prompt: 
@@ -398,65 +460,6 @@ exp4b_cosine_decay_off:
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
     
     rbf_beta: 1.0
-    
-    iters: 1000
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-
-# Experiment 5: feature layer sweep
-exp5_feature_layer:
-  name: exp5_feature_layer
-  method: grid
-  sweep_parameters:
-    feature_layer: ['early', 'mid', 'last'] # 2: early, 5: mid, 11: last -> 2, 5, 11
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    lambda_repulsion: 1000 
-    guidance_scale: 100
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-
-    rbf_beta: 1.0
-
-    use_cosine_decay: False
     
     iters: 1000
     invert_bg_prob: 0.5
