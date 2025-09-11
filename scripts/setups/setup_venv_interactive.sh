@@ -4,7 +4,7 @@ set -e  # Stop on error
 # -----------------------------
 # Configuration
 # -----------------------------
-BASE_DIR=/workspace/3D-Generation-fixed
+BASE_DIR=/workspace/3D-Generation-debug
 VENV_DIR="${BASE_DIR}/venv"
 # CUDA_VERSION="12.1"
 # CUDA_HOME="/usr/local/cuda-${CUDA_VERSION}"

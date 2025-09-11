@@ -29,11 +29,11 @@ PROMPT_IDX=1
 PROMPT=${PROMPTS[${PROMPT_IDX}]}
 EVAL_RADIUS=${EVAL_RADIUS[${PROMPT_IDX}]}
 
-ITERS=800
+ITERS=800   
 
 
-REPULSION_TYPES=("svgd")
-KERNEL_TYPES=("cosine")
+REPULSION_TYPES=("rlsd")
+KERNEL_TYPES=("rbf")
 
 LAMBDA_REPULSION=(600 800 1000 1200 1400)
 
@@ -41,7 +41,7 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
     for KERNEL_TYPE in "${KERNEL_TYPES[@]}"; do
         for LAMBDA_REPULSION in "${LAMBDA_REPULSION[@]}"; do
             TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${KERNEL_TYPE}__${LAMBDA_REPULSION}__${ITERS}"
-            OUTPUT_DIR="${BASE_DIR}/exp/exp2_lambda_repulsion_svgd_cosine/${TASK_NAME}"
+            OUTPUT_DIR="${BASE_DIR}/exp/exp2_lambda_repulsion_${REPULSION_TYPE}_${KERNEL_TYPE}/${TASK_NAME}"
             mkdir -p ${OUTPUT_DIR}
 
             if [[ -f "${OUTPUT_DIR}/.done" ]]; then
@@ -57,7 +57,7 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
             # Run Main Script
             # --------------------------------
             CMD="python ${WORKING_DIR}/main_ours.py \
-                --config ${WORKING_DIR}/configs/text_ours_${REPULSION_TYPE}_${KERNEL_TYPE}.yaml \
+                --config ${WORKING_DIR}/configs/text_ours.yaml \
                 prompt=\"${PROMPT}\" \
                 save_path=${PROMPT// /_} \
                 outdir=${OUTPUT_DIR} \

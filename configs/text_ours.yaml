@@ -6,8 +6,8 @@ feature_layer: 11 # 2: early, 5: mid, 11: last
 
 # repulsive loss
 lambda_repulsion: 1000 # weight for repulsive loss
-repulsion_type: "svgd" # "svgd" or "rlsd" or "wo"
-kernel_type: rbf # "rbf" or "cosine"
+repulsion_type: "wo" # "svgd" or "rlsd" or "wo"
+kernel_type: "none" # "rbf" or "cosine"
 rbf_beta: 1.0 # beta for rbf kernel
 cosine_beta: 1.0 # beta for cosine kernel
 cosine_eps_shift: 1e-3 # eps shift for cosine kernel
@@ -141,7 +141,8 @@ percent_dense: 0.01
 density_start_iter: 0
 density_end_iter: 3000
 densification_interval: 50
-opacity_reset_interval: 700
+# opacity_reset_interval: 700
+opacity_reset_interval: 100000
 densify_grad_threshold: 0.01
 
 ### Textured Mesh
