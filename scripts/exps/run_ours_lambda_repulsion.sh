@@ -57,15 +57,14 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
             # Run Main Script
             # --------------------------------
             CMD="python ${WORKING_DIR}/main_ours.py \
-                --config ${WORKING_DIR}/configs/text_ours_${REPULSION_TYPE}_${KERNEL_TYPE}.yaml \
+                --config ${WORKING_DIR}/configs/text_ours.yaml \
                 prompt=\"${PROMPT}\" \
                 save_path=${PROMPT// /_} \
                 outdir=${OUTPUT_DIR} \
                 seed=${SEED} \
                 iters=${ITERS} \
-                schedule_iters=${SCHEDULE_ITERS} \
+                total_schedule_iters=${SCHEDULE_ITERS} \
                 eval_radius=${EVAL_RADIUS}"
-
 
 
             if [ "$REPULSION_TYPE" != "wo" ]; then
