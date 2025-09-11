@@ -194,20 +194,19 @@ class GUI:
 
     def _cfg_schedule(self, r: float) -> float:
         """
-        r∈[0,1], r=0.8에서 ≈40, 말미에 살짝 쿨다운해 oversaturation 방지.
-        구간:
+        r∈[0,1]
         [0.0, 0.6]   : 15 → 32 (낮게 유지)
-        (0.6, 0.8]   : 32 → 40 (정리 시작)
-        (0.8, 1.0]   : 40 → 34 (late cooldown)
+        (0.6, 0.8]   : 32 → 50 (정리 시작, CFG 피크)
+        (0.8, 1.0]   : 50 → 42 (late cooldown 완화)
         """
         if r <= 0.6:
             return float(np.interp(r, [0.0, 0.6], [15.0, 32.0]))
         elif r <= 0.8:
-            return float(np.interp(r, [0.6, 0.8], [32.0, 40.0]))
+            return float(np.interp(r, [0.6, 0.8], [32.0, 50.0]))
         else:
-            # 코사인으로 40→34
+            # 코사인으로 50→42
             x = (r - 0.8) / 0.2
-            return float(34.0 + (40.0 - 34.0) * 0.5 * (1.0 + np.cos(np.pi * x)))
+            return float(42.0 + (50.0 - 42.0) * 0.5 * (1.0 + np.cos(np.pi * x)))
 
     def _noise_q_schedule(self, r: float) -> float:
         """
