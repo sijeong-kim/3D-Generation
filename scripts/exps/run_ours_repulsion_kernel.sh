@@ -40,7 +40,7 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
     for KERNEL_TYPE in "${KERNEL_TYPES[@]}"; do
         for LAMBDA_REPULSION in "${LAMBDA_REPULSION[@]}"; do
             TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${KERNEL_TYPE}__${LAMBDA_REPULSION}__${ITERS}"
-            OUTPUT_DIR="${BASE_DIR}/exp1_repulsion_kernel/${TASK_NAME}"
+            OUTPUT_DIR="${BASE_DIR}/exp/exp1_repulsion_kernel/${TASK_NAME}"
             mkdir -p ${OUTPUT_DIR}
 
             if [[ -f "${OUTPUT_DIR}/.done" ]]; then
