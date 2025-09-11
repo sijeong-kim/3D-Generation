@@ -1,5 +1,6 @@
 # visualizer.py
 import os
+from tkinter import FALSE
 import numpy as np
 import torch
 from gs_renderer import Renderer, MiniCam
@@ -16,8 +17,14 @@ class GaussianVisualizer:
             raise ValueError("Configuration object 'opt' cannot be None")
         self.opt = opt
         
-        # Renderers
-        self.renderers = renderers
+        # Create copies of renderers for visualization to avoid affecting training
+        self.renderers = []
+        for renderer in renderers:
+            # Create a deep copy of the renderer for visualization
+            import copy
+            renderer_copy = copy.deepcopy(renderer)
+            self.renderers.append(renderer_copy)
+        
         self.cam = cam
         
         # Evaluation parameters
@@ -80,6 +87,47 @@ class GaussianVisualizer:
         else:
             self.fixed_viewpoint_dir = None
     
+    def update_renderers(self, training_renderers):
+        """
+        Update visualizer's renderers with the latest training state.
+        This ensures visualization shows the current training progress.
+        Properly discards old copies to prevent memory leaks.
+        """
+        import copy
+        import gc
+        
+        # Explicitly delete old renderers to free memory
+        if hasattr(self, 'renderers') and self.renderers:
+            for old_renderer in self.renderers:
+                del old_renderer
+            del self.renderers
+        
+        # Force garbage collection
+        gc.collect()
+        
+        # Create new copies
+        self.renderers = []
+        for renderer in training_renderers:
+            renderer_copy = copy.deepcopy(renderer)
+            self.renderers.append(renderer_copy)
+    
+    def cleanup_renderers(self):
+        """
+        Explicitly clean up visualizer renderers to free memory.
+        Call this after visualization is complete.
+        """
+        import gc
+        
+        if hasattr(self, 'renderers') and self.renderers:
+            for renderer in self.renderers:
+                del renderer
+            del self.renderers
+            self.renderers = []
+        
+        # Force garbage collection
+        gc.collect()
+    
+    @torch.inference_mode()
     def arrange_particles_in_grid(self, particle_images):
         """
         Arrange particle images in a grid layout (2x4 by default, auto-adjusts for different numbers).
@@ -151,23 +199,26 @@ class GaussianVisualizer:
         return grid_tensor
     
     # Set viewpoints around object
-    @torch.no_grad()
+    @torch.inference_mode()
     def set_viewpoints(self, num_views=8):
         elevations = [0.0] * num_views  # All viewpoints at zero elevation
         azimuths = np.linspace(0, 360, num_views, endpoint=False)  # Evenly distributed azimuth angles
         return [(elevations[i], azimuths[i]) for i in range(num_views)]
 
     # Save rendered images
-    @torch.no_grad()
+    @torch.inference_mode()
     def save_rendered_images(self, step, images):
-        
+        """
+        Save rendered images for visualization only. This method does NOT affect training.
+        """
         if self.rendered_images_dir is not None:
             output_path = os.path.join(self.rendered_images_dir, f'step_{step}.png')
+            # Ensure images are in [0,1] range before saving
             vutils.save_image(images, output_path, normalize=False)
         
         
     # Set specific viewpoint camera
-    @torch.no_grad()
+    @torch.inference_mode()
     def get_fixed_view_camera(self, elevation, horizontal, radius):
         """
         Compute camera pose for specified angles
@@ -187,7 +238,7 @@ class GaussianVisualizer:
         return camera
     
     # Set front view camera
-    @torch.no_grad()
+    @torch.inference_mode()
     def get_front_view_camera(self):
         """
         Generate a camera viewpoint for front view rendering.
@@ -195,13 +246,13 @@ class GaussianVisualizer:
         return self.get_fixed_view_camera(0.0, 0.0, self.eval_radius)
 
     # Set multi-viewpoints around object
-    @torch.no_grad()
+    @torch.inference_mode()
     def set_multi_viewpoints_around_object(self, num_views=8):
         elevations = [0.0] * num_views  # All viewpoints at zero elevation
         azimuths = np.linspace(0, 360, num_views, endpoint=False)  # Evenly distributed azimuth angles
         return [(elevations[i], azimuths[i]) for i in range(num_views)]
     
-
+    @torch.inference_mode()
     def get_multi_view_cameras(self, num_views=8):
         """
         Generate a set of camera viewpoints for multi-view rendering.
@@ -215,7 +266,7 @@ class GaussianVisualizer:
         return cameras
     
 
-    @torch.no_grad()
+    @torch.inference_mode()
     def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize_multi_viewpoints=None, save_iid=None):
         # 📥 Use default values if parameters are not provided
         if num_views is None:
@@ -245,12 +296,16 @@ class GaussianVisualizer:
         
         # Render images from each viewpoint
         multi_viewpoint_images = []
+        
+        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        
         for i, camera in enumerate(self.multi_viewpoints_cameras):
             # Render each particle from current viewpoint
             particle_images = []
+            
+            
             for particle_id in range(self.opt.num_particles):
-                # Render with white background for consistent visualization
-                bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+                # Render with white background for consistent visualization    
                 out = self.renderers[particle_id].render(camera, bg_color=bg_color)
                 image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
                 particle_images.append(image)
@@ -258,6 +313,7 @@ class GaussianVisualizer:
                 # 📥 Save individual particle image if enabled
                 if visualize_multi_viewpoints and save_iid and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and save_iid_paths is not None:
                     output_path = os.path.join(save_iid_paths[particle_id], f'view_{i:03d}.png')
+                    # Ensure images are in [0,1] range before saving
                     vutils.save_image(image, output_path, normalize=False)
             
             # Combine all particle images for current viewpoint using grid layout
@@ -270,6 +326,7 @@ class GaussianVisualizer:
             # 📥 Save combined view of all particles if multiple particles exist
             if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and multi_viewpoints_dir is not None:
                 output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
+                # Ensure images are in [0,1] range before saving
                 vutils.save_image(grid_image, output_path, normalize=False)
         
         # Stack all viewpoints into final tensor
@@ -277,39 +334,51 @@ class GaussianVisualizer:
         
         return multi_viewpoint_images
 
-    @torch.no_grad()
-    def visualize_fixed_viewpoint(self, step):
-        # Create output directory for this specific viewpoint
-        if self.fixed_viewpoint_dir is not None:
-            viewpoint_dir = os.path.join(self.fixed_viewpoint_dir, f'step_{step}')
-            os.makedirs(viewpoint_dir, exist_ok=True)
+    @torch.inference_mode()
+    def visualize_fixed_viewpoint(self, step, save_iid=None):
+        if save_iid is None:
+            save_iid = self.opt.save_iid
+            
+        # # Create output directory for this specific viewpoint
+        # if self.fixed_viewpoint_dir is not None:
+        #     viewpoint_dir = os.path.join(self.fixed_viewpoint_dir, f'step_{step}')
+        #     os.makedirs(viewpoint_dir, exist_ok=True)
         
         camera = self.fixed_viewpoint_camera
+        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
         
         # Render each particle from the fixed viewpoint
         particle_images = []
         for particle_id in range(self.opt.num_particles):
             # Render with white background for consistent visualization
-            bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+            
             out = self.renderers[particle_id].render(camera, bg_color=bg_color)
             image = out["image"].unsqueeze(0)  # Add batch dimension: [1, 3, H, W]
             particle_images.append(image)
         
             # Save individual particle image if visualization is enabled
-            if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
-                filename = f'step_{step}_particle_{particle_id}.png'
-                output_path = os.path.join(viewpoint_dir, filename)
+            if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None and save_iid:
+                output_path = os.path.join(self.fixed_viewpoint_dir, f'step_{step}_particle_{particle_id}.png')
+                # Ensure images are in [0,1] range before saving
+
                 vutils.save_image(image, output_path, normalize=False)
                 
+        del image
+        del out
+        
         # Combine all particle images using grid layout
         particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for return
         grid_image = self.arrange_particles_in_grid(particle_images)
         
         # Save combined view of all particles if visualization is enabled
         if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
-            filename = f'all_particles.png'
-            output_path = os.path.join(viewpoint_dir, filename)
+            output_path = os.path.join(self.fixed_viewpoint_dir, f'step_{step}_all_particles.png')
+            # Ensure images are in [0,1] range before saving
+
             vutils.save_image(grid_image, output_path, normalize=False)
+        
+        del particle_images
+        del bg_color
         
         return particle_images_tensor
     
