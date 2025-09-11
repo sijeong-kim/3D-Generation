@@ -1,21 +1,21 @@
 # training
 seed: 42
-num_particles: 4
+num_particles: 8
 feature_extractor_model_name: facebook/dinov2-base
 feature_layer: 11 # 2: early, 5: mid, 11: last
 
 # repulsive loss
-lambda_repulsion: 500 # weight for repulsive loss
-repulsion_type: "svgd" # "svgd" or "rlsd" or "wo"
-kernel_type: "rbf" # "rbf" or "cosine"
+lambda_repulsion: 1000 # weight for repulsive loss
+repulsion_type: "wo" # "svgd" or "rlsd" or "wo"
+kernel_type: "none" # "rbf" or "cosine"
 rbf_beta: 1.0 # beta for rbf kernel
 cosine_beta: 1.0 # beta for cosine kernel
 cosine_eps_shift: 1e-3 # eps shift for cosine kernel
 
 # guidance
-guidance_scale: 20 # should be lower like 20
+guidance_scale: 100
 force_same_t: True # 모든 파티클 동일 t
-
+force_same_noise: True # 모든 파티클 동일 noise
 
 # cosine decay
 use_cosine_decay: False # use cosine decay for sigma_t
@@ -34,21 +34,21 @@ save_rendered_images_interval: 100 # for debugging
 save_iid: False # for visualization
 visualize_multi_viewpoints: False # for visualization
 visualize_multi_viewpoints_interval: 500 # for debugging
-visualize_fixed_viewpoint: False # for visualization
+visualize_fixed_viewpoint: True # for visualization
 visualize_fixed_viewpoint_interval: 100 # for debugging
 visualize_graph: False # save graph for debugging
 visualize_graph_interval: 100 # for debugging
 # save_rep_features: False # save features from different layers
 # save_rep_features_interval: 100 # save features from different layers
-eval_W: 256
-eval_H: 256
-eval_radius: 3.0
+eval_W: 512
+eval_H: 512
+eval_radius: 3.0 # not to crop the object adjust the radius
 
 # metrics
 metrics: True
 quantitative_metrics_interval: 50
-losses_interval: 50
-efficiency_interval: 50
+losses_interval: 10
+efficiency_interval: 10
 kernel_metrics_interval: 10  # interval for logging kernel statistics
 enable_lpips: False
 
@@ -58,6 +58,9 @@ multi_view_type: "average_views" # "best_views", "average_views", "cross_attenti
 
 # save model
 save_model: False
+
+# save video snapshot
+video_snapshot: False
 
 ### Input
 # input rgba image path (default to None, can be load in GUI too)
@@ -96,7 +99,7 @@ warmup_rgb_loss: True
 # training batch size per iter
 batch_size: 1
 # training iterations for stage 1
-iters: 1500 # 500
+iters: 1000 # 500
 # whether to linearly anneal timestep
 anneal_timestep: True
 # training iterations for stage 2
@@ -138,7 +141,8 @@ percent_dense: 0.01
 density_start_iter: 0
 density_end_iter: 3000
 densification_interval: 50
-opacity_reset_interval: 700
+# opacity_reset_interval: 700
+opacity_reset_interval: 100000
 densify_grad_threshold: 0.01
 
 ### Textured Mesh
