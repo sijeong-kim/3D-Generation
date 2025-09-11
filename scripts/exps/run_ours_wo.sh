@@ -32,7 +32,7 @@ EVAL_RADIUS=(
 # PROMPT_KEY="hamburger"
 
 # ITERS=500
-ITERS=500
+ITERS=1000
 
 REPULSION_TYPE="wo" # "rlsd" "svgd"
 KERNEL_TYPE="none" # "rbf" "cosine"

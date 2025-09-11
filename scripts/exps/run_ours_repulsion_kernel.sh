@@ -9,14 +9,14 @@ export VENV_DIR=${BASE_DIR}/venv
 # Run Parameters
 # --------------------------------
 SEED=42
-PROMPT="a photo of a hamburger"
-# PROMPT="a small saguaro cactus planted in a clay pot"
+# PROMPT="a photo of a hamburger"
+PROMPT="a small saguaro cactus planted in a clay pot"
 # PROMPT="a photo of a tulip"
 # PROMPT="a photo of an ice cream"
 
 # PROMPT_KEY="hamburger"
 
-ITERS=1500
+ITERS=500
 
 
 REPULSION_TYPES=("rlsd" "svgd")
@@ -26,8 +26,8 @@ LAMBDA_REPULSION=1000
 
 for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
     for KERNEL_TYPE in "${KERNEL_TYPES[@]}"; do
-        TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${KERNEL_TYPE}__${LAMBDA_REPULSION}"
-        OUTPUT_DIR="${BASE_DIR}/outputs/${TASK_NAME}"
+        TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${KERNEL_TYPE}__${LAMBDA_REPULSION}__${ITERS}"
+        OUTPUT_DIR="${BASE_DIR}/exp/exp1_repulsion_kernel/${TASK_NAME}"
         mkdir -p ${OUTPUT_DIR}
 
         if [[ -f "${OUTPUT_DIR}/.done" ]]; then
@@ -49,23 +49,34 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
             outdir=${OUTPUT_DIR} \
             seed=${SEED} \
             iters=${ITERS} \
-            > ${OUTPUT_DIR}/output.log 2>&1"
+            eval_radius=${EVAL_RADIUS}"
+
 
 
         if [ "$REPULSION_TYPE" != "wo" ]; then
+            CMD="${CMD} repulsion_type=${REPULSION_TYPE}"
             CMD="${CMD} lambda_repulsion=${LAMBDA_REPULSION}"
+            CMD="${CMD} kernel_type=${KERNEL_TYPE}"
         fi
 
         echo "[RUNNING COMMAND] $CMD"
         eval $CMD
 
-        echo "[INFO] Job completed successfully."
+        # Run command and save output/error to files while showing in terminal
+        eval $CMD > >(tee "${OUTPUT_DIR}/stdout.log") 2> >(tee "${OUTPUT_DIR}/stderr.log" >&2)
+        local exit_code=$?
 
-        # make .done file
-        echo "Task completed: ${TASK_NAME}" > "${OUTPUT_DIR}/.done"
-        echo "Completed at: $(date)" >> "${OUTPUT_DIR}/.done"
+        if [ $exit_code -ne 0 ]; then
+            echo "[ERROR] Command failed with exit code: $exit_code"
+            exit 1
+        else
+            echo "[INFO] Job completed successfully."
+            # make .done file
+            echo "Task completed: ${TASK_NAME}" > "${OUTPUT_DIR}/.done"
+            echo "Completed at: $(date)" >> "${OUTPUT_DIR}/.done"
+        fi
 
-        sleep 60
+        sleep 10
 
     done
 done
