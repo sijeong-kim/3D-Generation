@@ -207,6 +207,7 @@ class GUI:
             # 코사인으로 50→42
             x = (r - 0.8) / 0.2
             return float(42.0 + (50.0 - 42.0) * 0.5 * (1.0 + np.cos(np.pi * x)))
+        
 
     def _noise_q_schedule(self, r: float) -> float:
         """
@@ -223,6 +224,51 @@ class GUI:
         else:
             x = (r - 0.7) / 0.3
             return float(0.55 * 0.5 * (1.0 + np.cos(np.pi * x)))  # 0.55→0.0
+
+    def _baseline_cfg_and_t(self, step: int):
+        """
+        step<=baseline_warmup_iters 구간에서 baseline과 완전히 동일한 스케줄.
+        cfg=100 고정, t는 step_ratio를 500으로 나눠 계산(anneal=True와 동일).
+        """
+        r = min(1.0, step / float(self.opt.baseline_warmup_iters))  # 0~1
+        # baseline에선 cfg=100 고정
+        cfg = float(self.opt.baseline_cfg)
+
+        # baseline anneal: (1-r)*T → 큰 t(더 noisy)에서 시작해 점차 줄어듦
+        if self.opt.baseline_anneal:
+            t_scalar = int(np.round((1.0 - r) * int(self.guidance_sd.num_train_timesteps)))
+            t_scalar = int(np.clip(t_scalar, int(self.guidance_sd.min_step), int(self.guidance_sd.max_step)))
+        else:
+            # 안 쓰겠지만 안전장치
+            t_scalar = int(self.guidance_sd.max_step)
+
+        t_override = torch.full((self.opt.num_particles,), t_scalar, dtype=torch.long, device=self.device)
+        return cfg, t_override
+
+    def _custom_cfg_and_t(self, step: int):
+        """
+        step > baseline_warmup_iters 이후 네가 설계한 커스텀 스케줄.
+        - r_custom은 [0,1]로 재정의: (step-500)/(total_schedule_iters-500)
+        - cfg: 너가 만든 _cfg_schedule(r_custom)
+        - t: 너가 만든 _noise_q_schedule(r_custom) → DDIM t로 변환
+        """
+        # r_custom: 후반부만 0→1로 스케일
+        start = int(self.opt.baseline_warmup_iters)
+        end   = int(self.opt.total_schedule_iters)
+        denom = max(1, end - start)
+        r_custom = float(np.clip((step - start) / float(denom), 0.0, 1.0))
+
+        # cfg 스케줄 (네가 위에 만든 함수 그대로 활용)
+        cfg = float(np.clip(self._cfg_schedule(r_custom), 5.0, 55.0))
+
+        # 노이즈 스케줄 → t_override
+        q = float(np.clip(self._noise_q_schedule(r_custom), 0.0, 1.0))
+        t_scalar = int(q * int(self.guidance_sd.num_train_timesteps))
+        t_scalar = int(np.clip(t_scalar, int(self.guidance_sd.min_step), int(self.guidance_sd.max_step)))
+        t_override = torch.full((self.opt.num_particles,), t_scalar, dtype=torch.long, device=self.device)
+
+        return cfg, t_override
+
 
 
     def seed_everything(self, seed):
@@ -311,7 +357,7 @@ class GUI:
         with torch.no_grad():
             self.guidance_sd.get_text_embeds([self.prompt], [self.negative_prompt])
             
-        T = int(self.opt.schedule_iters)
+        T = int(self.opt.total_schedule_iters)
         min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
         max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation),  80 - self.opt.elevation)
         self.view_ver_seq = self.rng.np.integers(low=min_ver, high=max_ver, size=T, endpoint=False)
@@ -338,24 +384,30 @@ class GUI:
 
 
         # 스케줄 비율 r (iters와 무관, schedule 축 기준)
-        step_ratio = min(1, self.step / self.opt.schedule_iters)
-        
+        step_ratio = min(1, self.step / self.opt.total_schedule_iters)
+            
         ### novel view (manual batch)
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
         
+        # === 여기 추가: step에 따라 baseline vs custom 스케줄 분기 ===
+        if self.step <= int(self.opt.baseline_warmup_iters):
+            gs, t_override = self._baseline_cfg_and_t(self.step)
+        else:
+            gs, t_override = self._custom_cfg_and_t(self.step)
+
         
         # CFG 스케줄
-        gs = self._cfg_schedule(step_ratio)
-        gs = float(np.clip(gs, 5.0, 55.0))  # 안전 클램프
+        # gs = self._cfg_schedule(step_ratio)
+        # gs = float(np.clip(gs, 5.0, 55.0))  # 안전 클램프
 
-        # 노이즈 스케줄 → t_override 생성
-        q = self._noise_q_schedule(step_ratio)  # q ∈ [0,1]
-        t_scalar = int(np.clip(
-            q * int(self.guidance_sd.num_train_timesteps),
-            int(self.guidance_sd.min_step),
-            int(self.guidance_sd.max_step)
-        ))
-        t_override = torch.full((self.opt.num_particles,), t_scalar, dtype=torch.long, device=self.device)
+        # # 노이즈 스케줄 → t_override 생성
+        # q = self._noise_q_schedule(step_ratio)  # q ∈ [0,1]
+        # t_scalar = int(np.clip(
+        #     q * int(self.guidance_sd.num_train_timesteps),
+        #     int(self.guidance_sd.min_step),
+        #     int(self.guidance_sd.max_step)
+        # ))
+        # t_override = torch.full((self.opt.num_particles,), t_scalar, dtype=torch.long, device=self.device)
 
         images = []
         outputs = []
@@ -365,7 +417,7 @@ class GUI:
         # ver = np.random.randint(min_ver, max_ver)
         # hor = np.random.randint(-180, 180)
         
-        T = int(self.opt.schedule_iters)
+        T = int(self.opt.total_schedule_iters)
         idx = min(self.step - 1, T - 1)  # 0-index
         ver = int(self.view_ver_seq[idx])
         hor = int(self.view_hor_seq[idx])
