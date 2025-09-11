@@ -1,5 +1,6 @@
 # visualizer.py
 import os
+from tkinter import FALSE
 import numpy as np
 import torch
 from gs_renderer import Renderer, MiniCam
@@ -334,11 +335,14 @@ class GaussianVisualizer:
         return multi_viewpoint_images
 
     @torch.inference_mode()
-    def visualize_fixed_viewpoint(self, step):
-        # Create output directory for this specific viewpoint
-        if self.fixed_viewpoint_dir is not None:
-            viewpoint_dir = os.path.join(self.fixed_viewpoint_dir, f'step_{step}')
-            os.makedirs(viewpoint_dir, exist_ok=True)
+    def visualize_fixed_viewpoint(self, step, save_iid=None):
+        if save_iid is None:
+            save_iid = self.opt.save_iid
+            
+        # # Create output directory for this specific viewpoint
+        # if self.fixed_viewpoint_dir is not None:
+        #     viewpoint_dir = os.path.join(self.fixed_viewpoint_dir, f'step_{step}')
+        #     os.makedirs(viewpoint_dir, exist_ok=True)
         
         camera = self.fixed_viewpoint_camera
         bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
@@ -353,24 +357,28 @@ class GaussianVisualizer:
             particle_images.append(image)
         
             # Save individual particle image if visualization is enabled
-            if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
-                filename = f'step_{step}_particle_{particle_id}.png'
-                output_path = os.path.join(viewpoint_dir, filename)
+            if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None and save_iid:
+                output_path = os.path.join(self.fixed_viewpoint_dir, f'step_{step}_particle_{particle_id}.png')
                 # Ensure images are in [0,1] range before saving
 
                 vutils.save_image(image, output_path, normalize=False)
                 
+        del image
+        del out
+        
         # Combine all particle images using grid layout
         particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for return
         grid_image = self.arrange_particles_in_grid(particle_images)
         
         # Save combined view of all particles if visualization is enabled
         if self.opt.visualize_fixed_viewpoint and self.fixed_viewpoint_dir is not None:
-            filename = f'all_particles.png'
-            output_path = os.path.join(viewpoint_dir, filename)
+            output_path = os.path.join(self.fixed_viewpoint_dir, f'step_{step}_all_particles.png')
             # Ensure images are in [0,1] range before saving
 
             vutils.save_image(grid_image, output_path, normalize=False)
+        
+        del particle_images
+        del bg_color
         
         return particle_images_tensor
     
