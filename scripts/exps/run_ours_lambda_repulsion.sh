@@ -30,10 +30,10 @@ PROMPT=${PROMPTS[${PROMPT_IDX}]}
 EVAL_RADIUS=${EVAL_RADIUS[${PROMPT_IDX}]}
 
 ITERS=800
-
+SCHEDULE_ITERS=1000
 
 REPULSION_TYPES=("svgd")
-KERNEL_TYPES=("cosine")
+KERNEL_TYPES=("rbf")
 
 LAMBDA_REPULSION=(600 800 1000 1200 1400)
 
@@ -41,7 +41,7 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
     for KERNEL_TYPE in "${KERNEL_TYPES[@]}"; do
         for LAMBDA_REPULSION in "${LAMBDA_REPULSION[@]}"; do
             TASK_NAME="${PROMPT// /_}__${REPULSION_TYPE}__${KERNEL_TYPE}__${LAMBDA_REPULSION}__${ITERS}"
-            OUTPUT_DIR="${BASE_DIR}/exp/exp2_lambda_repulsion_svgd_cosine/${TASK_NAME}"
+            OUTPUT_DIR="${BASE_DIR}/exp/exp2_lambda_repulsion__${REPULSION_TYPE}__${KERNEL_TYPE}__${LAMBDA_REPULSION}__${ITERS}"
             mkdir -p ${OUTPUT_DIR}
 
             if [[ -f "${OUTPUT_DIR}/.done" ]]; then
@@ -63,6 +63,7 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
                 outdir=${OUTPUT_DIR} \
                 seed=${SEED} \
                 iters=${ITERS} \
+                schedule_iters=${SCHEDULE_ITERS} \
                 eval_radius=${EVAL_RADIUS}"
 
 

@@ -16,6 +16,7 @@ cosine_eps_shift: 1e-3 # eps shift for cosine kernel
 guidance_scale: 100
 force_same_t: True # 모든 파티클 동일 t
 force_same_noise: True # 모든 파티클 동일 noise
+schedule_iters: 1000
 
 # cosine decay
 use_cosine_decay: False # use cosine decay for sigma_t

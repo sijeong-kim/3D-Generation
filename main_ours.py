@@ -24,6 +24,22 @@ from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 
+class RNGPack:
+    def __init__(self, base_seed: int, device: str = "cuda"):
+        # NumPy 전용 RNG (뷰/배경 등 CPU 샘플링)
+        self.np = np.random.default_rng(int(base_seed))
+        # Torch 전용 RNG들
+        self.gen_cpu = torch.Generator(device="cpu")
+        self.gen_cpu.manual_seed(int(base_seed) + 1)
+
+        dev = "cuda" if device.startswith("cuda") else "cpu"
+        self.gen_shared_cuda = torch.Generator(device=dev)
+        self.gen_shared_cuda.manual_seed(int(base_seed) + 2)   # 모든 파티클이 공유할 노이즈
+
+        self.gen_ind_cuda = torch.Generator(device=dev)
+        self.gen_ind_cuda.manual_seed(int(base_seed) + 3)      # 필요 시 파티클별 노이즈
+
+
 class GUI:
     def __init__(self, opt):
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -110,6 +126,9 @@ class GUI:
         else:
             self.visualizer = None
             
+            
+        self.rng = RNGPack(int(self.seed), device=self.device.type)
+            
     def __del__(self):
         pass
     
@@ -170,12 +189,48 @@ class GUI:
             print(f"[WARNING] GPU {gpu_id} not available, using CPU")
             self.device = torch.device("cpu")
             return False
+        
+    # GUI 클래스 내부 메서드로 추가
+
+    def _cfg_schedule(self, r: float) -> float:
+        """
+        r∈[0,1], r=0.8에서 ≈40, 말미에 살짝 쿨다운해 oversaturation 방지.
+        구간:
+        [0.0, 0.6]   : 15 → 32 (낮게 유지)
+        (0.6, 0.8]   : 32 → 40 (정리 시작)
+        (0.8, 1.0]   : 40 → 34 (late cooldown)
+        """
+        if r <= 0.6:
+            return float(np.interp(r, [0.0, 0.6], [15.0, 32.0]))
+        elif r <= 0.8:
+            return float(np.interp(r, [0.6, 0.8], [32.0, 40.0]))
+        else:
+            # 코사인으로 40→34
+            x = (r - 0.8) / 0.2
+            return float(34.0 + (40.0 - 34.0) * 0.5 * (1.0 + np.cos(np.pi * x)))
+
+    def _noise_q_schedule(self, r: float) -> float:
+        """
+        노이즈 비율 q ∈ [0,1]; 클수록 noisy.
+        중간 노이즈 plateau(q≈0.55)를 r=0.7까지 유지 → r>0.7에서 급히 감소.
+        [0.0, 0.3]   : 0.65 → 0.58 (다양성 확보)
+        (0.3, 0.7]   : 0.58 → 0.55 (plateau 근접, 안정화)
+        (0.7, 1.0]   : 0.55 → 0.0 (부드러운 코사인 감쇠)
+        """
+        if r <= 0.3:
+            return float(np.interp(r, [0.0, 0.3], [0.65, 0.58]))
+        elif r <= 0.7:
+            return float(np.interp(r, [0.3, 0.7], [0.58, 0.55]))
+        else:
+            x = (r - 0.7) / 0.3
+            return float(0.55 * 0.5 * (1.0 + np.cos(np.pi * x)))  # 0.55→0.0
+
 
     def seed_everything(self, seed):
         try:
             seed = int(seed)
         except:
-            seed = np.random.randint(0, 1000000)
+            seed = np.random.randint(0, 1000003)
 
         os.environ["PYTHONHASHSEED"] = str(seed)
         np.random.seed(seed)
@@ -189,7 +244,7 @@ class GUI:
         torch.backends.cudnn.allow_tf32 = False
 
     def prepare_train(self):
-
+        
         self.step = 0
         self.optimizers = []
         for i in range(self.opt.num_particles):
@@ -256,6 +311,14 @@ class GUI:
         # prepare embeddings
         with torch.no_grad():
             self.guidance_sd.get_text_embeds([self.prompt], [self.negative_prompt])
+            
+        T = int(self.opt.schedule_iters)
+        min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
+        max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation),  80 - self.opt.elevation)
+        self.view_ver_seq = self.rng.np.integers(low=min_ver, high=max_ver, size=T, endpoint=False)
+        self.view_hor_seq = self.rng.np.integers(low=-180,  high=180,    size=T, endpoint=False)
+        self.bg_white_seq = (self.rng.np.random(T) > self.opt.invert_bg_prob)
+
 
     def train_step(self):
     # 1. Forward pass
@@ -268,34 +331,55 @@ class GUI:
                 starter.record()
                 
 
-        step_ratio = min(1, self.step / self.opt.iters)
+        
 
         total_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
         attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
         repulsion_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
 
+
+        # 스케줄 비율 r (iters와 무관, schedule 축 기준)
+        step_ratio = min(1, self.step / self.opt.schedule_iters)
+        
         ### novel view (manual batch)
         render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
+        
+        
+        # CFG 스케줄
+        gs = self._cfg_schedule(step_ratio)
+        gs = float(np.clip(gs, 5.0, 55.0))  # 안전 클램프
+
+        # 노이즈 스케줄 → t_override 생성
+        q = self._noise_q_schedule(step_ratio)  # q ∈ [0,1]
+        t_scalar = int(np.clip(
+            q * int(self.guidance_sd.num_train_timesteps),
+            int(self.guidance_sd.min_step),
+            int(self.guidance_sd.max_step)
+        ))
+        t_override = torch.full((self.opt.num_particles,), t_scalar, dtype=torch.long, device=self.device)
+
         images = []
         outputs = []
-        # poses = []
-        # vers, hors, radii = [], [], []
-        # avoid too large elevation (> 80 or < -80), and make sure it always cover [min_ver, max_ver]
-        min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
-        max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation), 80 - self.opt.elevation)
-        
+
         # render random view
         
-        self.seed_everything(self.seed + self.step)
+        # ver = np.random.randint(min_ver, max_ver)
+        # hor = np.random.randint(-180, 180)
         
-        ver = np.random.randint(min_ver, max_ver)
-        hor = np.random.randint(-180, 180)
+        T = int(self.opt.schedule_iters)
+        idx = min(self.step - 1, T - 1)  # 0-index
+        ver = int(self.view_ver_seq[idx])
+        hor = int(self.view_hor_seq[idx])
         radius = 0
         
         pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)        
         cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
-        bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
-
+        
+        # bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+        bg_is_white = bool(self.bg_white_seq[idx])
+        bg_color_np = np.array([1,1,1] if bg_is_white else [0,0,0], dtype=np.float32)
+        bg_color = torch.from_numpy(bg_color_np).to(self.device).to(torch.float32)
+        
         for j in range(self.opt.num_particles):
             
             # set seed for each particle + iteration step for different viewpoints each iter
@@ -353,10 +437,15 @@ class GUI:
         attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
     
         score_gradients, latents = self.guidance_sd.train_step_gradient(
-            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-            guidance_scale=self.opt.guidance_scale,
+            images, 
+            # step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+            step_ratio=None, # t_override 사용 로 통제
+            guidance_scale=gs, # schedule cfg
             force_same_t=self.opt.force_same_t,
             force_same_noise=self.opt.force_same_noise,
+            shared_cuda_gen=self.rng.gen_shared_cuda,
+            cpu_gen=self.rng.gen_cpu,
+            t_override=t_override,
         )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
         
         score_gradients = score_gradients.to(torch.float32)

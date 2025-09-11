@@ -30,7 +30,7 @@ PROMPT=${PROMPTS[${PROMPT_IDX}]}
 EVAL_RADIUS=${EVAL_RADIUS[${PROMPT_IDX}]}
 
 ITERS=800
-
+SCHEDULE_ITERS=1000
 REPULSION_TYPES=("svgd" "rlsd")
 KERNEL_TYPES=("cosine" "rbf")
 
@@ -62,6 +62,7 @@ for REPULSION_TYPE in "${REPULSION_TYPES[@]}"; do
                 outdir=${OUTPUT_DIR} \
                 seed=${SEED} \
                 iters=${ITERS} \
+                schedule_iters=${SCHEDULE_ITERS} \
                 eval_radius=${EVAL_RADIUS}"
 
 
