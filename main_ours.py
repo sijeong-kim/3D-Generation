@@ -289,6 +289,9 @@ class GUI:
 
         pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
         cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
+        
+        bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+
     
         for j in range(self.opt.num_particles):
             # set seed for each particle + iteration step for different background each iter
@@ -297,7 +300,6 @@ class GUI:
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
 
-            bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device=self.device)
             out = self.renderers[j].render(cur_cam, bg_color=bg_color)
 
             image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
@@ -315,26 +317,11 @@ class GUI:
         
         images = torch.cat(images, dim=0) # [N, 3, H, W]
         
-        self.seed_everything(self.seed + self.step)
+        repulsion_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
         
-        # 2.1. Get gradients and latents from SD (latent space)
-        score_gradients, latents = self.guidance_sd.train_step_gradient(
-            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-            guidance_scale=self.opt.guidance_scale,
-            force_same_t=self.opt.force_same_t,
-        )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64], w_sigma: [N]
-
-        if self.opt.repulsion_type == 'wo':
-            # SDS loss == attraction loss
-            target = (latents - score_gradients).detach()
-            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
-            attraction_loss = attraction_loss_per_particle.mean()
-            # No repulsion loss for WO
-            repulsion_loss = torch.tensor(0.0, device=images.device, dtype=torch.float32)
-            
-        else:
-            # 3. Feature extraction (feature space)
-            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature]
+        # repulsion loss (feature space)
+        if self.opt.repulsion_type in ['rlsd', 'svgd']:
+            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature] 
             
             # 4. Kernel computation (feature space)
             if self.opt.kernel_type == 'rbf':
@@ -356,73 +343,53 @@ class GUI:
             kernel = kernel.detach().to(torch.float32)
             kernel_grad = kernel_grad.detach().to(torch.float32)
             
-            # 4.5. Compute and log kernel statistics (if metrics enabled)
-            if self.opt.metrics and self.metrics_calculator is not None and (self.step==1 or self.step % self.opt.kernel_metrics_interval == 0):
-                neff_mean, neff_std, row_sum_mean, row_sum_std, gradient_norm_mean, gradient_norm_std = self.metrics_calculator.compute_kernel_statistics(kernel, kernel_grad, features)
-                self.metrics_calculator.log_kernel_stats(
-                    step=self.step,
-                    kernel_stats={
-                        "neff_mean": neff_mean,
-                        "neff_std": neff_std,
-                        "row_sum_mean": row_sum_mean,
-                        "row_sum_std": row_sum_std,
-                        "gradient_norm_mean": gradient_norm_mean,
-                        "gradient_norm_std": gradient_norm_std,
-                    }
-                )
-            
-            # 5. Attraction loss (latent space)            
-            if self.opt.repulsion_type == 'svgd':
-                v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)  # [N,4,64,64]  
-                target = (latents - v).detach()
-            elif self.opt.repulsion_type == 'rlsd':
-                target = (latents - score_gradients).detach()
-            else:
-                raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
+            repulsion_loss = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
+            repulsion_loss = repulsion_loss.mean() # [N] -> [1]
 
-            # per-sample attraction loss (keeps your sum/B scale per sample) == multiply the per-sample mean by D_latent of summing up
-            attraction_loss_per_particle = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N, D_latent] -> [N]
-            attraction_loss = attraction_loss_per_particle.mean() # [N] -> [1]
-            
-            w_cos = 1.0
-            # Cosine decay for repulsion weight
-            if self.opt.use_cosine_decay:
-                s = min(1.0, max(0.0, (self.step / self.opt.iters - self.opt.rep_cosine_warmup) / max(1e-8, 1.0 - self.opt.rep_cosine_warmup)))
-                w_cos = 0.5 * (1.0 + torch.cos(torch.pi * torch.tensor(s, device=images.device, dtype=torch.float32)))
-                w_cos = torch.clamp(w_cos, min=self.opt.cosine_decay_floor)
-            
-            w_cos = torch.as_tensor(w_cos, device=images.device, dtype=torch.float32)
-            
-            # 6. Repulsion loss
-            repulsion_loss_per_particle = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
-            repulsion_loss = (w_cos * repulsion_loss_per_particle).mean() # [N] -> [1]
+        # attraction loss (latent space)
+        attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
+    
+        score_gradients, latents = self.guidance_sd.train_step_gradient(
+            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+            guidance_scale=self.opt.guidance_scale,
+            force_same_t=self.opt.force_same_t,
+            force_same_noise=self.opt.force_same_noise,
+        )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
         
-        # 7. Scale losses
+        score_gradients = score_gradients.to(torch.float32)
+        latents = latents.to(torch.float32)
+        
+        if self.opt.repulsion_type == 'svgd':
+            v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)  # [N,4,64,64]  
+            target = (latents - v).detach()
+        elif self.opt.repulsion_type in ['rlsd', 'wo']:
+            target = (latents - score_gradients).detach()
+        else:
+            raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
+            
+        attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
+        attraction_loss = attraction_loss.mean()
+            
+        # elif self.opt.repulsion_type in ['rlsd', 'wo']:
+        #     for j in range(self.opt.num_particles):
+        #         sds_loss = self.guidance_sd.train_step(images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None)
+        #         attraction_loss = attraction_loss + sds_loss
+            
+
+        ### optimize step ### 
+        
         scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
         
-        #########################################################
-        # Backward pass
-        #########################################################
-        
-        # 1. Compute gradients
-        # Optionally visualize autograd graph before backward to avoid retaining graph twice
-        if self.opt.visualize_graph and (self.step==1 or self.step % self.opt.visualize_graph_interval == 0):
-            graph_dir = os.path.join(self.opt.outdir, "visualizations", "loss_graph")
-            os.makedirs(graph_dir, exist_ok=True)
-            params = {n: p for n,p in self.renderers[0].gaussians.named_parameters() if p.requires_grad}
-            make_dot(total_loss, params=params).render(os.path.join(graph_dir, f"total_loss_step_{self.step}"), format="png")
-
+        # 2. Backward pass (Compute gradients)
         total_loss.backward()
-            
-        # 2. Optimize step (Update parameters)
+        
+        # 3. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
             self.optimizers[j].step()
-            
-        #########################################################
-        # Densify and prune (after backward pass so gradients are available)
-        #########################################################
+
+        # densify and prune (after backward pass so gradients are available)
         for j in range(self.opt.num_particles):
             if self.step >= self.opt.density_start_iter and self.step <= self.opt.density_end_iter:
                 viewspace_point_tensor, visibility_filter, radii = outputs[j]["viewspace_points"], outputs[j]["visibility_filter"], outputs[j]["radii"]
@@ -435,12 +402,12 @@ class GUI:
                 if self.step % self.opt.opacity_reset_interval == 0:
                         self.renderers[j].gaussians.reset_opacity()
                         
-        #########################################################
-        # Zero gradients (Prepare for next iteration)
-        #########################################################
+        
+        # 4. Zero gradients (Prepare for next iteration)
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
         
+
         #########################################################
         # Log metrics and visualize
         #########################################################
@@ -489,7 +456,11 @@ class GUI:
             
                 # quantitative metrics
                 if self.step==1 or self.step % self.opt.quantitative_metrics_interval == 0 and self.visualizer is not None:
+                    # Update visualizer with current training state
+                    self.visualizer.update_renderers(self.renderers)
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, visualize_multi_viewpoints=self.opt.visualize_multi_viewpoints, save_iid=self.opt.save_iid)  # [V, N, 3, H, W]
+                    # Clean up visualizer renderers to free memory
+                    self.visualizer.cleanup_renderers()
                     # fidelity
                     fidelity_mean, fidelity_std = self.metrics_calculator.compute_clip_fidelity_in_multi_viewpoints_stats(multi_view_images)
                     # compute inter-particle diversity 
@@ -522,11 +493,19 @@ class GUI:
             if self.opt.visualize and self.visualizer is not None:
                 # save rendered images (save at the end of each interval)
                 if self.opt.save_rendered_images and (self.step==1 or self.step % self.opt.save_rendered_images_interval == 0):
+                    self.visualizer.update_renderers(self.renderers)
                     self.visualizer.save_rendered_images(self.step, images)
+                    self.visualizer.cleanup_renderers()
                     
                 if self.opt.visualize_fixed_viewpoint and (self.step==1 or self.step % self.opt.visualize_fixed_viewpoint_interval == 0):
+                    self.visualizer.update_renderers(self.renderers)
                     self.visualizer.visualize_fixed_viewpoint(self.step)
-
+                    self.visualizer.cleanup_renderers()
+                
+                # Clean up visualizer renderers to free memory
+                
+                
+                
         # Periodic GPU memory cleanup
         if self.step % self.opt.efficiency_interval == 0:
             try:
@@ -546,10 +525,6 @@ class GUI:
             except NameError:
                 pass
             try:
-                del w_sigma
-            except NameError:
-                pass
-            try:
                 del features
             except NameError:
                 pass
@@ -559,14 +534,6 @@ class GUI:
                 pass
             try:
                 del kernel_grad
-            except NameError:
-                pass
-            try:
-                del attraction_loss_per_particle
-            except NameError:
-                pass
-            try:
-                del repulsion_loss_per_particle
             except NameError:
                 pass
             try:
@@ -584,7 +551,7 @@ class GUI:
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-
+                
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0):
         path = os.path.join(self.opt.outdir, f'saved_models')
@@ -759,18 +726,19 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # # Multi-viewpoints for 30 fps video (save at the end of training)
-        # if self.opt.visualize and self.visualizer is not None and self.step == self.opt.iters:
-        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+        # Multi-viewpoints for 30 fps video (save at the end of training)
+        if self.opt.video_snapshot:
+            # Update visualizer with final training state
+            self.visualizer.update_renderers(self.renderers)
+            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+            # Clean up visualizer renderers to free memory
+            self.visualizer.cleanup_renderers()
 
         # save model
         if self.opt.save_model:
             for j in range(self.opt.num_particles):
                 self.save_model(mode='model', particle_id=j)
-                self.save_model(mode='geo+tex', particle_id=j)
-        
-        # Clean up GPU resources after training
-        self.cleanup_gpu_resources()
+                self.save_model(mode='geo+tex', particle_id=j)   
 
 if __name__ == "__main__":
     import argparse

@@ -1,8 +1,3 @@
-# sd_utils.py
-# This is DDIM, not DDPM...
-# This is the code for the paper:
-# https://arxiv.org/abs/2507.03895
-
 from diffusers import (
     DDIMScheduler,
     StableDiffusionPipeline,
@@ -72,18 +67,6 @@ class StableDiffusion(nn.Module):
         self.tokenizer = pipe.tokenizer
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
-        
-        
-        # xformers
-        try:
-            pipe.unet.enable_xformers_memory_efficient_attention()
-        except Exception:
-            pass
-        # channels_last for UNet activations
-        try:
-            pipe.unet.to(memory_format=torch.channels_last)
-        except Exception:
-            pass
 
         self.scheduler = DDIMScheduler.from_pretrained(
             model_key, subfolder="scheduler", torch_dtype=self.dtype
@@ -152,6 +135,79 @@ class StableDiffusion(nn.Module):
         imgs = self.decode_latents(latents) # [1, 3, 512, 512]
         return imgs
 
+    # def train_step(
+    #     self,
+    #     pred_rgb,
+    #     step_ratio=None,
+    #     guidance_scale=100,
+    #     as_latent=False,
+    #     vers=None, hors=None,
+    # ):
+        
+    #     batch_size = pred_rgb.shape[0]
+    #     pred_rgb = pred_rgb.to(self.dtype)
+
+    #     if as_latent:
+    #         latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
+    #     else:
+    #         # interp to 512x512 to be fed into vae.
+    #         pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
+    #         # encode image into latents with vae, requires grad!
+    #         latents = self.encode_imgs(pred_rgb_512)
+
+    #     with torch.no_grad():
+    #         if step_ratio is not None:
+    #             # dreamtime-like
+    #             # t = self.max_step - (self.max_step - self.min_step) * np.sqrt(step_ratio)
+    #             t = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
+    #             t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
+    #         else:
+    #             t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+
+    #         # w(t), sigma_t^2
+    #         w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
+
+    #         # predict the noise residual with unet, NO grad!
+    #         # add noise
+    #         noise = torch.randn_like(latents)
+    #         latents_noisy = self.scheduler.add_noise(latents, noise, t)
+    #         # pred noise
+    #         latent_model_input = torch.cat([latents_noisy] * 2)
+    #         tt = torch.cat([t] * 2)
+
+    #         if hors is None:
+    #             embeddings = torch.cat([self.embeddings['pos'].expand(batch_size, -1, -1), self.embeddings['neg'].expand(batch_size, -1, -1)])
+    #         else:
+    #             def _get_dir_ind(h):
+    #                 if abs(h) < 60: return 'front'
+    #                 elif abs(h) < 120: return 'side'
+    #                 else: return 'back'
+
+    #             embeddings = torch.cat([self.embeddings[_get_dir_ind(h)] for h in hors] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+
+    #         noise_pred = self.unet(
+    #             latent_model_input, tt, encoder_hidden_states=embeddings
+    #         ).sample
+
+    #         # perform guidance (high scale from paper!)
+    #         noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
+    #         noise_pred = noise_pred_uncond + guidance_scale * (
+    #             noise_pred_cond - noise_pred_uncond
+    #         )
+
+    #         grad = w * (noise_pred - noise)
+    #         grad = torch.nan_to_num(grad)
+
+    #         # seems important to avoid NaN...
+    #         # grad = grad.clamp(-1, 1)
+
+    #     target = (latents - grad).detach()
+    #     loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
+
+    #     return loss
+
+
+    
     def train_step(
         self,
         pred_rgb,
@@ -159,181 +215,174 @@ class StableDiffusion(nn.Module):
         guidance_scale=100,
         as_latent=False,
         vers=None, hors=None,
-        repulsion_enabled=False,
-        repulsion_type="wo",
+        force_same_t: bool = True,  # 모든 파티클 동일 t
+        force_same_noise: bool = True,  # 모든 파티클 동일 noise
     ):
-        
         batch_size = pred_rgb.shape[0]
         pred_rgb = pred_rgb.to(self.dtype)
 
         if as_latent:
             latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
         else:
-            # interp to 512x512 to be fed into vae.
             pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
-            # encode image into latents with vae, requires grad!
             latents = self.encode_imgs(pred_rgb_512)
 
         with torch.no_grad():
+            # --- 1) t 생성: 항상 shape = [batch_size] 인 torch.LongTensor 로 맞춤 ---
             if step_ratio is not None:
-                # dreamtime-like
-                # t = self.max_step - (self.max_step - self.min_step) * np.sqrt(step_ratio)
-                t = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
-                t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
+                # step_ratio in [0,1] 가정. (1-step_ratio)*num_steps → 큰 t는 더 noisy
+                t_scalar = int(np.round((1 - float(step_ratio)) * self.num_train_timesteps))
+                t_scalar = int(np.clip(t_scalar, int(self.min_step), int(self.max_step)))
+                if force_same_t:
+                    t = torch.full((batch_size,), t_scalar, dtype=torch.long, device=self.device)
+                else:
+                    t = torch.randint(self.min_step, self.max_step + 1,
+                                    (batch_size,), dtype=torch.long, device=self.device)
             else:
-                t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+                if force_same_t:
+                    t_scalar = torch.randint(self.min_step, self.max_step + 1,
+                                            (1,), dtype=torch.long, device=self.device)
+                    t = t_scalar.expand(batch_size)  # same t for all particles in this step
+                else:
+                    t = torch.randint(self.min_step, self.max_step + 1,
+                                    (batch_size,), dtype=torch.long, device=self.device)
 
-            # w(t), sigma_t^2
-            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1)
+            # --- 2) w(t) 계산은 항상 벡터 t 기반으로 ---
+            # self.alphas: [num_train_timesteps] 라고 가정
+            alpha_t = self.alphas.to(self.device)[t]            # shape: [B]
+            w = (1 - alpha_t).view(batch_size, 1, 1, 1)         # broadcast-ready
+
+            # --- 3) 노이즈 추가 / U-Net 호출 ---
             
-            if repulsion_enabled:
-                sigma_t = torch.sqrt(w)
-                sigma_t = sigma_t.mean()
+            if force_same_noise:
+                base = torch.randn_like(latents[:1]) # [1, 4, 64, 64]
+                noise = base.expand_as(latents).contiguous() # [N, 4, 64, 64] 배치 전원 동일한 노이즈
 
-            # predict the noise residual with unet, NO grad!
-            # add noise
-            noise = torch.randn_like(latents)
+            else:
+                noise = torch.randn_like(latents)
+
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
-            latent_model_input = torch.cat([latents_noisy] * 2)
-            tt = torch.cat([t] * 2)
+
+            latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
+            tt = torch.cat([t] * 2, dim=0)
 
             if hors is None:
-                embeddings = torch.cat([self.embeddings['pos'].expand(batch_size, -1, -1), self.embeddings['neg'].expand(batch_size, -1, -1)])
+                embeddings = torch.cat([
+                    self.embeddings['pos'].expand(batch_size, -1, -1),
+                    self.embeddings['neg'].expand(batch_size, -1, -1)
+                ], dim=0)
             else:
                 def _get_dir_ind(h):
                     if abs(h) < 60: return 'front'
                     elif abs(h) < 120: return 'side'
                     else: return 'back'
+                # hors 길이가 batch_size 라고 가정
+                pos_emb = torch.stack([self.embeddings[_get_dir_ind(h)] for h in hors], dim=0)
+                embeddings = torch.cat([pos_emb, self.embeddings['neg'].expand(batch_size, -1, -1)], dim=0)
 
-                embeddings = torch.cat([self.embeddings[_get_dir_ind(h)] for h in hors] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+            noise_pred = self.unet(latent_model_input, tt, encoder_hidden_states=embeddings).sample
 
-            noise_pred = self.unet(
-                latent_model_input, tt, encoder_hidden_states=embeddings
-            ).sample
-
-            # perform guidance (high scale from paper!)
-            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (
-                noise_pred_cond - noise_pred_uncond
-            )
+            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2, dim=0)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
 
             grad = w * (noise_pred - noise)
             grad = torch.nan_to_num(grad)
-
-            # seems important to avoid NaN...
-            # grad = grad.clamp(-1, 1)
+            # 필요시: grad = grad.clamp(-1, 1)
 
         target = (latents - grad).detach()
-        
-        if repulsion_type == "svgd":
-            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='none').view(batch_size, -1).sum(dim=1) # [N]
-        elif repulsion_type == "rlsd" or repulsion_type == "wo":
-            loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0] # [1]                
 
+        loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
         return loss
-    
-    
+
+
+
     def train_step_gradient(
         self,
         pred_rgb,
         step_ratio=None,
-        guidance_scale=20,# 100 -> 20
+        guidance_scale=100,
         as_latent=False,
         vers=None, hors=None,
-        # use_sigma_weight=False, # γ 사용 여부
-        # rep_sigma_power=0.5, # not used
-        # gamma_base: float = 200.0, # ★ γ = gamma_base * σ_t
-        force_same_t: bool = True, # 모든 파티클 동일 t
+        force_same_t: bool = True,  # 모든 파티클 동일 t
+        force_same_noise: bool = True,  # 모든 파티클 동일 noise
     ):
-        
         batch_size = pred_rgb.shape[0]
         pred_rgb = pred_rgb.to(self.dtype)
 
         if as_latent:
             latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
         else:
-            # interp to 512x512 to be fed into vae.
             pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
-            # encode image into latents with vae, requires grad!
             latents = self.encode_imgs(pred_rgb_512)
-            
-        assert latents.shape[1:] == (4, 64, 64), f"latents.shape: {latents.shape}"
 
         with torch.no_grad():
-            # if step_ratio is not None:
-            #     # dreamtime-like
-            #     # t = self.max_step - (self.max_step - self.min_step) * np.sqrt(step_ratio)
-            #     t = np.round((1 - step_ratio) * self.num_train_timesteps).clip(self.min_step, self.max_step)
-            #     t = torch.full((batch_size,), t, dtype=torch.long, device=self.device)
-            # else:
-            #     t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
-            
-            # ===== t 샘플링: 동일 t + (선형) 어닐링 =====
+            # --- 1) t 생성: 항상 shape = [batch_size] 인 torch.LongTensor 로 맞춤 ---
             if step_ratio is not None:
-                t_scalar = np.round((1 - step_ratio) * self.num_train_timesteps)
-                t_scalar = int(np.clip(t_scalar, self.min_step, self.max_step))
+                # step_ratio in [0,1] 가정. (1-step_ratio)*num_steps → 큰 t는 더 noisy
+                t_scalar = int(np.round((1 - float(step_ratio)) * self.num_train_timesteps))
+                t_scalar = int(np.clip(t_scalar, int(self.min_step), int(self.max_step)))
                 if force_same_t:
                     t = torch.full((batch_size,), t_scalar, dtype=torch.long, device=self.device)
                 else:
-                    t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+                    t = torch.randint(self.min_step, self.max_step + 1,
+                                    (batch_size,), dtype=torch.long, device=self.device)
             else:
                 if force_same_t:
-                    t_scalar = torch.randint(self.min_step, self.max_step + 1, (1,), dtype=torch.long, device=self.device)
-                    t = t_scalar.expand(batch_size)
+                    t_scalar = torch.randint(self.min_step, self.max_step + 1,
+                                            (1,), dtype=torch.long, device=self.device)
+                    t = t_scalar.expand(batch_size)  # same t for all particles in this step
                 else:
-                    t = torch.randint(self.min_step, self.max_step + 1, (batch_size,), dtype=torch.long, device=self.device)
+                    t = torch.randint(self.min_step, self.max_step + 1,
+                                    (batch_size,), dtype=torch.long, device=self.device)
 
-            # ===== w(t)와 σ_t =====
-            # 안정성을 위해 float32로 계산
-            w = (1 - self.alphas[t]).view(batch_size, 1, 1, 1).to(torch.float32)
-            # sigma_t = torch.sqrt(w).view(batch_size)  # [N], float32
+            # --- 2) w(t) 계산은 항상 벡터 t 기반으로 ---
+            # self.alphas: [num_train_timesteps] 라고 가정
+            alpha_t = self.alphas.to(self.device)[t]            # shape: [B]
+            w = (1 - alpha_t).view(batch_size, 1, 1, 1)         # broadcast-ready
 
-            # if use_sigma_weight:
-            #     sigma_t = torch.sqrt(w).view(batch_size)
-            #     sigma_norm = sigma_t / (sigma_t.mean() + 1e-8)
-            #     w_sigma = sigma_norm.pow(rep_sigma_power) # gamma
-            #     w_sigma = w_sigma.to(torch.float32)  # [N]
-            # else:
-            #     w_sigma = torch.ones(batch_size, device=self.device, dtype=torch.float32)
+            # --- 3) 노이즈 추가 / U-Net 호출 ---
+            if force_same_noise:
+                base = torch.randn_like(latents[:1]) # [1, 4, 64, 64]
+                noise = base.expand_as(latents).contiguous() # [N, 4, 64, 64] 배치 전원 동일한 노이즈
 
-            # ===== U-Net 예측 =====
-            # predict the noise residual with unet, NO grad!
-            # add noise
-            noise = torch.randn_like(latents)
+            else:
+                noise = torch.randn_like(latents)
+
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
-            # pred noise
-            latent_model_input = torch.cat([latents_noisy] * 2)
-            tt = torch.cat([t] * 2)
+
+            latent_model_input = torch.cat([latents_noisy] * 2, dim=0)
+            tt = torch.cat([t] * 2, dim=0)
 
             if hors is None:
-                embeddings = torch.cat([self.embeddings['pos'].expand(batch_size, -1, -1), self.embeddings['neg'].expand(batch_size, -1, -1)])
+                embeddings = torch.cat([
+                    self.embeddings['pos'].expand(batch_size, -1, -1),
+                    self.embeddings['neg'].expand(batch_size, -1, -1)
+                ], dim=0)
             else:
                 def _get_dir_ind(h):
                     if abs(h) < 60: return 'front'
                     elif abs(h) < 120: return 'side'
                     else: return 'back'
+                # hors 길이가 batch_size 라고 가정
+                pos_emb = torch.stack([self.embeddings[_get_dir_ind(h)] for h in hors], dim=0)
+                embeddings = torch.cat([pos_emb, self.embeddings['neg'].expand(batch_size, -1, -1)], dim=0)
 
-                embeddings = torch.cat([self.embeddings[_get_dir_ind(h)] for h in hors] + [self.embeddings['neg'].expand(batch_size, -1, -1)])
+            noise_pred = self.unet(latent_model_input, tt, encoder_hidden_states=embeddings).sample
 
-            noise_pred = self.unet(
-                latent_model_input, tt, encoder_hidden_states=embeddings
-            ).sample
+            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2, dim=0)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_cond - noise_pred_uncond)
 
-            # perform guidance (high scale from paper!)
-            noise_pred_cond, noise_pred_uncond = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + guidance_scale * (
-                noise_pred_cond - noise_pred_uncond
-            )
-
-            grad = (w * (noise_pred - noise)).to(torch.float32)  # [N,4,64,64], float32로 반환
+            grad = w * (noise_pred - noise)
             grad = torch.nan_to_num(grad)
+            # 필요시: grad = grad.clamp(-1, 1)
 
-   
-        # return grad.detach(), latents.to(torch.float32), w_sigma.detach()
-        # return grad.detach(), latents.to(torch.float32), w_sigma.detach()
-        return grad.detach(), latents.to(torch.float32)
-    
+        return grad, latents
+        # target = (latents - grad).detach()
+
+        # loss = 0.5 * F.mse_loss(latents.float(), target, reduction='sum') / latents.shape[0]
+        # return loss
+
+
     @torch.no_grad()
     def produce_latents(
         self,
