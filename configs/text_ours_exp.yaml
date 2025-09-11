@@ -32,7 +32,7 @@ exp0_baseline:
 
     guidance_scale: 100
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -99,7 +99,7 @@ exp0_repulsion_kernel:
     use_cosine_decay: False
     # rep_cosine_warmup: 0.2
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -164,7 +164,7 @@ exp1a_repulsion_kernel_lambda_rlsd_rbf:
     use_cosine_decay: False
     # rep_cosine_warmup: 0.2
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -297,7 +297,7 @@ exp1c_repulsion_kernel_lambda_svgd_rbf:
     use_cosine_decay: False
     # rep_cosine_warmup: 0.2
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -362,7 +362,7 @@ exp1d_repulsion_kernel_lambda_svgd_cosine:
     use_cosine_decay: False
     # rep_cosine_warmup: 0.2
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -426,7 +426,7 @@ exp2_guidance_scale:
     use_cosine_decay: False
     # rep_cosine_warmup: 0.2
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -492,7 +492,7 @@ exp3_num_pts:
     use_cosine_decay: False
     # rep_cosine_warmup: 0.2
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -559,7 +559,7 @@ exp4a_cosine_decay_on:
     
     rbf_beta: 1.0
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -623,7 +623,7 @@ exp4b_cosine_decay_off:
     
     rbf_beta: 1.0
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -685,7 +685,7 @@ exp5_feature_layer:
 
     use_cosine_decay: False
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
@@ -748,7 +748,7 @@ exp6_rbf_beta:
 
     use_cosine_decay: False
     
-    iters: 1500
+    iters: 800
     invert_bg_prob: 0.5
 
     eval_radius: # not to crop the object adjust the radius
