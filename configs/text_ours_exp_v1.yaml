@@ -73,10 +73,10 @@ exp1_repulsion_kernel:
   method: grid
   sweep_parameters:
     prompt: 
-      # hamburger: "a photo of a hamburger"
+      hamburger: "a photo of a hamburger"
       cactus: "a small saguaro cactus planted in a clay pot"
-      # icecream: "a photo of an ice cream"
-      # tulip: "a photo of a tulip"
+      icecream: "a photo of an ice cream"
+      tulip: "a photo of a tulip"
       
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf'] # ['rbf']
@@ -126,8 +126,8 @@ exp1_repulsion_kernel:
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
 
-    save_model: False
-    video_snapshot: False
+    save_model: True
+    video_snapshot: True
 
 # Experiment 2: (Repulsion type x kernel type) & lambda sweep 
 exp2_lambda:
