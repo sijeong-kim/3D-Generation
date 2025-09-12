@@ -91,7 +91,7 @@ class GUI:
         # override if provide a checkpoint
         for i in range(self.opt.num_particles):
             # Set different seed for each particle during initialization
-            init_seed = self.seed + i * self.opt.iters
+            init_seed = self.seed + i * 1000000 
             self.seeds.append(init_seed)
             self.seed_everything(init_seed)
             
@@ -261,7 +261,9 @@ class GUI:
 
         # 0. Update step
 
-        step_ratio = min(1, self.step / self.opt.iters)
+        # step_ratio = min(1, self.step / self.opt.iters)
+        step_ratio = min(1, self.step / self.opt.schedule_iters)
+
 
         total_loss = 0
 
@@ -502,7 +504,23 @@ class GUI:
                     self.visualizer.visualize_fixed_viewpoint(self.step)
                     self.visualizer.cleanup_renderers()
                 
+            # save model at the best step
+            if self.step == self.opt.best_step:
+                print(f"[INFO] best step reached: {self.step}")
+                # Multi-viewpoints for 30 fps video (save at the end of training)
+                if self.opt.video_snapshot:
+                    # Update visualizer with final training state
+                    self.visualizer.update_renderers(self.renderers)
+                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
                 # Clean up visualizer renderers to free memory
+                    self.visualizer.cleanup_renderers()
+
+                # save model
+                if self.opt.save_model:
+                    for j in range(self.opt.num_particles):
+                        self.save_model(mode='model', particle_id=j, step=self.step)
+                        self.save_model(mode='geo+tex', particle_id=j, step=self.step)   
+                
                 
                 
                 
@@ -553,12 +571,12 @@ class GUI:
                 torch.cuda.empty_cache()
                 
     @torch.no_grad()
-    def save_model(self, mode='geo', texture_size=1024, particle_id=0):
+    def save_model(self, mode='geo', texture_size=1024, particle_id=0, step=None):
         path = os.path.join(self.opt.outdir, f'saved_models')
         os.makedirs(path, exist_ok=True)
         
         if mode == 'geo':
-            path = os.path.join(path, f'particle_{particle_id}_mesh.ply')
+            path = os.path.join(path, f'step_{step}_particle_{particle_id}_mesh.ply')
             mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
             mesh.write_ply(path)
             # Cleanup heavy objects and CUDA cache
@@ -571,7 +589,7 @@ class GUI:
                 torch.cuda.empty_cache()
 
         elif mode == 'geo+tex':
-            path = os.path.join(path, f'particle_{particle_id}_mesh.' + self.opt.mesh_format)
+            path = os.path.join(path, f'step_{step}_particle_{particle_id}_mesh.' + self.opt.mesh_format)
             mesh = self.renderers[particle_id].gaussians.extract_mesh(path, self.opt.density_thresh)
 
             # perform texture extraction
@@ -726,19 +744,19 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.opt.video_snapshot:
-            # Update visualizer with final training state
-            self.visualizer.update_renderers(self.renderers)
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
-            # Clean up visualizer renderers to free memory
-            self.visualizer.cleanup_renderers()
+        # # Multi-viewpoints for 30 fps video (save at the end of training)
+        # if self.opt.video_snapshot:
+        #     # Update visualizer with final training state
+        #     self.visualizer.update_renderers(self.renderers)
+        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+        #     # Clean up visualizer renderers to free memory
+        #     self.visualizer.cleanup_renderers()
 
-        # save model
-        if self.opt.save_model:
-            for j in range(self.opt.num_particles):
-                self.save_model(mode='model', particle_id=j)
-                self.save_model(mode='geo+tex', particle_id=j)   
+        # # save model
+        # if self.opt.save_model:
+        #     for j in range(self.opt.num_particles):
+        #         self.save_model(mode='model', particle_id=j)
+        #         self.save_model(mode='geo+tex', particle_id=j)   
 
 if __name__ == "__main__":
     import argparse
