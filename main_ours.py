@@ -106,7 +106,22 @@ class GUI:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
-            
+
+        self.repctl = {
+            "target": float(getattr(opt, "rep_ratio_target", 40.0)),# % 목표(가운데값)
+            "low": float(getattr(opt, "rep_ratio_low", opt.rep_ratio_target - 2.0)),      # % 하한
+            "high": float(getattr(opt, "rep_ratio_high", opt.rep_ratio_target + 2.0)),    # % 상한
+            "ema": float(getattr(opt, "rep_ratio_ema", 0.9)),       # EMA 계수 (0.9~0.98 권장)
+            "interval": int(getattr(opt, "rep_update_interval", 10)), # 몇 스텝마다 갱신할지
+            "warmup": int(getattr(opt, "rep_warmup_steps", 50)),      # 초기 워밍업 스텝
+            "k": float(getattr(opt, "rep_ratio_k", 0.12)),          # 조정 강도 (작을수록 완만)
+            "min": float(getattr(opt, "lambda_repulsion_min", 1e-6)),
+            "max": float(getattr(opt, "lambda_repulsion_max", 1e6)),
+            "step_cap": float(getattr(opt, "rep_step_mult_cap", 1.25)), # 1회 갱신시 배수 상한
+            "denom_floor": float(getattr(opt, "rep_ratio_denom_floor", 1e-6)),
+        }
+        self._rep_ratio_ema = None
+        
     def __del__(self):
         pass
     
@@ -185,6 +200,102 @@ class GUI:
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
 
+    # def adaptive_lambda_repulsion(self, ratio_pct: float):
+        # """EMA된 비율을 타깃(%)에 가깝게 유지하도록 lambda_repulsion을 곱셈형으로 조정."""
+        # # EMA 업데이트
+        # if self._rep_ratio_ema is None:
+        #     self._rep_ratio_ema = ratio_pct
+        # else:
+        #     a = self.repctl["ema"]
+        #     self._rep_ratio_ema = a * self._rep_ratio_ema + (1 - a) * ratio_pct
+            
+        # # EMA 업데이트 뒤
+        # low, high = self.repctl["low"], self.repctl["high"]
+        # if low <= self._rep_ratio_ema <= high:
+        #     return
+
+        # # 워밍업/주기 체크
+        # if self.step < self.repctl["warmup"] or (self.step % self.repctl["interval"] != 0):
+        #     return
+
+        # target = self.repctl["target"]
+        # if target <= 0:
+        #     return
+
+        # # 에러(상대값) 계산: target보다 낮으면 +, 높으면 -
+        # error = (target - self._rep_ratio_ema) / target
+
+        # # 곱셈형 업데이트 (exp), 1회 변화량 캡
+        # # error가 0.2면 exp(k*0.2)만큼 증가, 음수면 감소
+        # k = self.repctl["k"]
+        # raw_mult = np.exp(k * error)
+
+        # # 과도한 진동 방지를 위해 배수 클램프
+        # max_mult = self.repctl["step_cap"]
+        # min_mult = 1.0 / max_mult
+        # mult = float(np.clip(raw_mult, min_mult, max_mult))
+
+        # new_lambda = float(np.clip(self.opt.lambda_repulsion * mult, self.repctl["min"], self.repctl["max"]))
+
+        # if new_lambda != self.opt.lambda_repulsion:
+        #     self.opt.lambda_repulsion = new_lambda
+        #     # 디버그 로그(옵션)
+        #     print(f"[CTRL] step {self.step}: ratio_ema={self._rep_ratio_ema:.2f}% -> "
+        #           f"lambda_repulsion={self.opt.lambda_repulsion:.6f} (x{mult:.3f})")
+            
+    def adaptive_lambda_repulsion(self, ratio_pct: float):
+        """
+        ratio_pct: 100 * |scaled_repulsion_loss| / max(|scaled_attraction_loss|, eps)
+        목표: ratio_pct ~= self.repctl["target"] (예: 20.0)
+        EMA + dead-band + 곱셈형 업데이트(exp) + 1회 변화량 캡(step_cap) + [min,max] 클램프
+        """
+        # ---- EMA 업데이트 ----
+        a = float(self.repctl.get("ema", 0.9))
+        if self._rep_ratio_ema is None:
+            self._rep_ratio_ema = float(ratio_pct)
+        else:
+            self._rep_ratio_ema = a * float(self._rep_ratio_ema) + (1.0 - a) * float(ratio_pct)
+
+        # ---- 워밍업/주기 ----
+        warmup = int(self.repctl.get("warmup", 50))
+        interval = int(self.repctl.get("interval", 10))
+        if self.step < warmup or (self.step % interval != 0):
+            return
+
+        # ---- 목표/데드밴드 ----
+        target = float(self.repctl.get("target", 20.0))  # ← 20%로 맞추려면 설정에서 rep_ratio_target: 20.0
+        if target <= 0:
+            return
+
+        # dead-band: 설정에 low/high가 있으면 사용, 없으면 target ±2% 자동 생성
+        low = float(self.repctl.get("low", target - 2.0))
+        high = float(self.repctl.get("high", target + 2.0))
+        ema_ratio = float(self._rep_ratio_ema)
+
+        # dead-band 안이면 조정 없음
+        if low <= ema_ratio <= high:
+            return
+
+        # ---- 곱셈형 업데이트 (exp) ----
+        # target보다 낮으면 lambda를 키우고(>1), 높으면 줄이기(<1)
+        k = float(self.repctl.get("k", 0.12))
+        raw_mult = np.exp(k * (target - ema_ratio) / max(target, 1e-6))
+
+        # 1회 변화량 캡
+        step_cap = float(self.repctl.get("step_cap", 1.25))
+        mult = float(np.clip(raw_mult, 1.0 / step_cap, step_cap))
+
+        # [min, max] 범위 보호
+        lam_min = float(self.repctl.get("min", 0.0))
+        lam_max = float(self.repctl.get("max", 5.0))
+        new_lambda = float(np.clip(self.opt.lambda_repulsion * mult, lam_min, lam_max))
+
+        # 변경 적용 (미세한 변동 무시)
+        if abs(new_lambda - self.opt.lambda_repulsion) > 1e-12:
+            self.opt.lambda_repulsion = new_lambda
+            print(f"[CTRL] step {self.step}: ratio_ema={ema_ratio:.2f}% "
+                f"target={target:.2f}% mult={mult:.3f} -> lambda_repulsion={self.opt.lambda_repulsion:.6f}")
+
 
     def prepare_train(self):
 
@@ -251,9 +362,13 @@ class GUI:
         
         with torch.no_grad():
             if self.step==1 or self.step % self.opt.efficiency_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
-                starter = torch.cuda.Event(enable_timing=True)
-                ender = torch.cuda.Event(enable_timing=True)
-                starter.record()
+                if torch.cuda.is_available():
+                    starter = torch.cuda.Event(enable_timing=True)
+                    ender = torch.cuda.Event(enable_timing=True)
+                    starter.record()
+                else:
+                    starter = None
+                    ender = None
                 
         #########################################################
         # Forward pass
@@ -263,8 +378,7 @@ class GUI:
 
         # step_ratio = min(1, self.step / self.opt.iters)
         step_ratio = min(1, self.step / self.opt.schedule_iters)
-
-
+        
         total_loss = 0
 
         # 1.1. Render images (novel view)
@@ -292,7 +406,7 @@ class GUI:
         pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
         cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
         
-        bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device="cuda")
+        bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device=self.device)
 
     
         for j in range(self.opt.num_particles):
@@ -376,14 +490,49 @@ class GUI:
         #     for j in range(self.opt.num_particles):
         #         sds_loss = self.guidance_sd.train_step(images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None)
         #         attraction_loss = attraction_loss + sds_loss
-            
-
-        ### optimize step ### 
         
+        ### optimize step ### 
+
+        # attraction 은 그래프 열고 스케일
         scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
+
+        # --- PATCH: 비율 계산 및 lambda 적응 순서 수정 ---
+        # 1) 현재 lambda로 repulsion을 '비율 계산용'으로만 한 번 스케일(그래프 X)
+        
+        # Calculate ratio_pct for both adaptive_lambda True and False cases
+        with torch.no_grad():
+            scaled_repulsion_for_ratio = (self.opt.lambda_repulsion * repulsion_loss).detach()
+            denom_val = max(float(abs(scaled_attraction_loss.detach().item())), 1e-8)
+            ratio_pct = 100.0 * float(abs(scaled_repulsion_for_ratio.item())) / denom_val
+
+        if self.opt.adaptive_lambda:
+            if (
+                self.opt.repulsion_type != 'wo'
+                and abs(repulsion_loss.detach().item()) > 1e-12
+                and self.opt.adaptive_lambda
+                and torch.isfinite(repulsion_loss).item()
+                and torch.isfinite(scaled_attraction_loss).item()
+                and denom_val > self.repctl.get("denom_floor", 1e-6)  # ← 추가
+            ):
+                self.adaptive_lambda_repulsion(ratio_pct)
+
+        # 2) (필요 시 업데이트된) lambda로 repulsion을 '학습용'으로 다시 스케일 (그래프 O)
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+
+
+        # 최종 loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
         
+        # --- 안전 가드 ---
+        if not torch.isfinite(total_loss):
+            print(f"[WARN] non-finite total_loss at step {self.step}: "
+                f"attract={scaled_attraction_loss.item():.4e}, "
+                f"repulse={scaled_repulsion_loss.item():.4e}")
+            # 그래디언트 초기화만 하고 스킵
+            for j in range(self.opt.num_particles):
+                self.optimizers[j].zero_grad(set_to_none=True)
+            return
+
         # 2. Backward pass (Compute gradients)
         total_loss.backward()
         
@@ -401,8 +550,8 @@ class GUI:
                 if self.step % self.opt.densification_interval == 0:
                         self.renderers[j].gaussians.densify_and_prune(self.opt.densify_grad_threshold, min_opacity=0.01, extent=4, max_screen_size=1)
                 
-                if self.step % self.opt.opacity_reset_interval == 0:
-                        self.renderers[j].gaussians.reset_opacity()
+                # if self.step % self.opt.opacity_reset_interval == 0:
+                #         self.renderers[j].gaussians.reset_opacity()
                         
         
         # 4. Zero gradients (Prepare for next iteration)
@@ -417,14 +566,19 @@ class GUI:
             if self.opt.metrics and self.metrics_calculator is not None:
                 # time
                 if self.step==1 or self.step % self.opt.efficiency_interval == 0:
-                    ender.record()
-                    torch.cuda.synchronize()
-                    t = starter.elapsed_time(ender)
-                    
-                    # memory usage
-                    memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
-                    max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
-                    
+                    if torch.cuda.is_available():
+                        ender.record()
+                        torch.cuda.synchronize()
+                        t = starter.elapsed_time(ender)
+                        
+                        # memory usage
+                        memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
+                        max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
+                    else:
+                        t = None
+                        memory_allocated = None
+                        max_memory_allocated = None
+                        
                     # log
                     self.metrics_calculator.log_efficiency(
                         step=self.step,
@@ -442,7 +596,11 @@ class GUI:
                     scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
                     scaled_repulsion_loss_val = self.opt.lambda_repulsion * repulsion_loss_val
                     total_loss_val = total_loss.item()
-                    
+                    if self.opt.adaptive_lambda:
+                        ratio_pct_after = 100.0 * float(abs(scaled_repulsion_loss_val)) / max(float(abs(scaled_attraction_loss_val)), 1e-8)
+                    else:
+                        ratio_pct_after = ratio_pct
+
                     # log
                     self.metrics_calculator.log_losses(
                         step=self.step,
@@ -452,7 +610,12 @@ class GUI:
                             "scaled_attraction_loss": scaled_attraction_loss_val,
                             "scaled_repulsion_loss": scaled_repulsion_loss_val,
                             "total_loss": total_loss_val,
-                            "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
+                            # "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
+                            # add
+                            "scaled_repulsion_loss_ratio_before": ratio_pct,
+                            "scaled_repulsion_loss_ratio_after": ratio_pct_after,
+                            "lambda_repulsion": float(self.opt.lambda_repulsion),
+                            "rep_ratio_pct_ema": float(self._rep_ratio_ema) if self._rep_ratio_ema is not None else None,
                         },
                     )
             
@@ -512,7 +675,7 @@ class GUI:
                     # Update visualizer with final training state
                     self.visualizer.update_renderers(self.renderers)
                     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
-                # Clean up visualizer renderers to free memory
+                    # Clean up visualizer renderers to free memory
                     self.visualizer.cleanup_renderers()
 
                 # save model
@@ -725,7 +888,7 @@ class GUI:
                 torch.cuda.empty_cache()
 
         else:
-            path = os.path.join(path, f'particle_{particle_id}_model.ply')
+            path = os.path.join(path, f'step_{step}_particle_{particle_id}_model.ply')
             self.renderers[particle_id].gaussians.save_ply(path)
 
             print(f"[INFO] particle {particle_id} save model to {path}.")

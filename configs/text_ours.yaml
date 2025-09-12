@@ -6,6 +6,8 @@ feature_layer: 11 # 2: early, 5: mid, 11: last
 
 # repulsive loss
 lambda_repulsion: 1000 # weight for repulsive loss
+adaptive_lambda: False
+rep_ratio_target: 40.0
 repulsion_type: "wo" # "svgd" or "rlsd" or "wo"
 kernel_type: "none" # "rbf" or "cosine"
 rbf_beta: 1.0 # beta for rbf kernel
@@ -13,7 +15,7 @@ cosine_beta: 1.0 # beta for cosine kernel
 cosine_eps_shift: 1e-3 # eps shift for cosine kernel
 
 # guidance
-guidance_scale: 100
+guidance_scale: 50
 force_same_t: True # 모든 파티클 동일 t
 force_same_noise: True # 모든 파티클 동일 noise
 schedule_steps: 1500
@@ -104,6 +106,7 @@ warmup_rgb_loss: True
 batch_size: 1
 # training iterations for stage 1
 iters: 1000 # 500
+schedule_iters: 1500
 # whether to linearly anneal timestep
 anneal_timestep: True
 # training iterations for stage 2
