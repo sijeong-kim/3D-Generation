@@ -24,9 +24,9 @@ exp0_baseline:
   # fixed parameters
   fixed_parameters:
     seed: 42
-    adaptive_lambda: True
-    rep_ratio_target: 40.0
-    lambda_repulsion: 1000
+    # adaptive_lambda: False
+    # rep_ratio_target: 40.0
+    # lambda_repulsion: 1000
 
     iters: 1000
     schedule_iters: 1500
@@ -75,7 +75,7 @@ exp1_repulsion_kernel:
     prompt: 
       # hamburger: "a photo of a hamburger"
       cactus: "a small saguaro cactus planted in a clay pot"
-      icecream: "a photo of an ice cream"
+      # icecream: "a photo of an ice cream"
       # tulip: "a photo of a tulip"
       
     repulsion_type: ['rlsd', 'svgd']
@@ -139,10 +139,10 @@ exp2_lambda:
     lambda_repulsion: # TODO: add more values
       rlsd_rbf: [600, 800, 1000, 1200, 1400]
     prompt: 
-      # hamburger: "a photo of a hamburger"
+      hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
+      tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:

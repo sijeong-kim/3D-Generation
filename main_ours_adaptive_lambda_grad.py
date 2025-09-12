@@ -107,10 +107,11 @@ class GUI:
         else:
             self.visualizer = None
 
+        target = float(getattr(opt, "rep_ratio_target", 15.0))# % 목표(가운데값)
         self.repctl = {
-            "target": float(getattr(opt, "rep_ratio_target", 40.0)),# % 목표(가운데값)
-            "low": float(getattr(opt, "rep_ratio_low", opt.rep_ratio_target - 2.0)),      # % 하한
-            "high": float(getattr(opt, "rep_ratio_high", opt.rep_ratio_target + 2.0)),    # % 상한
+            "target": target,
+            "low": float(getattr(opt, "rep_ratio_low", target - 2.0)),      # % 하한
+            "high": float(getattr(opt, "rep_ratio_high", target + 2.0)),    # % 상한
             "ema": float(getattr(opt, "rep_ratio_ema", 0.9)),       # EMA 계수 (0.9~0.98 권장)
             "interval": int(getattr(opt, "rep_update_interval", 10)), # 몇 스텝마다 갱신할지
             "warmup": int(getattr(opt, "rep_warmup_steps", 50)),      # 초기 워밍업 스텝
@@ -199,50 +200,7 @@ class GUI:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
-
-    # def adaptive_lambda_repulsion(self, ratio_pct: float):
-        # """EMA된 비율을 타깃(%)에 가깝게 유지하도록 lambda_repulsion을 곱셈형으로 조정."""
-        # # EMA 업데이트
-        # if self._rep_ratio_ema is None:
-        #     self._rep_ratio_ema = ratio_pct
-        # else:
-        #     a = self.repctl["ema"]
-        #     self._rep_ratio_ema = a * self._rep_ratio_ema + (1 - a) * ratio_pct
-            
-        # # EMA 업데이트 뒤
-        # low, high = self.repctl["low"], self.repctl["high"]
-        # if low <= self._rep_ratio_ema <= high:
-        #     return
-
-        # # 워밍업/주기 체크
-        # if self.step < self.repctl["warmup"] or (self.step % self.repctl["interval"] != 0):
-        #     return
-
-        # target = self.repctl["target"]
-        # if target <= 0:
-        #     return
-
-        # # 에러(상대값) 계산: target보다 낮으면 +, 높으면 -
-        # error = (target - self._rep_ratio_ema) / target
-
-        # # 곱셈형 업데이트 (exp), 1회 변화량 캡
-        # # error가 0.2면 exp(k*0.2)만큼 증가, 음수면 감소
-        # k = self.repctl["k"]
-        # raw_mult = np.exp(k * error)
-
-        # # 과도한 진동 방지를 위해 배수 클램프
-        # max_mult = self.repctl["step_cap"]
-        # min_mult = 1.0 / max_mult
-        # mult = float(np.clip(raw_mult, min_mult, max_mult))
-
-        # new_lambda = float(np.clip(self.opt.lambda_repulsion * mult, self.repctl["min"], self.repctl["max"]))
-
-        # if new_lambda != self.opt.lambda_repulsion:
-        #     self.opt.lambda_repulsion = new_lambda
-        #     # 디버그 로그(옵션)
-        #     print(f"[CTRL] step {self.step}: ratio_ema={self._rep_ratio_ema:.2f}% -> "
-        #           f"lambda_repulsion={self.opt.lambda_repulsion:.6f} (x{mult:.3f})")
-            
+  
     def adaptive_lambda_repulsion(self, ratio_pct: float):
         """
         ratio_pct: 100 * |scaled_repulsion_loss| / max(|scaled_attraction_loss|, eps)
@@ -485,46 +443,23 @@ class GUI:
             
         attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
         attraction_loss = attraction_loss.mean()
-            
-        # elif self.opt.repulsion_type in ['rlsd', 'wo']:
-        #     for j in range(self.opt.num_particles):
-        #         sds_loss = self.guidance_sd.train_step(images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None)
-        #         attraction_loss = attraction_loss + sds_loss
         
-        ### optimize step ### 
-
-        # attraction 은 그래프 열고 스케일
-        scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
-
-        # --- PATCH: 비율 계산 및 lambda 적응 순서 수정 ---
-        # 1) 현재 lambda로 repulsion을 '비율 계산용'으로만 한 번 스케일(그래프 X)
-        
-        # Calculate ratio_pct for both adaptive_lambda True and False cases
-        # with torch.no_grad():
-        #     scaled_repulsion_for_ratio = (self.opt.lambda_repulsion * repulsion_loss).detach()
-        #     denom_val = max(float(abs(scaled_attraction_loss.detach().item())), 1e-8)
-        #     ratio_pct = 100.0 * float(abs(scaled_repulsion_for_ratio.item())) / denom_val
-            
-            
-        # kernel_grad, score_gradients 구한 직후 (backward 전)
         with torch.no_grad():
-            rep_g = kernel_grad.float().view(kernel_grad.shape[0], -1).norm(p=2, dim=1).mean().item()
-            att_g = score_gradients.float().view(score_gradients.shape[0], -1).norm(p=2, dim=1).mean().item()
-            ratio_g = 100.0 * (self.opt.lambda_repulsion * rep_g) / max(self.opt.lambda_sd * att_g, 1e-8)
+            rep_g = kernel_grad.float().view(kernel_grad.shape[0], -1).norm(2, dim=1).mean().item()
+            att_g = score_gradients.float().view(score_gradients.shape[0], -1).norm(2, dim=1).mean().item()
+            denom_val_g = self.opt.lambda_sd * att_g + 1e-8
+            rep_ratio_before = 100.0 * (self.opt.lambda_repulsion * rep_g) / denom_val_g
 
-        if self.opt.adaptive_lambda:
+        if self.opt.adaptive_lambda and rep_g > 0:
             if (
                 self.opt.repulsion_type != 'wo'
-                and abs(repulsion_loss.detach().item()) > 1e-12
-                and self.opt.adaptive_lambda
-                and torch.isfinite(repulsion_loss).item()
-                and torch.isfinite(scaled_attraction_loss).item()
-                and denom_val > self.repctl.get("denom_floor", 1e-6)  # ← 추가
+                and denom_val_g > self.repctl.get("denom_floor", 1e-6)  # ← att_g 기반
             ):
-                self.adaptive_lambda_repulsion(ratio_g)
+                self.adaptive_lambda_repulsion(rep_ratio_before)
 
         # 2) (필요 시 업데이트된) lambda로 repulsion을 '학습용'으로 다시 스케일 (그래프 O)
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
+        scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
 
         # 최종 loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
@@ -602,6 +537,10 @@ class GUI:
                     scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
                     scaled_repulsion_loss_val = self.opt.lambda_repulsion * repulsion_loss_val
                     total_loss_val = total_loss.item()
+                    if self.opt.adaptive_lambda:
+                        rep_ratio_after = 100.0 * (self.opt.lambda_repulsion * rep_g) / denom_val_g
+                    else:
+                        rep_ratio_after = rep_ratio_before
 
                     # log
                     self.metrics_calculator.log_losses(
@@ -614,9 +553,10 @@ class GUI:
                             "total_loss": total_loss_val,
                             # "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
                             # add
-                            "grad_ratio": ratio_g,
+                            "rep_ratio_before": rep_ratio_before,
+                            "rep_ratio_after": rep_ratio_after,
                             "lambda_repulsion": float(self.opt.lambda_repulsion),
-                            "grad_ratio_ema": float(self._grad_ratio_ema) if self._grad_ratio_ema is not None else None,
+                            "rep_ratio_ema": float(self._rep_ratio_ema) if self._rep_ratio_ema is not None else None,
                         },
                     )
             
