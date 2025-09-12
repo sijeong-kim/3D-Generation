@@ -5,18 +5,155 @@
 # - Runs main_ours.py directly for each experiment
 # - Per-run CPU/GPU initialization + teardown
 # - Logs/summary/resume/retry support
+# - Terminal output logging to files
 
 set -euo pipefail
+
+# =======================
+# Logging setup
+# =======================
+LOG_FILE=""
+LOG_DIR=""
+setup_logging() {
+  local sweep_name="$1"
+  local outdir="$2"
+  
+  # Skip logging if disabled
+  if [[ "$ENABLE_LOGGING" == "false" ]]; then
+    print_info "Logging disabled by --no_logging flag"
+    return
+  fi
+  
+  # Determine log directory
+  if [[ -n "$CUSTOM_LOG_DIR" ]]; then
+    LOG_DIR="$CUSTOM_LOG_DIR"
+  else
+    LOG_DIR="$outdir/$sweep_name/logs"
+  fi
+  
+  mkdir -p "$LOG_DIR"
+  
+  # Cleanup old logs if requested
+  if [[ "$CLEANUP_LOGS" == "true" ]]; then
+    cleanup_old_logs "$LOG_DIR"
+  fi
+  
+  # Create timestamped log file
+  local timestamp=$(date +"%Y%m%d_%H%M%S")
+  LOG_FILE="$LOG_DIR/run_${timestamp}.log"
+  
+  # Also create a symlink to the latest log
+  local latest_log="$LOG_DIR/latest.log"
+  [[ -L "$latest_log" ]] && rm -f "$latest_log"
+  ln -s "$(basename "$LOG_FILE")" "$latest_log"
+  
+  # Log script start
+  {
+    echo "=========================================="
+    echo "Script started: $(date -Iseconds)"
+    echo "Sweep name: $sweep_name"
+    echo "Output directory: $outdir"
+    echo "Log file: $LOG_FILE"
+    echo "Log directory: $LOG_DIR"
+    echo "=========================================="
+  } >> "$LOG_FILE"
+  
+  print_info "Logging enabled: $LOG_FILE"
+  print_info "Latest log symlink: $latest_log"
+}
+
+# Function to clean up old log files
+cleanup_old_logs() {
+  local log_dir="$1"
+  local keep_count=10
+  
+  print_info "Cleaning up old log files (keeping last $keep_count)..."
+  
+  # Find all log files and sort by modification time (newest first)
+  local log_files=($(find "$log_dir" -name "run_*.log" -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | cut -d' ' -f2-))
+  
+  if [[ ${#log_files[@]} -gt $keep_count ]]; then
+    local files_to_remove=($(printf '%s\n' "${log_files[@]}" | tail -n +$((keep_count + 1))))
+    
+    for file in "${files_to_remove[@]}"; do
+      print_info "Removing old log: $(basename "$file")"
+      rm -f "$file"
+    done
+    
+    print_info "Cleaned up ${#files_to_remove[@]} old log files"
+  else
+    print_info "No cleanup needed (${#log_files[@]} log files found)"
+  fi
+}
+
+# Function to capture command output and log it
+log_command() {
+  local cmd="$1"
+  local description="$2"
+  
+  print_info "Executing: $description"
+  
+  if [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]]; then
+    {
+      echo ""
+      echo "--- $description ---"
+      echo "Command: $cmd"
+      echo "Time: $(date -Iseconds)"
+      echo "---"
+    } >> "$LOG_FILE"
+    
+    if eval "$cmd" 2>&1 | tee -a "$LOG_FILE"; then
+      print_success "Completed: $description"
+      return 0
+    else
+      local result=$?
+      print_error "Failed: $description (exit code: $result)"
+      return $result
+    fi
+  else
+    # No logging, just execute the command
+    if eval "$cmd"; then
+      print_success "Completed: $description"
+      return 0
+    else
+      local result=$?
+      print_error "Failed: $description (exit code: $result)"
+      return $result
+    fi
+  fi
+}
 
 # =======================
 # Pretty printing helpers
 # =======================
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; PURPLE='\033[0;35m'; NC='\033[0m'
-print_info()    { echo -e "${BLUE}[INFO]${NC} $*"; }
-print_success() { echo -e "${GREEN}[SUCCESS]${NC} $*"; }
-print_warning() { echo -e "${YELLOW}[WARNING]${NC} $*"; }
-print_error()   { echo -e "${RED}[ERROR]${NC} $*"; }
-print_header()  { echo -e "${PURPLE}$*${NC}"; }
+
+# Enhanced print functions that output to both terminal and log file
+print_info()    { 
+  local msg="${BLUE}[INFO]${NC} $*"
+  echo -e "$msg"
+  [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]] && echo -e "$msg" >> "$LOG_FILE"
+}
+print_success() { 
+  local msg="${GREEN}[SUCCESS]${NC} $*"
+  echo -e "$msg"
+  [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]] && echo -e "$msg" >> "$LOG_FILE"
+}
+print_warning() { 
+  local msg="${YELLOW}[WARNING]${NC} $*"
+  echo -e "$msg"
+  [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]] && echo -e "$msg" >> "$LOG_FILE"
+}
+print_error()   { 
+  local msg="${RED}[ERROR]${NC} $*"
+  echo -e "$msg"
+  [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]] && echo -e "$msg" >> "$LOG_FILE"
+}
+print_header()  { 
+  local msg="${PURPLE}$*${NC}"
+  echo -e "$msg"
+  [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]] && echo -e "$msg" >> "$LOG_FILE"
+}
 
 usage() {
   cat <<'EOF'
@@ -34,6 +171,9 @@ OPTIONS:
   --timeout SEC         Per-run timeout in seconds (default: 7200)
   --base_config PATH    Base yaml (default: configs/text_ours.yaml)
   --sweep_config PATH   Sweep yaml (default: configs/text_ours_exp_v1.yaml)
+  --no_logging          Disable terminal output logging to files
+  --log_dir DIR         Custom log directory (default: <outdir>/<sweep_name>/logs)
+  --cleanup_logs        Clean up old log files (keep last 10)
   --help                Show this help
 
 Example:
@@ -63,6 +203,9 @@ BASE_CONFIG="configs/text_ours.yaml"
 SWEEP_CONFIG="configs/text_ours_exp_v1.yaml"
 SWEEP_NAME=""
 SLEEP_BETWEEN="60"
+ENABLE_LOGGING="true"
+CUSTOM_LOG_DIR=""
+CLEANUP_LOGS="false"
 
 # =======================
 # Parse args
@@ -80,6 +223,9 @@ while [[ $# -gt 0 ]]; do
     --timeout) TIMEOUT="$2"; shift 2 ;;
     --base_config) BASE_CONFIG="$2"; shift 2 ;;
     --sweep_config) SWEEP_CONFIG="$2"; shift 2 ;;
+    --no_logging) ENABLE_LOGGING="false"; shift ;;
+    --log_dir) CUSTOM_LOG_DIR="$2"; shift 2 ;;
+    --cleanup_logs) CLEANUP_LOGS="true"; shift ;;
     --help) usage; exit 0 ;;
     --sleep_between) SLEEP_BETWEEN="$2"; shift 2 ;;
     --*) print_error "Unknown option: $1"; usage; exit 1 ;;
@@ -92,6 +238,11 @@ done
 [[ -f "$SWEEP_CONFIG" ]] || { print_error "Sweep config not found: $SWEEP_CONFIG"; exit 1; }
 
 export DRY_RUN GPUS CPU_CORES THREADS MEM_SOFT_MB TIMEOUT SLEEP_BETWEEN
+
+# =======================
+# Setup logging
+# =======================
+setup_logging "$SWEEP_NAME" "$OUTDIR"
 
 # =======================
 # Helpers
@@ -294,9 +445,7 @@ PY
 # =======================
 # Main flow
 # =======================
-print_info "Loading experiment configs via exp_config.py ..."
-python3 scripts/experiments/exp_config.py "$BASE_CONFIG" "$SWEEP_CONFIG" "$SWEEP_NAME" --save-files \
-  > /tmp/_exp_config.out 2>&1 || { print_error "exp_config.py failed"; cat /tmp/_exp_config.out; exit 1; }
+log_command "python3 scripts/experiments/exp_config.py \"$BASE_CONFIG\" \"$SWEEP_CONFIG\" \"$SWEEP_NAME\" --save-files" "Loading experiment configs via exp_config.py"
 
 # exp_config.py is expected to create "exp/<sweep_name>/experiment_summary.txt"
 EXP_DIR="exp/$SWEEP_NAME"
@@ -417,4 +566,18 @@ if [[ $failed_runs -gt 0 ]]; then
   print_warning "$failed_runs run(s) failed. Re-run with --retry_failed_only to target failures."
 else
   print_success "All experiments completed successfully!"
+fi
+
+# Final log entry
+if [[ "$ENABLE_LOGGING" == "true" && -n "$LOG_FILE" ]]; then
+  {
+    echo ""
+    echo "=========================================="
+    echo "Script completed: $(date -Iseconds)"
+    echo "Total experiments: $CONFIG_COUNT"
+    echo "Successful: $successful_runs"
+    echo "Failed: $failed_runs"
+    echo "Log file: $LOG_FILE"
+    echo "=========================================="
+  } >> "$LOG_FILE"
 fi
