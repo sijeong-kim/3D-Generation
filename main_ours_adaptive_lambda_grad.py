@@ -500,12 +500,17 @@ class GUI:
         # 1) 현재 lambda로 repulsion을 '비율 계산용'으로만 한 번 스케일(그래프 X)
         
         # Calculate ratio_pct for both adaptive_lambda True and False cases
+        # with torch.no_grad():
+        #     scaled_repulsion_for_ratio = (self.opt.lambda_repulsion * repulsion_loss).detach()
+        #     denom_val = max(float(abs(scaled_attraction_loss.detach().item())), 1e-8)
+        #     ratio_pct = 100.0 * float(abs(scaled_repulsion_for_ratio.item())) / denom_val
+            
+            
+        # kernel_grad, score_gradients 구한 직후 (backward 전)
         with torch.no_grad():
-            scaled_repulsion_for_ratio = (self.opt.lambda_repulsion * repulsion_loss).detach()
-            denom_val = max(float(abs(scaled_attraction_loss.detach().item())), 1e-8)
-            ratio_pct = 100.0 * float(abs(scaled_repulsion_for_ratio.item())) / denom_val
-            
-            
+            rep_g = kernel_grad.float().view(kernel_grad.shape[0], -1).norm(p=2, dim=1).mean().item()
+            att_g = score_gradients.float().view(score_gradients.shape[0], -1).norm(p=2, dim=1).mean().item()
+            ratio_g = 100.0 * (self.opt.lambda_repulsion * rep_g) / max(self.opt.lambda_sd * att_g, 1e-8)
 
         if self.opt.adaptive_lambda:
             if (
@@ -516,11 +521,10 @@ class GUI:
                 and torch.isfinite(scaled_attraction_loss).item()
                 and denom_val > self.repctl.get("denom_floor", 1e-6)  # ← 추가
             ):
-                self.adaptive_lambda_repulsion(ratio_pct)
+                self.adaptive_lambda_repulsion(ratio_g)
 
         # 2) (필요 시 업데이트된) lambda로 repulsion을 '학습용'으로 다시 스케일 (그래프 O)
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-
 
         # 최종 loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
@@ -598,10 +602,6 @@ class GUI:
                     scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
                     scaled_repulsion_loss_val = self.opt.lambda_repulsion * repulsion_loss_val
                     total_loss_val = total_loss.item()
-                    if self.opt.adaptive_lambda:
-                        ratio_pct_after = 100.0 * float(abs(scaled_repulsion_loss_val)) / max(float(abs(scaled_attraction_loss_val)), 1e-8)
-                    else:
-                        ratio_pct_after = ratio_pct
 
                     # log
                     self.metrics_calculator.log_losses(
@@ -614,10 +614,9 @@ class GUI:
                             "total_loss": total_loss_val,
                             # "scaled_repulsion_loss_ratio": abs(scaled_repulsion_loss_val / scaled_attraction_loss_val) * 100,
                             # add
-                            "scaled_repulsion_loss_ratio_before": ratio_pct,
-                            "scaled_repulsion_loss_ratio_after": ratio_pct_after,
+                            "grad_ratio": ratio_g,
                             "lambda_repulsion": float(self.opt.lambda_repulsion),
-                            "rep_ratio_pct_ema": float(self._rep_ratio_ema) if self._rep_ratio_ema is not None else None,
+                            "grad_ratio_ema": float(self._grad_ratio_ema) if self._grad_ratio_ema is not None else None,
                         },
                     )
             
