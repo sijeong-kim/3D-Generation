@@ -931,19 +931,19 @@ class GUI:
             for j in range(self.opt.num_particles):
                 self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
     
-        # # Multi-viewpoints for 30 fps video (save at the end of training)
-        # if self.opt.video_snapshot:
-        #     # Update visualizer with final training state
-        #     self.visualizer.update_renderers(self.renderers)
-        #     self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
-        #     # Clean up visualizer renderers to free memory
-        #     self.visualizer.cleanup_renderers()
+        # Multi-viewpoints for 30 fps video (save at the end of training)
+        if self.opt.video_snapshot:
+            # Update visualizer with final training state
+            self.visualizer.update_renderers(self.renderers)
+            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+            # Clean up visualizer renderers to free memory
+            self.visualizer.cleanup_renderers()
 
-        # # save model
-        # if self.opt.save_model:
-        #     for j in range(self.opt.num_particles):
-        #         self.save_model(mode='model', particle_id=j)
-        #         self.save_model(mode='geo+tex', particle_id=j)   
+        # save model
+        if self.opt.save_model:
+            for j in range(self.opt.num_particles):
+                self.save_model(mode='model', particle_id=j)
+                self.save_model(mode='geo+tex', particle_id=j)   
 
 if __name__ == "__main__":
     import argparse
