@@ -328,6 +328,9 @@ run_single_experiment() {
   # PyTorch allocator (helps multi-run fragmentation)
   export PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True,max_split_size_mb:128"
   
+  # Set CUDA architecture to avoid compilation warnings
+  export TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0"
+  
 
   # Optional soft memory cap for child
   local ULIMIT_PREFIX=""
