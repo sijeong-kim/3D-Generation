@@ -349,7 +349,7 @@ exp3_guidance_scale:
   fixed_parameters:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
-    lambda_repulsion: 1000
+    # lambda_repulsion: 1000
     adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
