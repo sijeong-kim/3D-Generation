@@ -79,10 +79,12 @@ exp0_baseline:
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+    
+    seed: [42, 123, 456]
 
   # fixed parameters
   fixed_parameters:
-    seed: 42
+    # seed: 42
     # adaptive_lambda: False
     # rep_ratio_target: 40.0
     # lambda_repulsion: 1000
