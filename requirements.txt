@@ -50,3 +50,4 @@ notebook
 ipykernel
 pytest
 
+mcubes

@@ -706,7 +706,7 @@ class GUI:
                 if self.opt.save_model:
                     for j in range(self.opt.num_particles):
                         self.save_model(mode='model', particle_id=j, step=self.step)
-                        self.save_model(mode='geo+tex', particle_id=j, step=self.step)   
+                        self.save_model(mode='geo+tex', particle_id=j, step=self.step)
                 
                 
                 
@@ -942,8 +942,8 @@ class GUI:
         # save model
         if self.opt.save_model:
             for j in range(self.opt.num_particles):
-                self.save_model(mode='model', particle_id=j)
-                self.save_model(mode='geo+tex', particle_id=j)   
+                self.save_model(mode='model', particle_id=j, step=self.step)
+                self.save_model(mode='geo+tex', particle_id=j, step=self.step)   
 
 if __name__ == "__main__":
     import argparse

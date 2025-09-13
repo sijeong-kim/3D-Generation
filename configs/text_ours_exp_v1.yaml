@@ -127,8 +127,8 @@ exp1_repulsion_kernel:
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
 
-    save_model: True
-    video_snapshot: True
+    save_model: False
+    video_snapshot: False
 
 
 # Experiment 2: lambda (λ) sweep (rlsd, rbf fixed) --> 시각적으로 안정적 1000 정도
@@ -751,6 +751,10 @@ exp8_cosine_decay_off:
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
+
+    save_model: False
+    video_snapshot: False
+
 
 ###### Appendix #####
 # seed {42, 123} seed 바뀌어도 경향은 동일함을 증명 → 본문 재현성 강화.
