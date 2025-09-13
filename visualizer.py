@@ -291,7 +291,7 @@ class GaussianVisualizer:
                 
             # Create directories for individual particle views
             if save_iid:
-                save_iid_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_iid_particles')
+                save_iid_dir = os.path.join(self.multi_viewpoints_dir, f'step_{step}_view_{num_views}_iid_particles')
                 os.makedirs(save_iid_dir, exist_ok=True)
                 save_iid_paths = []
                 for particle_id in range(self.opt.num_particles):

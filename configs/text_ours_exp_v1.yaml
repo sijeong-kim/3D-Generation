@@ -343,6 +343,7 @@ exp3_guidance_scale:
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+  lambda_repulsion: [1200, 1400]
 
   # fixed parameters
   fixed_parameters:
