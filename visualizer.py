@@ -86,6 +86,8 @@ class GaussianVisualizer:
             os.makedirs(self.fixed_viewpoint_dir, exist_ok=True)
         else:
             self.fixed_viewpoint_dir = None
+            
+        self.white_background_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
     
     def update_renderers(self, training_renderers):
         """
@@ -271,6 +273,9 @@ class GaussianVisualizer:
         # 📥 Use default values if parameters are not provided
         if num_views is None:
             num_views = self.opt.num_views
+            multi_viewpoints_cameras = self.multi_viewpoints_cameras
+        else:
+            multi_viewpoints_cameras = self.get_multi_view_cameras(num_views)
 
         if visualize_multi_viewpoints is None:
             visualize_multi_viewpoints = self.opt.visualize_multi_viewpoints
@@ -297,9 +302,9 @@ class GaussianVisualizer:
         # Render images from each viewpoint
         multi_viewpoint_images = []
         
-        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        bg_color = self.white_background_color
         
-        for i, camera in enumerate(self.multi_viewpoints_cameras):
+        for i, camera in enumerate(multi_viewpoints_cameras):
             # Render each particle from current viewpoint
             particle_images = []
             
@@ -348,7 +353,7 @@ class GaussianVisualizer:
         #     os.makedirs(viewpoint_dir, exist_ok=True)
         
         camera = self.fixed_viewpoint_camera
-        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
+        bg_color = self.white_background_color
         
         # Render each particle from the fixed viewpoint
         particle_images = []
@@ -381,7 +386,6 @@ class GaussianVisualizer:
             vutils.save_image(grid_image, output_path, normalize=False)
         
         del particle_images
-        del bg_color
         
         return particle_images_tensor
     
