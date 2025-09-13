@@ -351,7 +351,7 @@ class GaussianVisualizer:
         # Stack all viewpoints into final tensor
         multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0)  # [V, N, 3, H, W]
         
-        del multi_viewpoint_images
+        # Clean up intermediate variables (but keep the return value)
         del particle_images
         del particle_images_tensor
         del grid_image
