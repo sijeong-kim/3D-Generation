@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e  # Stop on error
 
+
+sudo apt-get update
+sudo apt-get install -y libegl1-mesa-dev libglvnd-dev mesa-common-dev
+# (often enough; if you still see issues, add)
+sudo apt-get install -y libgles2-mesa-dev
+
+
 # -----------------------------
 # Configuration
 # -----------------------------
