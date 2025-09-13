@@ -266,7 +266,7 @@ exp2_lambda_fine:
   method: grid
   sweep_parameters:
     lambda_repulsion: # TODO: add more values
-      rlsd_rbf: [600, 800, 1000, 1200, 1400] # 국소 탐색
+      rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600, 1800, 2000] # 국소 탐색
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
