@@ -67,18 +67,18 @@ class GaussianVisualizer:
             self.rendered_images_dir = None
             
         # Initialize visualization directory for multi-viewpoints
-        if self.opt.visualize_multi_viewpoints:
+        if self.opt.visualize_multi_viewpoints or self.opt.video_snapshot:
             self.multi_viewpoints_dir = os.path.join(self.save_dir, "multi_viewpoints")
             os.makedirs(self.multi_viewpoints_dir, exist_ok=True)
         else:
             self.multi_viewpoints_dir = None
         
         # Initialize visualization directory for iid images
-        if self.opt.save_iid:
-            self.iid_dir = os.path.join(self.save_dir, "iid")
-            os.makedirs(self.iid_dir, exist_ok=True)
-        else:
-            self.iid_dir = None
+        # if self.opt.save_iid or :
+        #     self.iid_dir = os.path.join(self.save_dir, "iid")
+        #     os.makedirs(self.iid_dir, exist_ok=True)
+        # else:
+        #     self.iid_dir = None
             
         # Initialize visualization directory for fixed viewpoint
         if self.opt.visualize_fixed_viewpoint:
@@ -271,8 +271,7 @@ class GaussianVisualizer:
         # 📥 Use default values if parameters are not provided
         if num_views is None:
             num_views = self.opt.num_views
-        if save_iid is None:
-            save_iid = self.opt.save_iid
+
         if visualize_multi_viewpoints is None:
             visualize_multi_viewpoints = self.opt.visualize_multi_viewpoints
         
@@ -282,15 +281,16 @@ class GaussianVisualizer:
         
         if visualize_multi_viewpoints and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0):
             # Create directory for combined particle views
-            if self.opt.num_particles > 1:
-                multi_viewpoints_dir = os.path.join(self.multi_viewpoints_dir, f'step_{step}_view_{num_views}_all_particles')
-                os.makedirs(multi_viewpoints_dir, exist_ok=True)
+            multi_viewpoints_dir = os.path.join(self.multi_viewpoints_dir, f'step_{step}_view_{num_views}_all_particles')
+            os.makedirs(multi_viewpoints_dir, exist_ok=True)
                 
             # Create directories for individual particle views
             if save_iid:
+                save_iid_dir = os.path.join(self.save_dir, f'step_{step}_view_{num_views}_iid_particles')
+                os.makedirs(save_iid_dir, exist_ok=True)
                 save_iid_paths = []
                 for particle_id in range(self.opt.num_particles):
-                    particle_dir = os.path.join(self.iid_dir, f'step_{step}_view_{num_views}_particle_{particle_id}')
+                    particle_dir = os.path.join(save_iid_dir, f'particle_{particle_id}')
                     os.makedirs(particle_dir, exist_ok=True)
                     save_iid_paths.append(particle_dir)
         
@@ -311,10 +311,11 @@ class GaussianVisualizer:
                 particle_images.append(image)
                 
                 # 📥 Save individual particle image if enabled
-                if visualize_multi_viewpoints and save_iid and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and save_iid_paths is not None:
-                    output_path = os.path.join(save_iid_paths[particle_id], f'view_{i:03d}.png')
-                    # Ensure images are in [0,1] range before saving
-                    vutils.save_image(image, output_path, normalize=False)
+                if self.opt.video_snapshot or (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0):
+                    if visualize_multi_viewpoints and save_iid and save_iid_paths is not None:
+                        output_path = os.path.join(save_iid_paths[particle_id], f'view_{i:03d}.png')
+                        # Ensure images are in [0,1] range before saving
+                        vutils.save_image(image, output_path, normalize=False)
             
             # Combine all particle images for current viewpoint using grid layout
             particle_images_tensor = torch.cat(particle_images, dim=0)  # [N, 3, H, W] - keep for metrics
@@ -324,11 +325,12 @@ class GaussianVisualizer:
             grid_image = self.arrange_particles_in_grid(particle_images)
             
             # 📥 Save combined view of all particles if multiple particles exist
-            if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and multi_viewpoints_dir is not None:
-                output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
-                # Ensure images are in [0,1] range before saving
-                vutils.save_image(grid_image, output_path, normalize=False)
-        
+            if self.opt.video_snapshot or (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0):
+                if visualize_multi_viewpoints and multi_viewpoints_dir is not None:
+                    output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
+                    # Ensure images are in [0,1] range before saving
+                    vutils.save_image(grid_image, output_path, normalize=False)
+            
         # Stack all viewpoints into final tensor
         multi_viewpoint_images = torch.stack(multi_viewpoint_images, dim=0)  # [V, N, 3, H, W]
 
