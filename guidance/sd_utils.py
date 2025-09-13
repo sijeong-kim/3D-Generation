@@ -1,3 +1,4 @@
+# sd_utils.py
 from diffusers import (
     DDIMScheduler,
     StableDiffusionPipeline,
@@ -11,11 +12,28 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def seed_everything(seed):
+# def seed_everything(seed):
+#     torch.manual_seed(seed)
+#     torch.cuda.manual_seed(seed)
+#     # torch.backends.cudnn.deterministic = True
+#     # torch.backends.cudnn.benchmark = True
+
+
+def seed_everything(seed: int):
+    import os, random, numpy as np, torch
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)                       # ← 추가
+    np.random.seed(seed)                    # ← 추가
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)        # ← 추가
+    # (선택) 단독 실행에서도 완전 결정성을 원하면 아래도 켜세요:
     # torch.backends.cudnn.deterministic = True
-    # torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.benchmark = False
+    # torch.use_deterministic_algorithms(True)
+    # os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    # torch.backends.cuda.matmul.allow_tf32 = False
+    # torch.backends.cudnn.allow_tf32 = False
 
 
 class StableDiffusion(nn.Module):
@@ -305,6 +323,7 @@ class StableDiffusion(nn.Module):
         vers=None, hors=None,
         force_same_t: bool = True,  # 모든 파티클 동일 t
         force_same_noise: bool = True,  # 모든 파티클 동일 noise
+        generator=None,
     ):
         batch_size = pred_rgb.shape[0]
         pred_rgb = pred_rgb.to(self.dtype)
@@ -313,7 +332,7 @@ class StableDiffusion(nn.Module):
             latents = F.interpolate(pred_rgb, (64, 64), mode="bilinear", align_corners=False) * 2 - 1
         else:
             pred_rgb_512 = F.interpolate(pred_rgb, (512, 512), mode="bilinear", align_corners=False)
-            latents = self.encode_imgs(pred_rgb_512)
+            latents = self.encode_imgs(pred_rgb_512, use_posterior_mean=True)
 
         with torch.no_grad():
             # --- 1) t 생성: 항상 shape = [batch_size] 인 torch.LongTensor 로 맞춤 ---
@@ -325,15 +344,15 @@ class StableDiffusion(nn.Module):
                     t = torch.full((batch_size,), t_scalar, dtype=torch.long, device=self.device)
                 else:
                     t = torch.randint(self.min_step, self.max_step + 1,
-                                    (batch_size,), dtype=torch.long, device=self.device)
+                                    (batch_size,), dtype=torch.long, device=self.device, generator=generator)
             else:
                 if force_same_t:
                     t_scalar = torch.randint(self.min_step, self.max_step + 1,
-                                            (1,), dtype=torch.long, device=self.device)
+                                            (1,), dtype=torch.long, device=self.device, generator=generator)
                     t = t_scalar.expand(batch_size)  # same t for all particles in this step
                 else:
                     t = torch.randint(self.min_step, self.max_step + 1,
-                                    (batch_size,), dtype=torch.long, device=self.device)
+                                    (batch_size,), dtype=torch.long, device=self.device, generator=generator)
 
             # --- 2) w(t) 계산은 항상 벡터 t 기반으로 ---
             # self.alphas: [num_train_timesteps] 라고 가정
@@ -342,11 +361,11 @@ class StableDiffusion(nn.Module):
 
             # --- 3) 노이즈 추가 / U-Net 호출 ---
             if force_same_noise:
-                base = torch.randn_like(latents[:1]) # [1, 4, 64, 64]
+                base = torch.randn(latents[:1].shape, device=latents.device, dtype=latents.dtype, generator=generator) # [1, 4, 64, 64]
                 noise = base.expand_as(latents).contiguous() # [N, 4, 64, 64] 배치 전원 동일한 노이즈
 
             else:
-                noise = torch.randn_like(latents)
+                noise = torch.randn(latents.shape, device=latents.device, dtype=latents.dtype, generator=generator)
 
             latents_noisy = self.scheduler.add_noise(latents, noise, t)
 
@@ -434,15 +453,23 @@ class StableDiffusion(nn.Module):
 
         return imgs
 
-    def encode_imgs(self, imgs):
-        # imgs: [B, 3, H, W]
+    # def encode_imgs(self, imgs):
+    #     # imgs: [B, 3, H, W]
 
+    #     imgs = 2 * imgs - 1
+
+    #     posterior = self.vae.encode(imgs).latent_dist
+    #     latents = posterior.sample() * self.vae.config.scaling_factor
+
+    #     return latents
+    
+    # for reproducibility
+    def encode_imgs(self, imgs, use_posterior_mean: bool = True):
         imgs = 2 * imgs - 1
-
         posterior = self.vae.encode(imgs).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
+        z = posterior.mean if use_posterior_mean else posterior.sample()
+        return z * self.vae.config.scaling_factor
 
-        return latents
 
     def prompt_to_img(
         self,

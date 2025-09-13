@@ -24,8 +24,6 @@ from feature_extractor import DINOv2MultiLayerFeatureExtractor
 
 from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 
-from torchviz import make_dot
-
 class GUI:
     def __init__(self, opt):
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
@@ -183,6 +181,24 @@ class GUI:
             self.device = torch.device("cpu")
             return False
 
+    # def seed_everything(self, seed):
+    #     try:
+    #         seed = int(seed)
+    #     except:
+    #         seed = np.random.randint(0, 1000000)
+
+    #     os.environ["PYTHONHASHSEED"] = str(seed)
+    #     np.random.seed(seed)
+    #     torch.manual_seed(seed)
+    #     torch.cuda.manual_seed(seed)
+    #     torch.backends.cudnn.deterministic = True
+    #     torch.backends.cudnn.benchmark = False
+    #     torch.use_deterministic_algorithms(True)
+    #     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    #     torch.backends.cuda.matmul.allow_tf32 = False
+    #     torch.backends.cudnn.allow_tf32 = False
+        
+        
     def seed_everything(self, seed):
         try:
             seed = int(seed)
@@ -190,15 +206,19 @@ class GUI:
             seed = np.random.randint(0, 1000000)
 
         os.environ["PYTHONHASHSEED"] = str(seed)
+        random.seed(seed)                       # ← 추가
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)        # ← 추가(멀티 GPU 대비)
+
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
         torch.use_deterministic_algorithms(True)
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
+
 
     # def adaptive_lambda_repulsion(self, ratio_pct: float):
         # """EMA된 비율을 타깃(%)에 가깝게 유지하도록 lambda_repulsion을 곱셈형으로 조정."""
@@ -411,7 +431,6 @@ class GUI:
     
         for j in range(self.opt.num_particles):
             # set seed for each particle + iteration step for different background each iter
-            self.seed_everything(self.seeds[j] + self.step)
             
             # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
@@ -465,11 +484,14 @@ class GUI:
         # attraction loss (latent space)
         attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
     
+        gen = torch.Generator(device=self.device).manual_seed(self.seed + self.step + 12345) # sd 전용 오프셋
+
         score_gradients, latents = self.guidance_sd.train_step_gradient(
             images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
             guidance_scale=self.opt.guidance_scale,
             force_same_t=self.opt.force_same_t,
             force_same_noise=self.opt.force_same_noise,
+            generator=gen,
         )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
         
         score_gradients = score_gradients.to(torch.float32)
