@@ -40,19 +40,12 @@ class GaussianVisualizer:
         # Auto-adjust grid layout based on number of particles
         self.auto_adjust_grid = True
         
-        self.white_background = torch.tensor([1.0, 1.0, 1.0], device=self.device)
-        
         
         ### Pre-compute camera positions for efficient rendering
         if self.opt.visualize_multi_viewpoints or self.opt.metrics:
             self.multi_viewpoints_cameras = self.get_multi_view_cameras(self.opt.num_views)
         else:
             self.multi_viewpoints_cameras = None
-            
-        if self.opt.video_snapshot:
-            self.video_snapshot_cameras = self.get_multi_view_cameras(120)
-        else:
-            self.video_snapshot_cameras = None
             
         if self.opt.visualize_fixed_viewpoint:
             self.fixed_viewpoint_camera = self.get_front_view_camera()
@@ -274,21 +267,12 @@ class GaussianVisualizer:
     
 
     @torch.inference_mode()
-    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize_multi_viewpoints=None, video_snapshot=None, save_iid=None):
+    def visualize_all_particles_in_multi_viewpoints(self, step, num_views=None, visualize_multi_viewpoints=None, save_iid=None):
         # 📥 Use default values if parameters are not provided
-        
-        if video_snapshot:
-            num_views = 120
-            multi_viewpoints_cameras = self.video_snapshot_cameras
-        elif num_views is None:
+        if num_views is None:
             num_views = self.opt.num_views
-            multi_viewpoints_cameras = self.multi_viewpoints_cameras
-        else:
-            multi_viewpoints_cameras = self.get_multi_view_cameras(num_views)
-            
         if save_iid is None:
             save_iid = self.opt.save_iid
-
         if visualize_multi_viewpoints is None:
             visualize_multi_viewpoints = self.opt.visualize_multi_viewpoints
         
@@ -313,11 +297,12 @@ class GaussianVisualizer:
         # Render images from each viewpoint
         multi_viewpoint_images = []
         
-        bg_color = self.white_background
+        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
         
         for i, camera in enumerate(self.multi_viewpoints_cameras):
             # Render each particle from current viewpoint
             particle_images = []
+            
             
             for particle_id in range(self.opt.num_particles):
                 # Render with white background for consistent visualization    
@@ -328,8 +313,6 @@ class GaussianVisualizer:
                 # 📥 Save individual particle image if enabled
                 if visualize_multi_viewpoints and save_iid and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and save_iid_paths is not None:
                     output_path = os.path.join(save_iid_paths[particle_id], f'view_{i:03d}.png')
-                    
-                    assert image.max() <= 1.0 and image.min() >= 0.0, f"Image is not in [0,1] range: {image.max()} {image.min()}"
                     # Ensure images are in [0,1] range before saving
                     vutils.save_image(image, output_path, normalize=False)
             
@@ -343,8 +326,6 @@ class GaussianVisualizer:
             # 📥 Save combined view of all particles if multiple particles exist
             if visualize_multi_viewpoints and (self.opt.num_particles > 1) and (step==1 or step % self.opt.visualize_multi_viewpoints_interval == 0) and multi_viewpoints_dir is not None:
                 output_path = os.path.join(multi_viewpoints_dir, f'view_{i:03d}.png')
-                
-                assert grid_image.max() <= 1.0 and grid_image.min() >= 0.0, f"Grid image is not in [0,1] range: {grid_image.max()} {grid_image.min()}"
                 # Ensure images are in [0,1] range before saving
                 vutils.save_image(grid_image, output_path, normalize=False)
         
@@ -365,7 +346,7 @@ class GaussianVisualizer:
         #     os.makedirs(viewpoint_dir, exist_ok=True)
         
         camera = self.fixed_viewpoint_camera
-        bg_color = self.white_background
+        bg_color = torch.tensor([1.0, 1.0, 1.0], device=self.device)
         
         # Render each particle from the fixed viewpoint
         particle_images = []
@@ -398,7 +379,7 @@ class GaussianVisualizer:
             vutils.save_image(grid_image, output_path, normalize=False)
         
         del particle_images
-        # del bg_color
+        del bg_color
         
         return particle_images_tensor
     

@@ -935,7 +935,7 @@ class GUI:
         if self.opt.video_snapshot:
             # Update visualizer with final training state
             self.visualizer.update_renderers(self.renderers)
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, visualize_multi_viewpoints=True, video_snapshot=True, save_iid=True) # 360 / 120 for 30 fps
+            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
             # Clean up visualizer renderers to free memory
             self.visualizer.cleanup_renderers()
 
