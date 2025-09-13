@@ -9,7 +9,7 @@
 
 # TODO: λ_repulsion 1D coarse → fine 탐색 → 그다음 β(temperature) 단일 축 튜닝 → 마지막에 국소 2D(λ×β) 미세탐색.
 
-# Experiment 0: Baseline
+# Experiment 0: Baseline (wo)
 exp0_baseline:
   name: exp0_baseline
   method: grid
@@ -68,7 +68,9 @@ exp0_baseline:
     save_model: True
     video_snapshot: True
 
-exp1_repulsion_kernel:
+
+# repulsion type x kernel type sweep --> rlsd, rbf is best...
+exp1_repulsion_kernel: 
   name: exp1_repulsion_kernel
   method: grid
   sweep_parameters:
@@ -79,8 +81,7 @@ exp1_repulsion_kernel:
       tulip: "a photo of a tulip"
       
     repulsion_type: ['rlsd', 'svgd']
-    kernel_type: ['cosine', 'rbf'] # ['rbf']
-
+    kernel_type: ['cosine', 'rbf']
 
   # fixed parameters
   fixed_parameters:
@@ -129,15 +130,153 @@ exp1_repulsion_kernel:
     save_model: True
     video_snapshot: True
 
-# Experiment 2: (Repulsion type x kernel type) & lambda sweep 
-exp2_lambda:
-  name: exp2_lambda
+
+# Experiment 2: lambda (λ) sweep (rlsd, rbf fixed) --> 시각적으로 안정적 1000 정도
+exp2_lambda_coarse: 
+  name: exp2_lambda_coarse
   method: grid
   sweep_parameters:
+    lambda_repulsion: # TODO: add more values
+      rlsd_rbf: [1, 10, 100, 1000, 10000]  # log scale
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
     repulsion_type: ['rlsd']
     kernel_type: ['rbf']
+
+  # fixed parameters
+  fixed_parameters:
+    adaptive_lambda: False
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
+# Experiment 3: lambda (λ) sweep (rlsd, rbf fixed)
+exp2_lambda_fine:
+  name: exp2_lambda_fine
+  method: grid
+  sweep_parameters:
     lambda_repulsion: # TODO: add more values
-      rlsd_rbf: [600, 800, 1000, 1200, 1400]
+      rlsd_rbf: [600, 800, 1000, 1200, 1400] # 국소 탐색
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+
+  # fixed parameters
+  fixed_parameters:
+    adaptive_lambda: False
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
+# Experiment 3: guidance scale sweep (rlsd, rbf fixed)
+exp3_guidance_scale:
+  name: exp3_guidance_scale
+  method: grid
+  sweep_parameters:
+    guidance_scale: [30, 50, 70, 100]
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -146,10 +285,12 @@ exp2_lambda:
 
   # fixed parameters
   fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
     lambda_repulsion: 1000
+    adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
 
     seed: 42
     num_particles: 8
@@ -195,293 +336,51 @@ exp2_lambda:
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
 
-# Experiment 3: guidance scale sweep
-exp3_guidance_scale:
-  name: exp3_guidance_scale
+    save_model: False
+    video_snapshot: False
+
+
+# ------------------------------------------------------------ #
+# TODO: feature space (particle distribution)
+# Experiment 4: feature layer sweep
+exp4_feature_layer:
+  name: exp4_feature_layer
   method: grid
   sweep_parameters:
-    guidance_scale: [40, 50, 60, 70, 80, 90, 100]
+    feature_layer: ['early', 'mid', 'last'] # 2: early, 5: mid, 11: last
     prompt: 
-      # hamburger: "a photo of a hamburger"
-      # icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    lambda_repulsion: 1000
-    iters: 1000
-    schedule_iters: 1500
-    guidance_scale: 50
-
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    rbf_beta: 1.0
-    cosine_beta: 1.0
-    cosine_eps_shift: 1e-3
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-    
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-# Experiment 3: guidance scale sweep
-exp3_feature_layer:
-  name: exp3_feature_layer
-  method: grid
-  sweep_parameters:
-    feature_layer: ['early', 'mid', 'last']
-    prompt: 
-      # hamburger: "a photo of a hamburger"
+      hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
+      tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
-    lambda_repulsion: 1000
-    iters: 1000
 
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    
-    # feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    rbf_beta: 1.0
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-  
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-
-# Experiment 3: num_pts sweep
-exp4_num_pts:
-  name: exp4_num_pts
-  method: grid
-  sweep_parameters:
-    num_pts: [1000, 3000, 5000]
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    lambda_repulsion: 1000
-    iters: 1000
-
-    guidance_scale: 50
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    rbf_beta: 1.0
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-    
-    
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-
-# Experiment 5: cosine decay sweep
-exp5_cosine_decay_on:
-  name: exp5_cosine_decay_on
-  method: grid
-  sweep_parameters:
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-    cosine_decay_floor: [0.1, 0.3] 
-    rep_cosine_warmup: [0.0, 0.2]
-    
-  # fixed parameters
-  fixed_parameters:
-    use_cosine_decay: True
-
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    lambda_repulsion: 1000
-
-    iters: 1000
-    guidance_scale: 50
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-    
-    rbf_beta: 1.0
-    
-    
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-
-# Experiment 4b: cosine decay sweep
-exp5_cosine_decay_off:
-  name: exp5_cosine_decay_off
-  method: grid
-  sweep_parameters:
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-    
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
     adaptive_lambda: False
     lambda_repulsion: 1000
-    
+
     iters: 1000
     schedule_iters: 1500
-    # lambda_repulsion: 1000 
+    guidance_scale: 50
 
     seed: 42
-    guidance_scale: 50
-    
     num_particles: 8
     force_same_t: True
     force_same_noise: True
     anneal_timestep: True
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
 
     use_cosine_decay: False
-    
+    # rep_cosine_warmup: 0.2
+
     invert_bg_prob: 0.5
+
     eval_radius: # not to crop the object adjust the radius
       hamburger: 3.0
       icecream: 4.0
@@ -508,53 +407,14 @@ exp5_cosine_decay_off:
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
-
-    iters: 1000
-    schedule_iters: 1500
-    # lambda_repulsion: 1000 
-
-    seed: 42
-    guidance_scale: 50
     
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+    save_model: False
+    video_snapshot: False
 
-    use_cosine_decay: False
-    
-    invert_bg_prob: 0.5
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
 
-    eval_H: 512 
-    eval_W: 512
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-# Experiment 6: rbf beta sweep
-exp6_rbf_beta:
-  name: exp6_rbf_beta
+# Experiment 5: rbf beta sweep
+exp5_rbf_beta:
+  name: exp5_rbf_beta
   method: grid
   sweep_parameters:
     rbf_beta: [0.5, 1.0, 1.5, 2.0]
@@ -614,34 +474,240 @@ exp6_rbf_beta:
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
 
-###### Appendix #####
-# seed {42, 123} seed 바뀌어도 경향은 동일함을 증명 → 본문 재현성 강화.
-# num_particles {4, 8, 12} N=8 선택의 비용/효과 trade-off 설명 근거.
-# cosine beta sweep {1.0, 2.0}
-# best results (with lpips, multi viewpoint)
-
-
-
-# Experiment 3: guidance scale sweep
-exp_adaptive_lambda_ratio:
-  name: exp_adaptive_lambda_ratio
+# ------------------------------------------------------------ #
+exp6_num_particles:
+  name: exp6_num_particles
   method: grid
   sweep_parameters:
+    num_particles: [2, 4, 8, 16]
     prompt: 
       hamburger: "a photo of a hamburger"
-      # icecream: "a photo of an ice ceam"
-      # cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-
-    adaptive_lambda: [True, False]
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
-    adaptive_lambda: True
-    rep_ratio_target: 20.0
+
+    adaptive_lambda: False
+    lambda_repulsion: 1000
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
     
+    save_model: False
+    video_snapshot: False
+
+# ------------------------------------------------------------ #
+# Experiment 5: num_pts sweep
+exp7_num_pts:
+  name: exp7_num_pts
+  method: grid
+  sweep_parameters:
+    num_pts: [1000, 3000, 5000]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+
+    adaptive_lambda: False
+    lambda_repulsion: 1000
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
+# Experiment 5: cosine decay sweep
+exp8_cosine_decay_on:
+  name: exp8_cosine_decay_on
+  method: grid
+  sweep_parameters:
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    cosine_decay_floor: [0.1, 0.3] 
+    rep_cosine_warmup: [0.0, 0.2]
+    
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+
+    adaptive_lambda: False
+    lambda_repulsion: 1000
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
+# Experiment 4b: cosine decay sweep
+exp8_cosine_decay_off:
+  name: exp8_cosine_decay_off
+  method: grid
+  sweep_parameters:
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+    
+    adaptive_lambda: False
+    lambda_repulsion: 1000
+
     iters: 1000
     schedule_iters: 1500
     # lambda_repulsion: 1000 
@@ -684,3 +750,84 @@ exp_adaptive_lambda_ratio:
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
+
+###### Appendix #####
+# seed {42, 123} seed 바뀌어도 경향은 동일함을 증명 → 본문 재현성 강화.
+# num_particles {4, 8, 12} N=8 선택의 비용/효과 trade-off 설명 근거.
+# cosine beta sweep {1.0, 2.0}
+# best results (with lpips, multi viewpoint)
+
+
+
+# Experiment 3: adaptive lambda sweep (optional)
+exp_adaptive_lambda:
+  name: exp_adaptive_lambda
+  method: grid
+  sweep_parameters:
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+    rep_ratio_target: [20.0, 40.0]
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+
+    adaptive_lambda: True
+    lambda_repulsion: 1000
+    rep_ratio_target: 40.0
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
