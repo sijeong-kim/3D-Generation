@@ -691,22 +691,22 @@ class GUI:
                     self.visualizer.visualize_fixed_viewpoint(self.step)
                     self.visualizer.cleanup_renderers()
                 
-            # save model at the best step
-            if self.step == self.opt.best_step:
-                print(f"[INFO] best step reached: {self.step}")
-                # Multi-viewpoints for 30 fps video (save at the end of training)
-                if self.opt.video_snapshot:
-                    # Update visualizer with final training state
-                    self.visualizer.update_renderers(self.renderers)
-                    self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
-                    # Clean up visualizer renderers to free memory
-                    self.visualizer.cleanup_renderers()
+            # # save model at the best step
+            # if self.step == self.opt.best_step:
+            #     print(f"[INFO] best step reached: {self.step}")
+            #     # Multi-viewpoints for 30 fps video (save at the end of training)
+            #     if self.opt.video_snapshot:
+            #         # Update visualizer with final training state
+            #         self.visualizer.update_renderers(self.renderers)
+            #         self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+            #         # Clean up visualizer renderers to free memory
+            #         self.visualizer.cleanup_renderers()
 
-                # save model
-                if self.opt.save_model:
-                    for j in range(self.opt.num_particles):
-                        self.save_model(mode='model', particle_id=j, step=self.step)
-                        self.save_model(mode='geo+tex', particle_id=j, step=self.step)
+            #     # save model
+            #     if self.opt.save_model:
+            #         for j in range(self.opt.num_particles):
+            #             self.save_model(mode='model', particle_id=j, step=self.step)
+            #             self.save_model(mode='geo+tex', particle_id=j, step=self.step)
                 
                 
                 
@@ -935,7 +935,7 @@ class GUI:
         if self.opt.video_snapshot:
             # Update visualizer with final training state
             self.visualizer.update_renderers(self.renderers)
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, save_iid=True) # 360 / 120 for 30 fps
+            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, visualize_multi_viewpoints=True, save_iid=True) # 360 / 120 for 30 fps
             # Clean up visualizer renderers to free memory
             self.visualizer.cleanup_renderers()
 
