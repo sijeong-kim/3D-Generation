@@ -69,7 +69,7 @@ exp0_baseline:
     video_snapshot: True
 
 
-# repulsion type x kernel type sweep --> rlsd, rbf is best...
+# Experiment 1: repulsion type x kernel type sweep --> rlsd, rbf is best...
 exp1_repulsion_kernel: 
   name: exp1_repulsion_kernel
   method: grid
@@ -201,7 +201,7 @@ exp2_lambda_coarse:
     save_model: False
     video_snapshot: False
 
-# Experiment 3: lambda (λ) sweep (rlsd, rbf fixed)
+# Experiment 2: lambda (λ) sweep (rlsd, rbf fixed)
 exp2_lambda_fine:
   name: exp2_lambda_fine
   method: grid
@@ -475,6 +475,7 @@ exp5_rbf_beta:
     enable_lpips: False # disable lpips for faster training
 
 # ------------------------------------------------------------ #
+# Experiment 6: num_particles sweep
 exp6_num_particles:
   name: exp6_num_particles
   method: grid
@@ -545,7 +546,7 @@ exp6_num_particles:
     video_snapshot: False
 
 # ------------------------------------------------------------ #
-# Experiment 5: num_pts sweep
+# Experiment 7: num_pts sweep
 exp7_num_pts:
   name: exp7_num_pts
   method: grid
@@ -616,7 +617,7 @@ exp7_num_pts:
     save_model: False
     video_snapshot: False
 
-# Experiment 5: cosine decay sweep
+# Experiment 8: cosine decay sweep
 exp8_cosine_decay_on:
   name: exp8_cosine_decay_on
   method: grid
@@ -689,7 +690,7 @@ exp8_cosine_decay_on:
     save_model: False
     video_snapshot: False
 
-# Experiment 4b: cosine decay sweep
+# Experiment 8: cosine decay sweep
 exp8_cosine_decay_off:
   name: exp8_cosine_decay_off
   method: grid
@@ -759,7 +760,7 @@ exp8_cosine_decay_off:
 
 
 
-# Experiment 3: adaptive lambda sweep (optional)
+# [Optional] Experiment: adaptive lambda sweep
 exp_adaptive_lambda:
   name: exp_adaptive_lambda
   method: grid
