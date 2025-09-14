@@ -170,6 +170,9 @@ exp1_repulsion_kernel:
     eval_H: 512
     eval_W: 512
 
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
   settings:
     # visualize
     visualize: True
@@ -241,6 +244,9 @@ exp2_lambda_coarse:
     eval_H: 512 
     eval_W: 512
 
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
   settings:
     # visualize
     visualize: True
@@ -268,7 +274,7 @@ exp2_lambda_fine:
   method: grid
   sweep_parameters:
     lambda_repulsion: # TODO: add more values
-      rlsd_rbf: [600, 800, 1000, 1200, 1400, 1600, 1800, 2000] # 국소 탐색
+      rlsd_rbf: [600, 800, 1000, 1200, 1400] # 국소 탐색
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -311,6 +317,9 @@ exp2_lambda_fine:
     eval_H: 512 
     eval_W: 512
 
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
   settings:
     # visualize
     visualize: True
@@ -332,6 +341,79 @@ exp2_lambda_fine:
     save_model: False
     video_snapshot: False
 
+
+# Experiment 2: lambda (λ) sweep (rlsd, rbf fixed)
+exp_opacity_lr:
+  name: exp_opacity_lr
+  method: grid
+  sweep_parameters:
+    opacity_lr: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+    lambda_repulsion: 1000
+    adaptive_lambda: False
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
+
 # Experiment 3: guidance scale sweep (rlsd, rbf fixed)
 exp3_guidance_scale:
   name: exp3_guidance_scale
@@ -343,7 +425,7 @@ exp3_guidance_scale:
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
-  lambda_repulsion: [1200, 1400]
+  lambda_repulsion: 1000
 
   # fixed parameters
   fixed_parameters:
@@ -379,6 +461,9 @@ exp3_guidance_scale:
 
     eval_H: 512 
     eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -452,6 +537,9 @@ exp4_feature_layer:
     eval_H: 512 
     eval_W: 512
 
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
   settings:
     # visualize
     visualize: True
@@ -517,6 +605,9 @@ exp5_rbf_beta:
 
     eval_H: 512 
     eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -585,6 +676,9 @@ exp6_num_particles:
 
     eval_H: 512 
     eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -657,6 +751,9 @@ exp7_num_pts:
 
     eval_H: 512 
     eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -731,6 +828,9 @@ exp8_cosine_decay_on:
     eval_H: 512 
     eval_W: 512
 
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
   settings:
     # visualize
     visualize: True
@@ -795,6 +895,9 @@ exp8_cosine_decay_off:
 
     eval_H: 512 
     eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -876,6 +979,9 @@ exp_adaptive_lambda:
 
     eval_H: 512 
     eval_W: 512
+    
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
 
   settings:
     # visualize

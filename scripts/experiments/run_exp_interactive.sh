@@ -170,7 +170,7 @@ OPTIONS:
   --mem_soft_mb MB      Soft virtual memory cap for child (ulimit -v) (default: none)
   --timeout SEC         Per-run timeout in seconds (default: 7200)
   --base_config PATH    Base yaml (default: configs/text_ours.yaml)
-  --sweep_config PATH   Sweep yaml (default: configs/text_ours_exp_v1.yaml)
+  --sweep_config PATH   Sweep yaml (default: configs/text_ours_exp.yaml)
   --no_logging          Disable terminal output logging to files
   --log_dir DIR         Custom log directory (default: <outdir>/<sweep_name>/logs)
   --cleanup_logs        Clean up old log files (keep last 10)
@@ -200,7 +200,7 @@ THREADS=""
 MEM_SOFT_MB=""
 TIMEOUT="7200"
 BASE_CONFIG="configs/text_ours.yaml"
-SWEEP_CONFIG="configs/text_ours_exp_v1.yaml"
+SWEEP_CONFIG="configs/text_ours_exp.yaml"
 SWEEP_NAME=""
 SLEEP_BETWEEN="60"
 ENABLE_LOGGING="true"

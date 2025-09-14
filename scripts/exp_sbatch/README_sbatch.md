@@ -59,7 +59,7 @@ A convenient wrapper script that:
 | `sweep_name` | (required) | Name of the experiment sweep |
 | `--outdir` | `exp` | Output directory for results |
 | `--base_config` | `configs/text_ours.yaml` | Base configuration file |
-| `--sweep_config` | `configs/text_ours_exp_v1.yaml` | Sweep configuration file |
+| `--sweep_config` | `configs/text_ours_exp.yaml` | Sweep configuration file |
 | `--gpus` | `0` | GPU list (comma-separated) |
 | `--cpu_cores` | `0-7` | CPU cores to use |
 | `--threads` | `8` | Number of threads for BLAS/torch |
