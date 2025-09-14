@@ -108,6 +108,9 @@ exp0_baseline:
     eval_H: 512
     eval_W: 512
 
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
   settings:
     # visualize
     visualize: True
