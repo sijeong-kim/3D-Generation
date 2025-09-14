@@ -271,152 +271,6 @@ exp2_lambda_coarse:
     save_model: False
     video_snapshot: False
 
-# Experiment 2: lambda (λ) sweep (rlsd, rbf fixed)
-exp2_lambda_fine:
-  name: exp2_lambda_fine
-  method: grid
-  sweep_parameters:
-    lambda_repulsion: # TODO: add more values
-      rlsd_rbf: [600, 800, 1000, 1200, 1400] # 국소 탐색
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
-
-    repulsion_type: ['rlsd']
-    kernel_type: ['rbf']
-
-  # fixed parameters
-  fixed_parameters:
-    adaptive_lambda: False
-    iters: 1000
-    schedule_iters: 1500
-    guidance_scale: 50
-
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    rbf_beta: 1.0
-    cosine_beta: 1.0
-    cosine_eps_shift: 1e-3
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-    opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.001
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-    
-    save_model: False
-    video_snapshot: False
-
-
-# Experiment 2: lambda (λ) sweep (rlsd, rbf fixed)
-exp_opacity_lr:
-  name: exp_opacity_lr
-  method: grid
-  sweep_parameters:
-    opacity_lr: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      # icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    lambda_repulsion: 1000
-    adaptive_lambda: False
-    iters: 1000
-    schedule_iters: 1500
-    guidance_scale: 50
-
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    rbf_beta: 1.0
-    cosine_beta: 1.0
-    cosine_eps_shift: 1e-3
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
-    invert_bg_prob: 0.5
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512
-    eval_W: 512
-
-    opacity_reset_interval: 1000000 # disable opacity reset
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-    
-    save_model: False
-    video_snapshot: False
-
-
 # Experiment 3: guidance scale sweep (rlsd, rbf fixed)
 exp3_guidance_scale:
   name: exp3_guidance_scale
@@ -489,6 +343,145 @@ exp3_guidance_scale:
     save_model: False
     video_snapshot: False
 
+
+
+# Experiment 2: lambda (λ) sweep (rlsd, rbf fixed)
+exp4_lambda_fine:
+  name: exp4_lambda_fine
+  method: grid
+  sweep_parameters:
+    lambda_repulsion: # TODO: add more values
+      rlsd_rbf: [600, 800, 1000, 1200, 1400] # 국소 탐색
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+
+    repulsion_type: ['rlsd']
+    kernel_type: ['rbf']
+
+  # fixed parameters
+  fixed_parameters:
+    adaptive_lambda: False
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
+    save_model: False
+    video_snapshot: False
+
+# Experiment 5: rbf beta sweep
+exp5_rbf_beta:
+  name: exp5_rbf_beta
+  method: grid
+  sweep_parameters:
+    rbf_beta: [0.5, 1.0, 1.5, 2.0]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+    adaptive_lambda: False
+    lambda_repulsion: 1000
+    
+    iters: 1000
+    schedule_iters: 1500
+    # lambda_repulsion: 1000 
+
+    seed: 42
+    guidance_scale: 50
+    
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    use_cosine_decay: False
+    
+    invert_bg_prob: 0.5
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512 
+    eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
 
 # ------------------------------------------------------------ #
 # TODO: feature space (particle distribution)
@@ -564,71 +557,6 @@ exp4_feature_layer:
     save_model: False
     video_snapshot: False
 
-
-# Experiment 5: rbf beta sweep
-exp5_rbf_beta:
-  name: exp5_rbf_beta
-  method: grid
-  sweep_parameters:
-    rbf_beta: [0.5, 1.0, 1.5, 2.0]
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    adaptive_lambda: False
-    lambda_repulsion: 1000
-    
-    iters: 1000
-    schedule_iters: 1500
-    # lambda_repulsion: 1000 
-
-    seed: 42
-    guidance_scale: 50
-    
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    use_cosine_decay: False
-    
-    invert_bg_prob: 0.5
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    eval_H: 512 
-    eval_W: 512
-
-    opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.001
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    kernel_metrics_interval: 50
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
 
 # ------------------------------------------------------------ #
 # Experiment 6: num_particles sweep
@@ -920,6 +848,78 @@ exp8_cosine_decay_off:
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
 
+    save_model: False
+    video_snapshot: False
+
+
+
+exp_opacity_lr:
+  name: exp_opacity_lr
+  method: grid
+  sweep_parameters:
+    opacity_lr: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
+    prompt: 
+      # hamburger: "a photo of a hamburger"
+      # icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+    lambda_repulsion: 1000
+    adaptive_lambda: False
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+
+    seed: 42
+    num_particles: 8
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 1.0
+    cosine_beta: 1.0
+    cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+    # rep_cosine_warmup: 0.2
+
+    invert_bg_prob: 0.5
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    eval_H: 512
+    eval_W: 512
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    kernel_metrics_interval: 50
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+    
     save_model: False
     video_snapshot: False
 
