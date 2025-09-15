@@ -114,82 +114,51 @@ class GUI:
     def __del__(self):
         pass
     
-    def cleanup_gpu_resources(self):
-        """Clean up GPU resources and free memory."""
-        print("[INFO] Cleaning up GPU resources...")
-        
-        # Clean up renderers
+    
+    def _dump_run_meta(self, outdir):
+        meta = {
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda if torch.cuda.is_available() else None,
+            "cudnn": torch.backends.cudnn.version() if torch.cuda.is_available() else None,
+            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+            "seed": int(self.seed),
+            "opt": OmegaConf.to_container(self.opt, resolve=True),
+        }
+        import json, os
+        with open(os.path.join(outdir, "run_meta.json"), "w") as f:
+            json.dump(meta, f, indent=2)
+
+    def _periodic_cuda_trim(self):
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
+    def teardown(self):
+        # 렌더러/가우시안
         if hasattr(self, 'renderers'):
-            for renderer in self.renderers:
-                if hasattr(renderer, 'gaussians'):
-                    del renderer.gaussians
-                del renderer
-            self.renderers.clear()
-        
-        # Clean up visualizer
-        if hasattr(self, 'visualizer'):
-            del self.visualizer
-            self.visualizer = None
-        
-        # Clean up feature extractor
-        if hasattr(self, 'feature_extractor'):
-            del self.feature_extractor
-            self.feature_extractor = None
-        
-        # Clean up guidance models
-        if hasattr(self, 'guidance_sd'):
-            del self.guidance_sd
-            self.guidance_sd = None
-        
-        # Clean up metrics calculator
-        if hasattr(self, 'metrics_calculator'):
-            del self.metrics_calculator
-            self.metrics_calculator = None
-        
-        # Clean up optimizers
+            for r in self.renderers:
+                if hasattr(r, 'gaussians'):
+                    del r.gaussians
+                del r
+            self.renderers = []
+
+        # 시각화/피처/가이던스/메트릭/옵티마이저
+        for name in ['visualizer','feature_extractor','guidance_sd','metrics_calculator']:
+            if hasattr(self, name):
+                delattr(self, name)
         if hasattr(self, 'optimizers'):
-            for optimizer in self.optimizers:
-                del optimizer
-            self.optimizers.clear()
-        
-        # Force garbage collection and CUDA cleanup
+            for opt in self.optimizers:
+                del opt
+            self.optimizers = []
+            
+        if hasattr(self, '_io_stream'):
+            del self._io_stream
+
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
-        
-        print("[INFO] GPU resources cleaned up successfully.")
-    
-    def set_gpu_device(self, gpu_id: int):
-        """Set the CUDA device for this experiment."""
-        if torch.cuda.is_available() and gpu_id < torch.cuda.device_count():
-            torch.cuda.set_device(gpu_id)
-            self.device = torch.device(f"cuda:{gpu_id}")
-            print(f"[INFO] Switched to GPU {gpu_id}: {torch.cuda.get_device_name(gpu_id)}")
-            return True
-        else:
-            print(f"[WARNING] GPU {gpu_id} not available, using CPU")
-            self.device = torch.device("cpu")
-            return False
 
-    # def seed_everything(self, seed):
-    #     try:
-    #         seed = int(seed)
-    #     except:
-    #         seed = np.random.randint(0, 1000000)
-
-    #     os.environ["PYTHONHASHSEED"] = str(seed)
-    #     np.random.seed(seed)
-    #     torch.manual_seed(seed)
-    #     torch.cuda.manual_seed(seed)
-    #     torch.backends.cudnn.deterministic = True
-    #     torch.backends.cudnn.benchmark = False
-    #     torch.use_deterministic_algorithms(True)
-    #     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    #     torch.backends.cuda.matmul.allow_tf32 = False
-    #     torch.backends.cudnn.allow_tf32 = False
-        
-        
     def seed_everything(self, seed):
         try:
             seed = int(seed)
@@ -210,7 +179,6 @@ class GUI:
         torch.backends.cuda.matmul.allow_tf32 = False
         torch.backends.cudnn.allow_tf32 = False
 
-
     def prepare_train(self):
 
         self.step = 0
@@ -221,16 +189,15 @@ class GUI:
             self.optimizers.append(self.renderers[i].gaussians.optimizer)
 
         # feature extractor
-        # Use multi-layer extractor for specific layer extraction
-        # Supports: 'early' (25% depth), 'mid' (50% depth), 'last' (final layer)
-        
-        if self.opt.repulsion_type != 'wo':
+        if self.opt.repulsion_type != 'wo' or self.opt.save_features:
+            # Use multi-layer extractor for specific layer extraction
+            # Supports: 'early' (25% depth), 'mid' (50% depth), 'last' (final layer)
+            
             print(f"[INFO] Using DINOv2 features from '{self.opt.feature_layer}' layer")
             self.feature_extractor = DINOv2MultiLayerFeatureExtractor(
                 model_name=self.opt.feature_extractor_model_name, 
                 device=self.device
             )
-            
             # Freeze feature extractor weights
             self.feature_extractor.model.eval()
             for param in self.feature_extractor.model.parameters():
@@ -274,16 +241,24 @@ class GUI:
     def train_step(self):
         self.step += 1
         
-        with torch.no_grad():
-            if self.step==1 or (self.step % self.opt.efficiency_interval == 0) and self.opt.metrics and (self.metrics_calculator is not None):
-                if torch.cuda.is_available():
-                    starter = torch.cuda.Event(enable_timing=True)
-                    ender = torch.cuda.Event(enable_timing=True)
-                    starter.record()
-                else:
-                    starter = None
-                    ender = None
-                
+        # with torch.no_grad():
+        #     if self.step==1 or (self.step % self.opt.efficiency_interval == 0) and self.opt.metrics and (self.metrics_calculator is not None):
+        #         if torch.cuda.is_available():
+        #             starter = torch.cuda.Event(enable_timing=True)
+        #             ender = torch.cuda.Event(enable_timing=True)
+        #             starter.record()
+        #         else:
+        #             starter = None
+        #             ender = None
+
+
+        # ---- TIME LOG: start ----
+        wall_start = time.perf_counter()
+        cuda_evt_start = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
+        if cuda_evt_start is not None:
+            cuda_evt_start.record()
+        # ---- TIME LOG: start ----
+
         #########################################################
         # Forward pass
         #########################################################
@@ -344,7 +319,10 @@ class GUI:
             # out["image"]는 images에 복사됐으니 out 전체는 버림
             del out
         
-        images = torch.cat(images, dim=0) # [N, 3, H, W]
+        # after rendering images for all particles
+        images = torch.cat(images, dim=0)  # [N, 3, H, W]
+        t_after_render = time.perf_counter()  # ---- TIME LOG ----
+
         
         repulsion_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
         
@@ -418,6 +396,10 @@ class GUI:
         score_gradients = score_gradients.to(torch.float32)
         latents = latents.to(torch.float32)
         
+        # ... target/attraction_loss 계산 ...
+        t_after_sd = time.perf_counter()  # ---- TIME LOG ----
+
+        
         if self.opt.repulsion_type == 'svgd':
             v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)  # [N,4,64,64]  
             target = (latents - v).detach()
@@ -450,7 +432,8 @@ class GUI:
         # 3. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
             self.optimizers[j].step()
-
+        t_after_update = time.perf_counter()  # ---- TIME LOG ----
+        
         # densify and prune (after backward pass so gradients are available)
         for j in range(self.opt.num_particles):
             if (self.step >= self.opt.density_start_iter) and (self.step <= self.opt.density_end_iter):
@@ -465,6 +448,7 @@ class GUI:
                     if self.step % self.opt.opacity_reset_interval == 0:
                             self.renderers[j].gaussians.reset_opacity()
                             
+        t_after_densify = time.perf_counter()  # ---- TIME LOG ----
         
         # 4. Zero gradients (Prepare for next iteration)
         for j in range(self.opt.num_particles):
@@ -478,29 +462,51 @@ class GUI:
             if self.opt.metrics and (self.metrics_calculator is not None):
                 # time
                 if (self.step==1 or self.step % self.opt.efficiency_interval == 0):
+
+                    # GPU step elapsed
+                    gpu_step_ms = None
                     if torch.cuda.is_available():
-                        ender.record()
+                        cuda_evt_end = torch.cuda.Event(enable_timing=True)
+                        cuda_evt_end.record()
                         torch.cuda.synchronize()
-                        t = starter.elapsed_time(ender)
-                        
-                        # memory usage
-                        memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)  # Convert to MB
-                        max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)  # Convert to MB
+                        gpu_step_ms = cuda_evt_start.elapsed_time(cuda_evt_end)  # ms
+
+                        memory_allocated = torch.cuda.memory_allocated() / (1024 ** 2)
+                        max_memory_allocated = torch.cuda.max_memory_allocated() / (1024 ** 2)
                     else:
-                        t = None
                         memory_allocated = None
                         max_memory_allocated = None
-                        
-                    # log
+
+                    # Wall-clock & section times (ms)
+                    render_ms   = (t_after_render   - wall_start)      * 1000.0
+                    sd_ms       = (t_after_sd       - t_after_render)  * 1000.0
+                    backward_update_ms = (t_after_update - t_after_sd)      * 1000.0
+                    densify_ms  = (t_after_densify  - t_after_update)* 1000.0
+                    step_wall_ms= (t_after_densify  - wall_start)      * 1000.0
+
+                    # Throughput (pixels/sec) — 참고용
+                    pixels = int(self.opt.num_particles * render_resolution * render_resolution)
+                    px_per_s = float(pixels) / max(step_wall_ms / 1000.0, 1e-9)
+
                     self.metrics_calculator.log_efficiency(
                         step=self.step,
-                        efficiency= {
-                            "time": t,
+                        efficiency={
+                            "step_wall_ms": step_wall_ms,
+                            "step_gpu_ms": gpu_step_ms,
+                            "render_ms": render_ms,
+                            "sd_guidance_ms": sd_ms,
+                            "backward_update_ms": backward_update_ms,
+                            "densify_ms": densify_ms,
+                            "pixels": pixels,
+                            "px_per_s": px_per_s,
                             "memory_allocated_mb": memory_allocated,
                             "max_memory_allocated_mb": max_memory_allocated,
                         },
                     )
                     
+                    if torch.cuda.is_available():
+                        torch.cuda.reset_peak_memory_stats()
+            
                 # losses
                 if (self.step==1 or self.step % self.opt.losses_interval == 0):
                     attraction_loss_val = attraction_loss.item()
@@ -550,13 +556,16 @@ class GUI:
                     self.metrics_calculator.log_quantitative_metrics(
                         step=self.step,
                         metrics= {
+                            # fidelity
                             "fidelity_mean": fidelity_mean,
                             "fidelity_std": fidelity_std,
+                            # inter-particle diversity
                             "inter_particle_diversity_mean": inter_particle_diversity_mean,
                             "inter_particle_diversity_std": inter_particle_diversity_std,
+                            # cross-view consistency
                             "cross_view_consistency_mean": cross_view_consistency_mean,
                             "cross_view_consistency_std": cross_view_consistency_std,
-                            # LPIPS
+                            # LPIPS (inter-sample and cross-view consistency)
                             "lpips_inter_mean": lpips_inter_mean if self.opt.enable_lpips else None,
                             "lpips_inter_std": lpips_inter_std if self.opt.enable_lpips else None,
                             "lpips_consistency_mean": lpips_consistency_mean if self.opt.enable_lpips else None,
@@ -596,54 +605,11 @@ class GUI:
             #             self.save_model(mode='model', particle_id=j, step=self.step)
             #             self.save_model(mode='geo+tex', particle_id=j, step=self.step)
                 
-                
         # Periodic GPU memory cleanup
         if self.step % self.opt.efficiency_interval == 0:
-            try:
-                del images
-            except NameError:
-                pass
-            try:
-                del outputs
-            except NameError:
-                pass
-            try:
-                del score_gradients
-            except NameError:
-                pass
-            try:
-                del latents
-            except NameError:
-                pass
-            try:
-                del features
-            except NameError:
-                pass
-            try:
-                del kernel
-            except NameError:
-                pass
-            try:
-                del kernel_grad
-            except NameError:
-                pass
-            try:
-                del scaled_attraction_loss
-            except NameError:
-                pass
-            try:
-                del scaled_repulsion_loss
-            except NameError:
-                pass
-            try:
-                del total_loss
-            except NameError:
-                pass
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.reset_peak_memory_stats()
-                torch.cuda.synchronize()
+            images = outputs = score_gradients = latents = features = kernel = kernel_grad = None
+            self._periodic_cuda_trim()
+
     
     @torch.no_grad()
     def _extract_particle_features_from_multi_view(
@@ -669,7 +635,14 @@ class GUI:
             x = X[i:j]
             with torch.no_grad():
                 if use_amp:
-                    with torch.cuda.amp.autocast(enabled=True):
+                    from contextlib import nullcontext
+
+                    amp_ctx = (
+                        torch.amp.autocast("cuda", dtype=torch.float16, enabled=(self.device.type == "cuda"))
+                        if torch.cuda.is_available()
+                        else nullcontext()
+                    )
+                    with amp_ctx:
                         f = self.feature_extractor.extract_cls_from_layer(layer_idx, x)  # [B, D]
                 else:
                     f = self.feature_extractor.extract_cls_from_layer(layer_idx, x)
@@ -728,7 +701,7 @@ class GUI:
             },
             out_path
         )
-        print(f"[features] saved: {out_path}")
+        print(f"[INFO] saved features: {out_path}")
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0, step=None):
@@ -896,27 +869,34 @@ class GUI:
     
     # no gui mode
     def train(self, iters=500):
-        if iters > 0:
-            self.prepare_train()
-            for i in tqdm.trange(iters):
-                self.train_step()
-            # do a last prune
-            for j in range(self.opt.num_particles):
-                self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
-    
-        # Multi-viewpoints for 30 fps video (save at the end of training)
-        if self.opt.video_snapshot:
-            # Update visualizer with final training state
-            self.visualizer.update_renderers(self.renderers)
-            self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, visualize_multi_viewpoints=True, save_iid=True) # 360 / 120 for 30 fps
-            # Clean up visualizer renderers to free memory
-            self.visualizer.cleanup_renderers()
+        
+        self._dump_run_meta(self.opt.outdir)
+        
+        try:
+            if iters > 0:
+                self.prepare_train()
+                for i in tqdm.trange(iters):
+                    self.train_step()
+                # do a last prune
+                for j in range(self.opt.num_particles):
+                    self.renderers[j].gaussians.prune(min_opacity=0.01, extent=1, max_screen_size=1)
+        
+            # Multi-viewpoints for 30 fps video (save at the end of training)
+            if self.opt.video_snapshot:
+                # Update visualizer with final training state
+                self.visualizer.update_renderers(self.renderers)
+                self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, num_views=120, visualize_multi_viewpoints=True, save_iid=True) # 360 / 120 for 30 fps
+                # Clean up visualizer renderers to free memory
+                self.visualizer.cleanup_renderers()
 
-        # save model
-        if self.opt.save_model:
-            for j in range(self.opt.num_particles):
-                self.save_model(mode='model', particle_id=j, step=self.step)
-                self.save_model(mode='geo+tex', particle_id=j, step=self.step)   
+            # save model
+            if self.opt.save_model:
+                for j in range(self.opt.num_particles):
+                    self.save_model(mode='model', particle_id=j, step=self.step)
+                    self.save_model(mode='geo+tex', particle_id=j, step=self.step)   
+
+        finally:
+            self.teardown()
 
 if __name__ == "__main__":
     import argparse
