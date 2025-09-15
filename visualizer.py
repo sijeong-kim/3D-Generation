@@ -150,12 +150,19 @@ class GaussianVisualizer:
         # Get image dimensions from first particle
         _, channels, height, width = particle_images[0].shape
         
+        # Special case: if only 1 particle, return it as-is without grid
+        if num_particles == 1:
+            return particle_images[0][0]  # Remove batch dimension: [3, H, W]
+        
         # Calculate grid dimensions
         if self.auto_adjust_grid:
             # Auto-adjust grid to be as square as possible
-            if num_particles <= 4:
-                grid_rows = 2
-                grid_cols = 2
+            if num_particles <= 3:
+                grid_rows = 1
+                grid_cols = 3
+            elif num_particles == 4:
+                grid_rows = 1
+                grid_cols = 4
             elif num_particles <= 6:
                 grid_rows = 2
                 grid_cols = 3
@@ -169,8 +176,8 @@ class GaussianVisualizer:
                 grid_rows = 3
                 grid_cols = 4
             else:
-                # For more than 12 particles, use a reasonable default
-                grid_rows = 3
+                # For more than 16 particles, use a reasonable default
+                grid_rows = 4
                 grid_cols = 4
         else:
             # Use fixed grid dimensions

@@ -10,77 +10,8 @@
 # TODO: λ_repulsion 1D coarse → fine 탐색 → 그다음 β(temperature) 단일 축 튜닝 → 마지막에 국소 2D(λ×β) 미세탐색.
 
 # Experiment 0: Baseline (wo)
-
-exp0_reproduce_paper:
-  name: exp0_reproduce_paper
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['wo']
-
-    seed: [42, 123, 456, 789]
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    num_particles: 1
-
-    iters: 500
-    schedule_iters: 500
-    guidance_scale: 100
-    
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    
-    invert_bg_prob: 0.5
-
-    eval_H: 512
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    opacity_reset_interval: 700
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-    opacity_lr: 0.003
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-    save_model: True
-    video_snapshot: True
-
-    save_features: False
-    # save_features_interval: 250
-
-
-# ------------------------------------------------------------ #
 # baseline (to compare with ours), which has same configuration with ours
-exp0_baseline:
+exp0_baseline: # same noise: diversity minimization and same with ours
   name: exp0_baseline
   method: grid
   sweep_parameters:
@@ -102,6 +33,73 @@ exp0_baseline:
     
     force_same_t: True
     force_same_noise: True
+    anneal_timestep: True
+    
+    num_particles: 8
+    invert_bg_prob: 0.5
+
+    eval_H: 512
+    eval_W: 512
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    density_start_iter: 0
+    density_end_iter: 3000
+    densification_interval: 50
+    densify_grad_threshold: 0.01
+
+    opacity_reset_interval: 700 # default
+    opacity_lr: 0.003 # ⭐️
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+    save_model: True
+    video_snapshot: True
+
+    save_features: True
+    save_features_interval: 250
+
+exp0_baseline_diff_noise: # different noise: diversity maximization
+  name: exp0_baseline_diff_noise
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+    
+    seed: [42, 123, 456]
+
+  # fixed parameters
+  fixed_parameters:
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+    
+    force_same_t: True
+    force_same_noise: False
     anneal_timestep: True
     
     num_particles: 8
@@ -699,6 +697,74 @@ exp_baseline_best:
 
     save_features: False
     # save_features_interval: 250
+
+# Experiment: reproduce DreamGaussian paper results
+exp_reproduce_paper:
+  name: exp_reproduce_paper
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']
+
+    seed: [42, 123, 456, 789]
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+
+  # fixed parameters
+  fixed_parameters:
+    num_particles: 1
+
+    iters: 500
+    schedule_iters: 500
+    guidance_scale: 100
+    
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+    
+    invert_bg_prob: 0.5
+
+    eval_H: 512
+    eval_W: 512
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    opacity_reset_interval: 700
+    density_start_iter: 0
+    density_end_iter: 3000
+    densification_interval: 50
+    densify_grad_threshold: 0.01
+    opacity_lr: 0.003
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+    save_model: True
+    video_snapshot: True
+
+    save_features: False
+    # save_features_interval: 250
+
 
 
 # Experiment: feature layer sweep
