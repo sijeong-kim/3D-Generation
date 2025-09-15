@@ -547,6 +547,88 @@ exp5_rbf_beta:
     save_features_interval: 250
 
 
+# Experiment 6: ours best
+exp6_ours_best: 
+  name: exp6_ours_best
+  method: grid
+  sweep_parameters:
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      icecream: "a photo of an ice cream"
+      tulip: "a photo of a tulip"
+
+    seed: [42]
+
+  # fixed parameters
+  fixed_parameters:
+
+    repulsion_type: 'rlsd'
+    kernel_type: 'rbf'
+
+    lambda_repulsion: 1000
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+    
+    force_same_t: True
+    force_same_noise: True
+    anneal_timestep: True
+  
+    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
+
+    rbf_beta: 0.5
+    # cosine_beta: 0.5
+    # cosine_eps_shift: 1e-3
+
+    use_cosine_decay: False
+
+    # rep_cosine_warmup: 0.2
+    num_particles: 8
+    # invert_bg_prob: 0.5
+
+    eval_H: 512
+    eval_W: 512
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+
+    density_start_iter: 0
+    density_end_iter: 3000
+    densification_interval: 50
+    densify_grad_threshold: 0.01
+
+    opacity_reset_interval: 1000000 # disable opacity reset
+    opacity_lr: 0.001
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+    save_model: True
+    video_snapshot: True
+
+    save_features: True
+    save_features_interval: 250
+
+
 # ------------------------------------------------------------ #
 # Appendix #
 # ------------------------------------------------------------ #
