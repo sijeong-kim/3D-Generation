@@ -75,7 +75,7 @@ exp0_baseline_best:
     # options
     losses_interval: 10
     efficiency_interval: 10 
-    enable_lpips: True # disable lpips for faster training
+    enable_lpips: False # disable lpips for faster training
 
     save_model: True
     video_snapshot: True
@@ -697,7 +697,7 @@ exp6_ours_best:
     # options
     losses_interval: 10
     efficiency_interval: 10 
-    enable_lpips: True # disable lpips for faster training
+    enable_lpips: False # disable lpips for faster training
 
     save_model: True
     video_snapshot: True
