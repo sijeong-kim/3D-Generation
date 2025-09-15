@@ -172,19 +172,25 @@ def merge_configs(base_config: Dict[str, Any], fixed_params: Dict[str, Any], fix
             # print(f"Method kernel lambda_repulsion: {sweep_params['lambda_repulsion']}")
     
     # Set eval_radius for each prompt with default fallback
-    if 'eval_radius' in fixed_params_dict and isinstance(fixed_params_dict['eval_radius'], dict) and \
-        'prompt' in sweep_params:
+    # Check both fixed_params_dict and setting_params for eval_radius
+    eval_radius_dict = None
+    if 'eval_radius' in fixed_params_dict and isinstance(fixed_params_dict['eval_radius'], dict):
+        eval_radius_dict = fixed_params_dict['eval_radius']
+    elif 'eval_radius' in setting_params and isinstance(setting_params['eval_radius'], dict):
+        eval_radius_dict = setting_params['eval_radius']
+    
+    if eval_radius_dict and 'prompt' in sweep_params:
         prompt_key = sweep_params['prompt']
-        default_radius = fixed_params_dict['eval_radius'].get('default', 4.0)
-        eval_radius_value = fixed_params_dict['eval_radius'].get(prompt_key, default_radius)
+        default_radius = eval_radius_dict.get('default', 4.0)
+        eval_radius_value = eval_radius_dict.get(prompt_key, default_radius)
         merged_config['eval_radius'] = eval_radius_value
         
         # Don't print debug messages to stdout - they interfere with bash parsing
-        # if prompt_key in fixed_params_dict['eval_radius']:
+        # if prompt_key in eval_radius_dict:
         #     print(f"Prompt-specific eval_radius (prompt, radius): ({prompt_key}, {eval_radius_value})")
         # else:
         #     print(f"Warning: No eval_radius found for prompt '{prompt_key}'. Using default: {default_radius}")
-        #     print(f"Available keys: {list(fixed_params_dict['eval_radius'].keys())}")
+        #     print(f"Available keys: {list(eval_radius_dict.keys())}")
 
     return merged_config
 

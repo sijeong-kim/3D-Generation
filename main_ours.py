@@ -387,16 +387,43 @@ class GUI:
         # attraction loss (latent space)
         attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
     
-        gen = torch.Generator(device=self.device).manual_seed(self.seed + self.step + 12345) # sd 전용 오프셋
+        # gen = torch.Generator(device=self.device).manual_seed(self.seed + self.step + 12345) # sd 전용 오프셋
 
-        score_gradients, latents = self.guidance_sd.train_step_gradient(
-            images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-            guidance_scale=self.opt.guidance_scale,
-            force_same_t=self.opt.force_same_t,
-            force_same_noise=self.opt.force_same_noise,
-            generator=gen,
-        )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
-        
+        # score_gradients, latents = self.guidance_sd.train_step_gradient(
+        #     images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
+        #     guidance_scale=self.opt.guidance_scale,
+        #     force_same_t=self.opt.force_same_t,
+        #     force_same_noise=self.opt.force_same_noise,
+        #     generator=gen,
+        # )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
+
+        if self.opt.force_same_noise:
+            # 기존 경로 유지(재현 비교용)
+            gen = torch.Generator(device=self.device).manual_seed(self.seed + self.step + 12345)
+            score_gradients, latents = self.guidance_sd.train_step_gradient(
+                images, step_ratio=step_ratio if self.opt.anneal_timestep else None,
+                guidance_scale=self.opt.guidance_scale,
+                force_same_t=self.opt.force_same_t,
+                force_same_noise=True,
+                generator=gen,
+            )
+        else:
+            # 입자별 독립 generator 경로(wo 독립 노이즈용)
+            score_list, lat_list = [], []
+            for j in range(self.opt.num_particles):
+                gen_j = torch.Generator(device=self.device).manual_seed(self.seeds[j] + self.step + 12345)
+                sg_j, lat_j = self.guidance_sd.train_step_gradient(
+                    images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None,
+                    guidance_scale=self.opt.guidance_scale,
+                    force_same_t=self.opt.force_same_t,
+                    force_same_noise=False,
+                    generator=gen_j,
+                )
+                score_list.append(sg_j)
+                lat_list.append(lat_j)
+            score_gradients = torch.cat(score_list, dim=0)
+            latents = torch.cat(lat_list, dim=0)
+
         score_gradients = score_gradients.to(torch.float32)
         latents = latents.to(torch.float32)
         
@@ -411,42 +438,9 @@ class GUI:
         attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
         attraction_loss = attraction_loss.mean()
             
-        # elif self.opt.repulsion_type in ['rlsd', 'wo']:
-        #     for j in range(self.opt.num_particles):
-        #         sds_loss = self.guidance_sd.train_step(images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None)
-        #         attraction_loss = attraction_loss + sds_loss
-        
         ### optimize step ### 
-
-        # attraction 은 그래프 열고 스케일
         scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
-
-        # --- PATCH: 비율 계산 및 lambda 적응 순서 수정 ---
-        # 1) 현재 lambda로 repulsion을 '비율 계산용'으로만 한 번 스케일(그래프 X)
-        
-        # Calculate ratio_pct for both adaptive_lambda True and False cases
-        with torch.no_grad():
-            scaled_repulsion_for_ratio = (self.opt.lambda_repulsion * repulsion_loss).detach()
-            denom_val = max(float(abs(scaled_attraction_loss.detach().item())), 1e-8)
-            ratio_pct = 100.0 * float(abs(scaled_repulsion_for_ratio.item())) / denom_val
-
-
-        # if self.opt.adaptive_lambda:
-        #     if (
-        #         self.opt.repulsion_type != 'wo'
-        #         and abs(repulsion_loss.detach().item()) > 1e-12
-        #         and self.opt.adaptive_lambda
-        #         and torch.isfinite(repulsion_loss).item()
-        #         and torch.isfinite(scaled_attraction_loss).item()
-        #         and denom_val > self.repctl.get("denom_floor", 1e-6)  # ← 추가
-        #     ):
-        #         self.adaptive_lambda_repulsion(ratio_pct)
-
-        # 2) (필요 시 업데이트된) lambda로 repulsion을 '학습용'으로 다시 스케일 (그래프 O)
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
-
-
-        # 최종 loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
         
         # --- 안전 가드 ---
@@ -476,9 +470,10 @@ class GUI:
                 if self.step % self.opt.densification_interval == 0:
                         self.renderers[j].gaussians.densify_and_prune(self.opt.densify_grad_threshold, min_opacity=0.01, extent=4, max_screen_size=1)
                 
-                # if self.step % self.opt.opacity_reset_interval == 0:
-                #         self.renderers[j].gaussians.reset_opacity()
-                        
+                if getattr(self.opt, 'opacity_reset_interval', 0) and self.opt.opacity_reset_interval > 0:
+                    if self.step % self.opt.opacity_reset_interval == 0:
+                            self.renderers[j].gaussians.reset_opacity()
+                            
         
         # 4. Zero gradients (Prepare for next iteration)
         for j in range(self.opt.num_particles):
@@ -605,8 +600,6 @@ class GUI:
             #             self.save_model(mode='geo+tex', particle_id=j, step=self.step)
                 
                 
-                
-                
         # Periodic GPU memory cleanup
         if self.step % self.opt.efficiency_interval == 0:
             try:
@@ -652,6 +645,7 @@ class GUI:
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                torch.cuda.reset_peak_memory_stats()
                 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0, step=None):
