@@ -67,7 +67,6 @@ exp0_reproduce_paper:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -138,7 +137,6 @@ exp0_baseline:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -220,7 +218,6 @@ exp1_repulsion_kernel:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -301,7 +298,6 @@ exp2_lambda_coarse:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -309,8 +305,8 @@ exp2_lambda_coarse:
     save_model: False
     video_snapshot: False
 
-    save_features: False
-    # save_features_interval: 250
+    save_features: True
+    save_features_interval: 250
 
 
 # Experiment 3: lambda (λ) sweep (rlsd, rbf fixed)
@@ -383,7 +379,6 @@ exp3_lambda_fine:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -391,8 +386,8 @@ exp3_lambda_fine:
     save_model: False
     video_snapshot: False
 
-    save_features: False
-    # save_features_interval: 250
+    save_features: True
+    save_features_interval: 250
 
 
 # Experiment 4: guidance scale sweep (rlsd, rbf fixed)
@@ -464,7 +459,6 @@ exp4_guidance_scale:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -472,8 +466,8 @@ exp4_guidance_scale:
     save_model: False
     video_snapshot: False
 
-    save_features: False
-    # save_features_interval: 250
+    save_features: True
+    save_features_interval: 250
 
 
 # Experiment 5: rbf beta sweep
@@ -542,7 +536,6 @@ exp5_rbf_beta:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -550,8 +543,8 @@ exp5_rbf_beta:
     save_model: False
     video_snapshot: False
 
-    save_features: False
-    # save_features_interval: 250
+    save_features: True
+    save_features_interval: 250
 
 
 # ------------------------------------------------------------ #
@@ -615,7 +608,6 @@ exp_baseline_best:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -696,7 +688,6 @@ exp_feature_layer:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -777,7 +768,6 @@ exp_num_particles:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -785,8 +775,8 @@ exp_num_particles:
     save_model: False
     video_snapshot: False
 
-    save_features: False
-    # save_features_interval: 250
+    save_features: True
+    save_features_interval: 250
 
 
 # Experiment: baseline (wo) with independent particles
@@ -848,7 +838,6 @@ exp_baseline_wo_indep_particles:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -856,8 +845,8 @@ exp_baseline_wo_indep_particles:
     save_model: True
     video_snapshot: True
 
-    save_features: False
-    # save_features_interval: 250
+    save_features: True
+    save_features_interval: 250
 
 
 # ------------------------------------------------------------ #
@@ -933,7 +922,6 @@ exp_num_pts:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -1017,7 +1005,6 @@ exp_cosine_decay_on:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -1097,7 +1084,6 @@ exp_cosine_decay_off:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -1116,10 +1102,10 @@ exp_opacity_lr:
     # opacity_lr: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
     opacity_lr: [0.001, 0.005, 0.01, 0.05]
     prompt: 
-      # hamburger: "a photo of a hamburger"
+      hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       # cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
+      tulip: "a photo of a tulip"
 
   # fixed parameters
   fixed_parameters:
@@ -1177,7 +1163,6 @@ exp_opacity_lr:
     num_views: 8
 
     # options
-    kernel_metrics_interval: 50
     losses_interval: 10
     efficiency_interval: 10 
     enable_lpips: False # disable lpips for faster training
@@ -1270,7 +1255,6 @@ exp_opacity_lr:
 #     num_views: 8
 
 #     # options
-#     kernel_metrics_interval: 50
 #     losses_interval: 10
 #     efficiency_interval: 10 
 #     enable_lpips: False # disable lpips for faster training
@@ -1341,7 +1325,6 @@ exp_opacity_lr:
 #     num_views: 8
 
 #     # options
-#     kernel_metrics_interval: 50
 #     losses_interval: 10
 #     efficiency_interval: 10 
 #     enable_lpips: False # disable lpips for faster training

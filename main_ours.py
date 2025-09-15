@@ -1,4 +1,5 @@
 # main_ours.py
+from omegaconf import OmegaConf
 import os
 import cv2
 import time
@@ -127,11 +128,15 @@ class GUI:
         import json, os
         with open(os.path.join(outdir, "run_meta.json"), "w") as f:
             json.dump(meta, f, indent=2)
-
+                
     def _periodic_cuda_trim(self):
         gc.collect()
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            reserved = torch.cuda.memory_reserved()
+            allocated = torch.cuda.memory_allocated()
+            if reserved - allocated > 1 * 1024**3:  # 1GB 이상 놀고 있으면
+                torch.cuda.empty_cache()
+
             
     def teardown(self):
         # 렌더러/가우시안
@@ -254,9 +259,13 @@ class GUI:
 
         # ---- TIME LOG: start ----
         wall_start = time.perf_counter()
-        cuda_evt_start = torch.cuda.Event(enable_timing=True) if torch.cuda.is_available() else None
-        if cuda_evt_start is not None:
+        
+        measure = bool(self.opt.metrics and self.metrics_calculator is not None)
+        if measure and torch.cuda.is_available():
+            cuda_evt_start = torch.cuda.Event(enable_timing=True)
             cuda_evt_start.record()
+        else:
+            cuda_evt_start = None
         # ---- TIME LOG: start ----
 
         #########################################################
@@ -870,6 +879,7 @@ class GUI:
     # no gui mode
     def train(self, iters=500):
         
+        os.makedirs(self.opt.outdir, exist_ok=True)
         self._dump_run_meta(self.opt.outdir)
         
         try:
@@ -900,7 +910,7 @@ class GUI:
 
 if __name__ == "__main__":
     import argparse
-    from omegaconf import OmegaConf
+    
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True, help="path to the yaml config file")
