@@ -104,21 +104,12 @@ class GUI:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
         else:
             self.visualizer = None
-
-        self.repctl = {
-            "target": float(getattr(opt, "rep_ratio_target", 40.0)),# % 목표(가운데값)
-            "low": float(getattr(opt, "rep_ratio_low", opt.rep_ratio_target - 2.0)),      # % 하한
-            "high": float(getattr(opt, "rep_ratio_high", opt.rep_ratio_target + 2.0)),    # % 상한
-            "ema": float(getattr(opt, "rep_ratio_ema", 0.9)),       # EMA 계수 (0.9~0.98 권장)
-            "interval": int(getattr(opt, "rep_update_interval", 10)), # 몇 스텝마다 갱신할지
-            "warmup": int(getattr(opt, "rep_warmup_steps", 50)),      # 초기 워밍업 스텝
-            "k": float(getattr(opt, "rep_ratio_k", 0.12)),          # 조정 강도 (작을수록 완만)
-            "min": float(getattr(opt, "lambda_repulsion_min", 1e-6)),
-            "max": float(getattr(opt, "lambda_repulsion_max", 4000.0)),
-            "step_cap": float(getattr(opt, "rep_step_mult_cap", 1.25)), # 1회 갱신시 배수 상한
-            "denom_floor": float(getattr(opt, "rep_ratio_denom_floor", 1e-6)),
-        }
-        self._rep_ratio_ema = None
+            
+        # tsne
+        self.features_outdir = os.path.join(self.opt.outdir, "features")
+        os.makedirs(self.features_outdir, exist_ok=True)
+        
+        self._io_stream = torch.cuda.Stream() if torch.cuda.is_available() else None
         
     def __del__(self):
         pass
@@ -284,7 +275,7 @@ class GUI:
         self.step += 1
         
         with torch.no_grad():
-            if self.step==1 or self.step % self.opt.efficiency_interval == 0 and self.opt.metrics and self.metrics_calculator is not None:
+            if self.step==1 or (self.step % self.opt.efficiency_interval == 0) and self.opt.metrics and (self.metrics_calculator is not None):
                 if torch.cuda.is_available():
                     starter = torch.cuda.Event(enable_timing=True)
                     ender = torch.cuda.Event(enable_timing=True)
@@ -462,7 +453,7 @@ class GUI:
 
         # densify and prune (after backward pass so gradients are available)
         for j in range(self.opt.num_particles):
-            if self.step >= self.opt.density_start_iter and self.step <= self.opt.density_end_iter:
+            if (self.step >= self.opt.density_start_iter) and (self.step <= self.opt.density_end_iter):
                 viewspace_point_tensor, visibility_filter, radii = outputs[j]["viewspace_points"], outputs[j]["visibility_filter"], outputs[j]["radii"]
                 self.renderers[j].gaussians.max_radii2D[visibility_filter] = torch.max(self.renderers[j].gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
                 self.renderers[j].gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
@@ -484,9 +475,9 @@ class GUI:
         # Log metrics and visualize
         #########################################################
         with torch.no_grad():
-            if self.opt.metrics and self.metrics_calculator is not None:
+            if self.opt.metrics and (self.metrics_calculator is not None):
                 # time
-                if self.step==1 or self.step % self.opt.efficiency_interval == 0:
+                if (self.step==1 or self.step % self.opt.efficiency_interval == 0):
                     if torch.cuda.is_available():
                         ender.record()
                         torch.cuda.synchronize()
@@ -511,7 +502,7 @@ class GUI:
                     )
                     
                 # losses
-                if self.step==1 or self.step % self.opt.losses_interval == 0:
+                if (self.step==1 or self.step % self.opt.losses_interval == 0):
                     attraction_loss_val = attraction_loss.item()
                     repulsion_loss_val = repulsion_loss.item()
                     scaled_attraction_loss_val = self.opt.lambda_sd * attraction_loss_val
@@ -535,10 +526,14 @@ class GUI:
                     )
             
                 # quantitative metrics
-                if self.step==1 or self.step % self.opt.quantitative_metrics_interval == 0 and self.visualizer is not None:
+                if (self.step==1 or self.step % self.opt.quantitative_metrics_interval == 0) and (self.visualizer is not None):
                     # Update visualizer with current training state
                     self.visualizer.update_renderers(self.renderers)
                     multi_view_images = self.visualizer.visualize_all_particles_in_multi_viewpoints(self.step, visualize_multi_viewpoints=self.opt.visualize_multi_viewpoints, save_iid=self.opt.save_iid)  # [V, N, 3, H, W]
+                    
+                    if self.opt.save_features and (self.step==1 or self.step % self.opt.save_features_interval == 0):
+                        self.save_features(multi_view_images, self.step)
+
                     # Clean up visualizer renderers to free memory
                     self.visualizer.cleanup_renderers()
                     # fidelity
@@ -569,8 +564,10 @@ class GUI:
                         }
                     )
                     
+                
+
             # visualize
-            if self.opt.visualize and self.visualizer is not None:
+            if self.opt.visualize and (self.visualizer is not None):
                 # save rendered images (save at the end of each interval)
                 if self.opt.save_rendered_images and (self.step==1 or self.step % self.opt.save_rendered_images_interval == 0):
                     self.visualizer.update_renderers(self.renderers)
@@ -646,7 +643,93 @@ class GUI:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.reset_peak_memory_stats()
+                torch.cuda.synchronize()
+    
+    @torch.no_grad()
+    def _extract_particle_features_from_multi_view(
+        self,
+        images_VN_3HW: torch.Tensor,   # [V, N, 3, H, W]
+        layer_idx: int,
+        use_amp: bool = True,
+        chunk_size: int = 64,
+        l2_after_each_view: bool = True,
+    ):
+        """
+        반환:
+        particle_feats [N, D]  : 뷰 평균된 파티클 대표 특징(최종 L2 정규화)
+        view_feats     [V, N, D] : 각 뷰별 특징(각각 L2 정규화되어 반환)
+        """
+        V, N, C, H, W = images_VN_3HW.shape
+        X = images_VN_3HW.reshape(V * N, C, H, W).contiguous().to(self.device, non_blocking=True)
+
+        feats_list = []
+        i = 0
+        while i < V * N: # 8 * 8 = 64
+            j = min(i + chunk_size, V * N)
+            x = X[i:j]
+            with torch.no_grad():
+                if use_amp:
+                    with torch.cuda.amp.autocast(enabled=True):
+                        f = self.feature_extractor.extract_cls_from_layer(layer_idx, x)  # [B, D]
+                else:
+                    f = self.feature_extractor.extract_cls_from_layer(layer_idx, x)
+            if l2_after_each_view:
+                f = F.normalize(f, dim=-1)
+            feats_list.append(f)
+            i = j
+
+        feats = torch.cat(feats_list, dim=0)        # [V*N, D]
+        feats = feats.view(V, N, -1)                # [V, N, D]
+        # 뷰 평균 → 파티클 대표 특징
+        particle_feats = feats.mean(dim=0)          # [N, D]
+        particle_feats = F.normalize(particle_feats, dim=-1)
+        view_feats = F.normalize(feats, dim=-1) if not l2_after_each_view else feats  # [V, N, D]
+        return particle_feats, view_feats
+
                 
+    @torch.no_grad()
+    def save_features(self, images, step=None):  # images: [V, N, 3, H, W]
+        step = int(self.step if step is None else step)
+        # 멀티뷰 → 파티클 대표 특징 뽑기
+        particle_feats, view_feats = self._extract_particle_features_from_multi_view(
+            images_VN_3HW=images,
+            layer_idx=self.opt.feature_layer,
+            use_amp=True,
+            chunk_size=int(getattr(self.opt, "feat_chunk", 64)),
+            l2_after_each_view=True,
+        )  # [N, D], [V, N, D]
+
+        # FP16으로 축소 후 CPU로 비블로킹 복사
+        pf16 = particle_feats.to(torch.float16).contiguous()
+        vf16 = view_feats.to(torch.float16).contiguous()
+
+        if torch.cuda.is_available():
+            if self._io_stream is None:
+                self._io_stream = torch.cuda.Stream()
+            with torch.cuda.stream(self._io_stream):
+                pf16_cpu = pf16.to("cpu", non_blocking=True)
+                vf16_cpu = vf16.to("cpu", non_blocking=True)
+            torch.cuda.current_stream().wait_stream(self._io_stream)
+        else:
+            pf16_cpu = pf16
+            vf16_cpu = vf16
+
+        out_path = os.path.join(self.features_outdir, f"step_{step:06d}.pt")
+        torch.save(
+            {
+                "step": step,
+                "V": int(images.shape[0]),
+                "N": int(images.shape[1]),
+                "particle_ids": torch.arange(self.opt.num_particles, dtype=torch.int32),
+                "particle_feats_fp16": pf16_cpu,  # [N, D]
+                "view_feats_fp16": vf16_cpu,      # [V, N, D]
+                "model_name": self.opt.feature_extractor_model_name,
+                "layer_idx": int(self.opt.feature_layer),
+            },
+            out_path
+        )
+        print(f"[features] saved: {out_path}")
+
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0, step=None):
         path = os.path.join(self.opt.outdir, f'saved_models')

@@ -42,8 +42,11 @@ visualize_fixed_viewpoint: True # for visualization
 visualize_fixed_viewpoint_interval: 100 # for debugging
 visualize_graph: False # save graph for debugging
 visualize_graph_interval: 100 # for debugging
-# save_rep_features: False # save features from different layers
-# save_rep_features_interval: 100 # save features from different layers
+
+# save features
+save_features_interval: 250 # save features from different layers
+save_features: False # save features from different layers
+
 eval_W: 512
 eval_H: 512
 eval_radius: 3.0 # not to crop the object adjust the radius

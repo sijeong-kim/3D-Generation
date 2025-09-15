@@ -75,6 +75,9 @@ exp0_reproduce_paper:
     save_model: True
     video_snapshot: True
 
+    save_features: False
+    # save_features_interval: 250
+
 
 # ------------------------------------------------------------ #
 # baseline (to compare with ours), which has same configuration with ours
@@ -142,6 +145,9 @@ exp0_baseline:
 
     save_model: True
     video_snapshot: True
+
+    save_features: True
+    save_features_interval: 250
 
 
 # Experiment 1: repulsion type x kernel type sweep --> rlsd, rbf is best...
@@ -222,6 +228,9 @@ exp1_repulsion_kernel:
     save_model: False
     video_snapshot: False
 
+    save_features: True
+    save_features_interval: 250
+
 # Experiment 2: lambda (λ) sweep (rlsd, rbf fixed) --> 시각적으로 안정적 1000 정도
 exp2_lambda_coarse: 
   name: exp2_lambda_coarse
@@ -299,6 +308,9 @@ exp2_lambda_coarse:
     
     save_model: False
     video_snapshot: False
+
+    save_features: False
+    # save_features_interval: 250
 
 
 # Experiment 3: lambda (λ) sweep (rlsd, rbf fixed)
@@ -379,6 +391,8 @@ exp3_lambda_fine:
     save_model: False
     video_snapshot: False
 
+    save_features: False
+    # save_features_interval: 250
 
 
 # Experiment 4: guidance scale sweep (rlsd, rbf fixed)
@@ -458,6 +472,8 @@ exp4_guidance_scale:
     save_model: False
     video_snapshot: False
 
+    save_features: False
+    # save_features_interval: 250
 
 
 # Experiment 5: rbf beta sweep
@@ -534,6 +550,9 @@ exp5_rbf_beta:
     save_model: False
     video_snapshot: False
 
+    save_features: False
+    # save_features_interval: 250
+
 
 # ------------------------------------------------------------ #
 # Appendix #
@@ -603,6 +622,9 @@ exp_baseline_best:
 
     save_model: True
     video_snapshot: True
+
+    save_features: False
+    # save_features_interval: 250
 
 
 # Experiment: feature layer sweep
@@ -682,6 +704,9 @@ exp_feature_layer:
     save_model: False
     video_snapshot: False
 
+    save_features: True
+    save_features_interval: 250
+
 
 # Experiment: num_particles sweep
 exp_num_particles:
@@ -760,6 +785,8 @@ exp_num_particles:
     save_model: False
     video_snapshot: False
 
+    save_features: False
+    # save_features_interval: 250
 
 
 # Experiment: baseline (wo) with independent particles
@@ -828,6 +855,9 @@ exp_baseline_wo_indep_particles:
 
     save_model: True
     video_snapshot: True
+
+    save_features: False
+    # save_features_interval: 250
 
 
 # ------------------------------------------------------------ #
@@ -910,6 +940,9 @@ exp_num_pts:
     
     save_model: False
     video_snapshot: False
+
+    save_features: False
+    # save_features_interval: 250
 
 
 # Experiment: cosine decay sweep
@@ -1072,6 +1105,9 @@ exp_cosine_decay_off:
     save_model: False
     video_snapshot: False
 
+    save_features: False
+    # save_features_interval: 250
+
 
 exp_opacity_lr:
   name: exp_opacity_lr
@@ -1148,6 +1184,9 @@ exp_opacity_lr:
     
     save_model: False
     video_snapshot: False
+
+    save_features: False
+    # save_features_interval: 250
 
 # ------------------------------------------------------------ #
 
