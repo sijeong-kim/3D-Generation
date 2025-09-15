@@ -98,7 +98,7 @@ exp0_baseline:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
     
     force_same_t: True
     force_same_noise: True
@@ -122,7 +122,7 @@ exp0_baseline:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.001 
+    opacity_lr: 0.001 # ⭐️
 
   settings:
     # visualize
@@ -170,7 +170,7 @@ exp1_repulsion_kernel:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
     
     force_same_t: True
     force_same_noise: True
@@ -250,7 +250,7 @@ exp2_lambda_coarse:
     # adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     num_particles: 8
     force_same_t: True
@@ -331,7 +331,7 @@ exp3_lambda_fine:
     # adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     num_particles: 8
     force_same_t: True
@@ -364,7 +364,7 @@ exp3_lambda_fine:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -395,7 +395,7 @@ exp4_guidance_scale:
   name: exp4_guidance_scale
   method: grid
   sweep_parameters:
-    guidance_scale: [30, 50, 70, 100]
+    guidance_scale: [30, 40, 50, 60, 70, 100]
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
@@ -444,7 +444,7 @@ exp4_guidance_scale:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -494,7 +494,7 @@ exp5_rbf_beta:
     iters: 1000
     schedule_iters: 1500
 
-    guidance_scale: 50
+    guidance_scale: 40
     
     num_particles: 8
     force_same_t: True
@@ -521,7 +521,7 @@ exp5_rbf_beta:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -570,7 +570,7 @@ exp6_ours_best:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
     
     force_same_t: True
     force_same_noise: True
@@ -603,7 +603,7 @@ exp6_ours_best:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.001
+    opacity_lr: 0.001 # ⭐️
 
   settings:
     # visualize
@@ -675,7 +675,7 @@ exp_baseline_best:
     densification_interval: 50
     densify_grad_threshold: 0.01
 
-    opacity_lr: 0.01
+    opacity_lr: 0.05
 
   settings:
     # visualize
@@ -724,7 +724,7 @@ exp_feature_layer:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     num_particles: 8
     force_same_t: True
@@ -755,7 +755,7 @@ exp_feature_layer:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -802,7 +802,7 @@ exp_num_particles:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     seed: 42
     force_same_t: True
@@ -835,7 +835,7 @@ exp_num_particles:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -881,7 +881,7 @@ exp_baseline_wo_indep_particles:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
     
     force_same_t: True
     force_same_noise: False # 독립 초기화로 공정 비교⭐️
@@ -904,7 +904,7 @@ exp_baseline_wo_indep_particles:
       cactus: 4.0
       tulip: 4.0
 
-    opacity_lr: 0.01
+    opacity_lr: 0.001
     opacity_reset_interval: 1000000 # disable opacity reset
 
   settings:
@@ -955,7 +955,7 @@ exp_num_pts:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     seed: 42
     num_particles: 8
@@ -989,7 +989,7 @@ exp_num_pts:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -1041,7 +1041,7 @@ exp_cosine_decay_on:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     seed: 42
     num_particles: 8
@@ -1072,7 +1072,7 @@ exp_cosine_decay_on:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -1118,7 +1118,7 @@ exp_cosine_decay_off:
     # lambda_repulsion: 1000 
 
     seed: 42
-    guidance_scale: 50
+    guidance_scale: 40
 
     
     num_particles: 8
@@ -1151,7 +1151,7 @@ exp_cosine_decay_off:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 1000000 # disable opacity reset
-    opacity_lr: 0.01
+    opacity_lr: 0.001
 
   settings:
     # visualize
@@ -1197,7 +1197,7 @@ exp_opacity_lr:
     # adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 40
 
     seed: 42
     num_particles: 8
@@ -1256,157 +1256,3 @@ exp_opacity_lr:
     # save_features_interval: 250
 
 # ------------------------------------------------------------ #
-
-###### Appendix #####
-
-
-# seed {42, 123} seed 바뀌어도 경향은 동일함을 증명 → 본문 재현성 강화.
-# num_particles {4, 8, 12} N=8 선택의 비용/효과 trade-off 설명 근거.
-# best results (with lpips, multi viewpoint)
-
-# wo + opacity_lr=0.05
-# ours + opacity_lr=0.01
-# opcacity reset interval = 700
-
-
-
-# # [Optional] Experiment: adaptive lambda sweep
-# exp_adaptive_lambda:
-#   name: exp_adaptive_lambda
-#   method: grid
-#   sweep_parameters:
-#     prompt: 
-#       # hamburger: "a photo of a hamburger"
-#       icecream: "a photo of an ice cream"
-#       cactus: "a small saguaro cactus planted in a clay pot"
-#       # tulip: "a photo of a tulip"
-#     rep_ratio_target: [20.0, 40.0]
-
-#   # fixed parameters
-#   fixed_parameters:
-#     repulsion_type: 'rlsd'
-#     kernel_type: 'rbf'
-
-#     adaptive_lambda: True
-#     lambda_repulsion: 1000
-#     rep_ratio_target: 40.0
-
-#     iters: 1000
-#     schedule_iters: 1500
-#     guidance_scale: 50
-
-#     seed: 42
-#     num_particles: 8
-#     force_same_t: True
-#     force_same_noise: True
-#     anneal_timestep: True
-
-#     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-#     rbf_beta: 0.5
-#     cosine_beta: 0.5
-#     cosine_eps_shift: 1e-3
-
-#     use_cosine_decay: False
-#     # rep_cosine_warmup: 0.2
-
-#     # invert_bg_prob: 0.5
-
-#     eval_radius: # not to crop the object adjust the radius
-#       hamburger: 3.0
-#       icecream: 4.0
-#       cactus: 4.0
-#       tulip: 4.0
-
-#     eval_H: 512 
-#     eval_W: 512
-    
-#     opacity_reset_interval: 1000000 # disable opacity reset
-#     opacity_lr: 0.01
-
-#   settings:
-#     # visualize
-#     visualize: True
-#     save_iid: False
-#     visualize_fixed_viewpoint: True
-#     visualize_fixed_viewpoint_interval: 100
-
-#     # metrics
-#     metrics: True
-#     quantitative_metrics_interval: 50
-#     num_views: 8
-
-#     # options
-#     losses_interval: 10
-#     efficiency_interval: 10 
-#     enable_lpips: False # disable lpips for faster training
-    
-#     save_model: False
-#     video_snapshot: False
-
-
-
-# # Experiment 6: rbf beta & lambda fine grid search
-# exp6_lambda_beta:
-#   name: exp6_lambda_beta
-#   method: grid
-#   sweep_parameters:
-#     rbf_beta: [0.5, 1.0, 1.5, 2.0]
-#     lambda_repulsion: [800, 1000, 1200]
-#     prompt: 
-#       # hamburger: "a photo of a hamburger"
-#       icecream: "a photo of an ice cream"
-#       cactus: "a small saguaro cactus planted in a clay pot"
-#       # tulip: "a photo of a tulip"
-
-#   # fixed parameters
-#   fixed_parameters:
-#     repulsion_type: 'rlsd'
-#     kernel_type: 'rbf'
-#     adaptive_lambda: False
-#     # lambda_repulsion: 1000
-    
-#     iters: 1000
-#     schedule_iters: 1500
-#     # lambda_repulsion: 1000 
-
-#     seed: 42
-#     guidance_scale: 50
-    
-#     num_particles: 8
-#     force_same_t: True
-#     force_same_noise: True
-#     anneal_timestep: True
-#     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-#     use_cosine_decay: False
-    
-#     invert_bg_prob: 0.5
-#     eval_radius: # not to crop the object adjust the radius
-#       hamburger: 3.0
-#       icecream: 4.0
-#       cactus: 4.0
-#       tulip: 4.0
-
-#     eval_H: 512 
-#     eval_W: 512
-
-#     opacity_reset_interval: 1000000 # disable opacity reset
-#     opacity_lr: 0.01
-
-#   settings:
-#     # visualize
-#     visualize: True
-#     save_iid: False
-#     visualize_fixed_viewpoint: True
-#     visualize_fixed_viewpoint_interval: 100
-
-#     # metrics
-#     metrics: True
-#     quantitative_metrics_interval: 50
-#     num_views: 8
-
-#     # options
-#     losses_interval: 10
-#     efficiency_interval: 10 
-#     enable_lpips: False # disable lpips for faster training
