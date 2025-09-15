@@ -811,17 +811,18 @@ class MetricsCalculator:
         # mem = efficiency.get("memory_allocated_MB", efficiency.get("memory_allocated_mb", ""))
         # mem_max = efficiency.get("max_memory_allocated_MB", efficiency.get("max_memory_allocated_mb", ""))
         
-        step_wall_ms = efficiency.get("step_wall_ms", ""),
-        step_gpu_ms = efficiency.get("step_gpu_ms", ""),
-        render_ms = efficiency.get("render_ms", ""),
-        sd_guidance_ms = efficiency.get("sd_guidance_ms", ""),
-        backward_update_ms = efficiency.get("backward_update_ms", ""),
-        densify_ms = efficiency.get("densify_ms", ""),
-        pixels = efficiency.get("pixels", ""),
-        px_per_s = efficiency.get("px_per_s", ""),
-        memory_allocated_mb = efficiency.get("memory_allocated_mb", ""),
-        max_memory_allocated_mb = efficiency.get("max_memory_allocated_mb", ""),
-        self.efficiency_writer.writerow([step, step_wall_ms, step_gpu_ms, render_ms, sd_guidance_ms, backprop_ms, densify_ms, pixels, px_per_s, memory_allocated_mb, max_memory_allocated_mb])
+        step_wall_ms = efficiency.get("step_wall_ms", "")
+        step_gpu_ms = efficiency.get("step_gpu_ms", "")
+        render_ms = efficiency.get("render_ms", "")
+        sd_guidance_ms = efficiency.get("sd_guidance_ms", "")
+        backward_update_ms = efficiency.get("backward_update_ms", "")
+        densify_ms = efficiency.get("densify_ms", "")
+        pixels = efficiency.get("pixels", "")
+        px_per_s = efficiency.get("px_per_s", "")
+        memory_allocated_mb = efficiency.get("memory_allocated_mb", "")
+        max_memory_allocated_mb = efficiency.get("max_memory_allocated_mb", "")
+        
+        self.efficiency_writer.writerow([step, step_wall_ms, step_gpu_ms, render_ms, sd_guidance_ms, backward_update_ms, densify_ms, pixels, px_per_s, memory_allocated_mb, max_memory_allocated_mb])
 
     @torch.no_grad()
     def log_metrics(self, step: int, efficiency: dict, losses: dict, metrics: dict):

@@ -71,15 +71,32 @@ class StableDiffusion(nn.Module):
         pipe = StableDiffusionPipeline.from_pretrained(
             model_key, torch_dtype=self.dtype
         )
+        
+        if is_xformers_available():
+            try:
+                pipe.enable_xformers_memory_efficient_attention()
+                print("[INFO] xFormers attention enabled.")
+            except Exception as e:
+                print(f"[WARN] xFormers enable failed: {e}")
 
-        if vram_O:
-            pipe.enable_sequential_cpu_offload()
-            pipe.enable_vae_slicing()
-            pipe.unet.to(memory_format=torch.channels_last)
-            pipe.enable_attention_slicing(1)
-            # pipe.enable_model_cpu_offload()
-        else:
-            pipe.to(device)
+        # if vram_O:
+        #     pipe.enable_sequential_cpu_offload()
+        #     pipe.enable_vae_slicing()
+        #     pipe.unet.to(memory_format=torch.channels_last)
+        #     pipe.enable_attention_slicing(1)
+        #     # pipe.enable_model_cpu_offload()
+        # else:
+        #     pipe.to(device)
+        
+        # ▶ 파이프 전체를 GPU로
+        pipe.to(device)
+
+        # ▶ UNet만 채널라스트(성능 ↑)
+        pipe.unet.to(memory_format=torch.channels_last)
+
+        # Keep text_encoder in the same dtype as the rest of the model for compatibility
+        # The dtype mismatch was causing the RuntimeError
+        pipe.text_encoder.to(dtype=self.dtype)
 
         self.vae = pipe.vae
         self.tokenizer = pipe.tokenizer
@@ -420,6 +437,7 @@ class StableDiffusion(nn.Module):
                     width // 8,
                 ),
                 device=self.device,
+                dtype=self.dtype,
             )
 
         batch_size = latents.shape[0]

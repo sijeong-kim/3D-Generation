@@ -28,19 +28,6 @@ from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 class GUI:
     def __init__(self, opt):
         
-        # 예: __init__ 바로 아래에
-        self.fast_mode = getattr(opt, "fast_mode", True)
-
-        if self.fast_mode:
-            # A100 최적화: TF32 켜기 + 비결정 허용
-            torch.backends.cuda.matmul.allow_tf32 = True
-            torch.backends.cudnn.allow_tf32 = True
-            torch.backends.cudnn.benchmark = True
-            torch.set_float32_matmul_precision("high")  # PyTorch 2.x
-            # 결정성 강제 끄기
-            os.environ.pop("CUBLAS_WORKSPACE_CONFIG", None)
-            torch.backends.cudnn.deterministic = False
-            torch.use_deterministic_algorithms(False)
 
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
         self.W = opt.W
@@ -101,20 +88,44 @@ class GUI:
         if self.opt.negative_prompt is not None:
             self.negative_prompt = self.opt.negative_prompt
 
+        # self.seeds = []
+        # # override if provide a checkpoint
+        # for i in range(self.opt.num_particles):
+        #     # Set different seed for each particle during initialization
+        #     init_seed = self.seed + i * 1000000 
+        #     self.seeds.append(init_seed)
+        #     self.seed_everything(init_seed)
+            
+        #     if self.opt.load is not None:
+        #         self.renderers[i].initialize(self.opt.load) # TODO: load from different checkpoints for each particle
+        #     else:
+        #         # initialize gaussians to a blob
+        #         self.renderers[i].initialize(num_pts=self.opt.num_pts)
         self.seeds = []
-        # override if provide a checkpoint
         for i in range(self.opt.num_particles):
-            # Set different seed for each particle during initialization
-            init_seed = self.seed + i * 1000000 
+            init_seed = self.seed + i * 1000000
             self.seeds.append(init_seed)
             self.seed_everything(init_seed)
-            
             if self.opt.load is not None:
-                self.renderers[i].initialize(self.opt.load) # TODO: load from different checkpoints for each particle
+                self.renderers[i].initialize(self.opt.load)
             else:
-                # initialize gaussians to a blob
                 self.renderers[i].initialize(num_pts=self.opt.num_pts)
-                
+
+        # 🔹 RNGs: 전역 시드 리셋 없이 사용할 전용 제너레이터들
+        self.rng_np = np.random.default_rng(int(self.seed))
+
+        if torch.cuda.is_available():
+            self.sd_rng = torch.Generator(device=self.device)
+        else:
+            self.sd_rng = torch.Generator()
+        self.sd_rng.manual_seed(int(self.seed) + 12345)
+
+        self.sd_rngs = []
+        for s in self.seeds:
+            g = torch.Generator(device=self.device) if torch.cuda.is_available() else torch.Generator()
+            g.manual_seed(int(s) + 12345)
+            self.sd_rngs.append(g)
+
         # visualizer
         if self.opt.visualize or self.opt.metrics:
             self.visualizer = GaussianVisualizer(opt=self.opt, renderers=self.renderers, cam=self.cam)
@@ -127,16 +138,46 @@ class GUI:
         
         self._io_stream = torch.cuda.Stream() if torch.cuda.is_available() else None
         
+        # __init__
+        self.fast_mode = bool(getattr(opt, "fast_mode", True))
+        if self.fast_mode:
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            torch.backends.cudnn.benchmark = True
+            if hasattr(torch, "set_float32_matmul_precision"):
+                torch.set_float32_matmul_precision("high")
+        else:
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            torch.use_deterministic_algorithms(True)
+            torch.backends.cuda.matmul.allow_tf32 = False
+            torch.backends.cudnn.allow_tf32 = False
+
+    # seed_everything: 시드만!
+    def seed_everything(self, seed):
+        try: seed = int(seed)
+        except: seed = np.random.randint(0, 1_000_000)
+        os.environ["PYTHONHASHSEED"] = str(seed)
+        random.seed(seed); np.random.seed(seed); torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed); torch.cuda.manual_seed_all(seed)
+
+        
     def __del__(self):
         pass
     
     
     def _dump_run_meta(self, outdir):
+        
+        gpu_idx = torch.cuda.current_device() if torch.cuda.is_available() else None
+        gpu_name = torch.cuda.get_device_name(gpu_idx) if gpu_idx is not None else None
+        
         meta = {
             "torch": torch.__version__,
             "cuda": torch.version.cuda if torch.cuda.is_available() else None,
             "cudnn": torch.backends.cudnn.version() if torch.cuda.is_available() else None,
-            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+            "gpu_name": gpu_name,
             "seed": int(self.seed),
             "opt": OmegaConf.to_container(self.opt, resolve=True),
         }
@@ -179,25 +220,59 @@ class GUI:
             torch.cuda.empty_cache()
             torch.cuda.synchronize()
 
-    def seed_everything(self, seed):
-        try:
-            seed = int(seed)
-        except:
-            seed = np.random.randint(0, 1000000)
+    # def seed_everything(self, seed):
+    #     try:
+    #         seed = int(seed)
+    #     except:
+    #         seed = np.random.randint(0, 1000000)
 
-        os.environ["PYTHONHASHSEED"] = str(seed)
-        random.seed(seed)                       # ← 추가
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)        # ← 추가(멀티 GPU 대비)
+    #     os.environ["PYTHONHASHSEED"] = str(seed)
+    #     random.seed(seed)                       # ← 추가
+    #     np.random.seed(seed)
+    #     torch.manual_seed(seed)
+    #     torch.cuda.manual_seed(seed)
+    #     torch.cuda.manual_seed_all(seed)        # ← 추가(멀티 GPU 대비)
 
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        torch.use_deterministic_algorithms(True)
-        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cudnn.allow_tf32 = False
+    #     torch.backends.cudnn.deterministic = True
+    #     torch.backends.cudnn.benchmark = False
+    #     torch.use_deterministic_algorithms(True)
+    #     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    #     torch.backends.cuda.matmul.allow_tf32 = False
+    #     torch.backends.cudnn.allow_tf32 = False
+    # def seed_everything(self, seed):
+    #     try:
+    #         seed = int(seed)
+    #     except:
+    #         seed = np.random.randint(0, 1_000_000)
+
+    #     os.environ["PYTHONHASHSEED"] = str(seed)
+    #     random.seed(seed)
+    #     np.random.seed(seed)
+    #     torch.manual_seed(seed)
+    #     if torch.cuda.is_available():
+    #         torch.cuda.manual_seed(seed)
+    #         torch.cuda.manual_seed_all(seed)
+
+    #     # 🔑 fast_mode에 따라 분기
+    #     if getattr(self, "fast_mode", False):
+    #         # 빠른 모드: 결정성 강제 X, TF32/benchmark 허용
+    #         os.environ.pop("CUBLAS_WORKSPACE_CONFIG", None)
+    #         torch.backends.cudnn.deterministic = False
+    #         torch.backends.cudnn.benchmark = True
+    #         torch.use_deterministic_algorithms(False)
+    #         torch.backends.cuda.matmul.allow_tf32 = True
+    #         torch.backends.cudnn.allow_tf32 = True
+    #         if hasattr(torch, "set_float32_matmul_precision"):
+    #             torch.set_float32_matmul_precision("high")
+    #     else:
+    #         # 재현성 모드
+    #         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    #         torch.backends.cudnn.deterministic = True
+    #         torch.backends.cudnn.benchmark = False
+    #         torch.use_deterministic_algorithms(True)
+    #         torch.backends.cuda.matmul.allow_tf32 = False
+    #         torch.backends.cudnn.allow_tf32 = False
+
 
     def prepare_train(self):
 
@@ -260,139 +335,79 @@ class GUI:
 
     def train_step(self):
         self.step += 1
-        
-        # with torch.no_grad():
-        #     if self.step==1 or (self.step % self.opt.efficiency_interval == 0) and self.opt.metrics and (self.metrics_calculator is not None):
-        #         if torch.cuda.is_available():
-        #             starter = torch.cuda.Event(enable_timing=True)
-        #             ender = torch.cuda.Event(enable_timing=True)
-        #             starter.record()
-        #         else:
-        #             starter = None
-        #             ender = None
 
-
-        # ---- TIME LOG: start ----
         wall_start = time.perf_counter()
-        
         measure = bool(self.opt.metrics and self.metrics_calculator is not None)
         if measure and torch.cuda.is_available():
             cuda_evt_start = torch.cuda.Event(enable_timing=True)
             cuda_evt_start.record()
         else:
             cuda_evt_start = None
-        # ---- TIME LOG: start ----
 
-        #########################################################
-        # Forward pass
-        #########################################################
-
-        # 0. Update step
-
-        # step_ratio = min(1, self.step / self.opt.iters)
+        # ---- Forward ----
         step_ratio = min(1, self.step / self.opt.schedule_iters)
-        
         total_loss = 0
 
-        # 1.1. Render images (novel view)
-        render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512) # intial acceleration
-        images = []
-        outputs = []
-        # poses = []
+        render_resolution = 128 if step_ratio < 0.3 else (256 if step_ratio < 0.6 else 512)
+        images, outputs = [], []
 
-        # vers, hors, radii = [], [], []
-        # avoid too large elevation (> 80 or < -80), and make sure it always cover [min_ver, max_ver]
         min_ver = max(min(self.opt.min_ver, self.opt.min_ver - self.opt.elevation), -80 - self.opt.elevation)
         max_ver = min(max(self.opt.max_ver, self.opt.max_ver - self.opt.elevation), 80 - self.opt.elevation)
-        
-        # render random view
-        self.seed_everything(self.seed + self.step)
-        
-        ver = np.random.randint(min_ver, max_ver)
-        hor = np.random.randint(-180, 180)
-        radius = 0
 
-        # vers.append(ver)
-        # hors.append(hor)
-        # radii.append(radius)
+        # ✅ 전용 RNG 사용 (전역 시드 리셋 금지)
+        ver = int(self.rng_np.integers(min_ver, max_ver))
+        hor = int(self.rng_np.integers(-180, 180))
+        radius = 0
 
         pose = orbit_camera(self.opt.elevation + ver, hor, self.opt.radius + radius)
         cur_cam = MiniCam(pose, render_resolution, render_resolution, self.cam.fovy, self.cam.fovx, self.cam.near, self.cam.far)
-        
-        bg_color = torch.tensor([1, 1, 1] if np.random.rand() > self.opt.invert_bg_prob else [0, 0, 0], dtype=torch.float32, device=self.device)
 
-    
+        bg_white = self.rng_np.random() > self.opt.invert_bg_prob
+        bg_color = torch.tensor([1, 1, 1] if bg_white else [0, 0, 0], dtype=torch.float32, device=self.device)
+
         for j in range(self.opt.num_particles):
-            # set seed for each particle + iteration step for different background each iter
-            
-            # update lr
             self.renderers[j].gaussians.update_learning_rate(self.step)
-
             out = self.renderers[j].render(cur_cam, bg_color=bg_color)
 
-            image = out["image"].unsqueeze(0) # [1, 3, H, W] in [0, 1]
+            image = out["image"].unsqueeze(0)
             images.append(image)
-            
-            # Store output for each particle
-            # 필요한 키만 저장
             outputs.append({
                 "viewspace_points": out["viewspace_points"],
                 "visibility_filter": out["visibility_filter"],
                 "radii": out["radii"],
             })
-            # out["image"]는 images에 복사됐으니 out 전체는 버림
             del out
-        
-        # after rendering images for all particles
-        images = torch.cat(images, dim=0)  # [N, 3, H, W]
-        t_after_render = time.perf_counter()  # ---- TIME LOG ----
 
-        
+        images = torch.cat(images, dim=0)  # [N,3,H,W]
+        t_after_render = time.perf_counter()
+
+        # ✅ 미리 None 선언 (wo일 때 클린업 안전)
+        features = None
+        kernel = None
+        kernel_grad = None
+
+        # Repulsion loss (feature space)
         repulsion_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
-        
-        # repulsion loss (feature space)
         if self.opt.repulsion_type in ['rlsd', 'svgd']:
-            features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images).to(self.device).to(torch.float32)   # [N, D_feature] 
-            
-            # 4. Kernel computation (feature space)
+            with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(self.device.type == "cuda")):
+                features = self.feature_extractor.extract_cls_from_layer(self.opt.feature_layer, images)
+            features = features.to(torch.float32)
+
             if self.opt.kernel_type == 'rbf':
-                kernel, kernel_grad = rbf_kernel_and_grad(
-                    features, 
-                    repulsion_type=self.opt.repulsion_type, 
-                    beta=self.opt.rbf_beta,
-                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+                kernel, kernel_grad = rbf_kernel_and_grad(features, repulsion_type=self.opt.repulsion_type, beta=self.opt.rbf_beta)
             elif self.opt.kernel_type == 'cosine':
-                kernel, kernel_grad = cosine_kernel_and_grad(
-                    features, 
-                    repulsion_type=self.opt.repulsion_type,
-                    beta=self.opt.cosine_beta,
-                    eps_shift=self.opt.cosine_eps_shift,
-                )  # kernel:[N,N], kernel_grad:[N, D_feature]
+                kernel, kernel_grad = cosine_kernel_and_grad(features, repulsion_type=self.opt.repulsion_type, beta=self.opt.cosine_beta, eps_shift=self.opt.cosine_eps_shift)
             else:
                 raise ValueError(f"Invalid kernel type: {self.opt.kernel_type}")
-            
+
             kernel = kernel.detach().to(torch.float32)
             kernel_grad = kernel_grad.detach().to(torch.float32)
-            
-            repulsion_loss = (kernel_grad * features).sum(dim=1) # [N, D_feature] * [N, D_feature] -> [N]
-            repulsion_loss = repulsion_loss.mean() # [N] -> [1]
 
-        # attraction loss (latent space)
-        attraction_loss = torch.tensor(0.0, device=self.device, dtype=torch.float32)
-    
-        # gen = torch.Generator(device=self.device).manual_seed(self.seed + self.step + 12345) # sd 전용 오프셋
+            repulsion_loss = (kernel_grad * features).sum(dim=1).mean()
 
-        # score_gradients, latents = self.guidance_sd.train_step_gradient(
-        #     images, step_ratio=step_ratio if self.opt.anneal_timestep else None, 
-        #     guidance_scale=self.opt.guidance_scale,
-        #     force_same_t=self.opt.force_same_t,
-        #     force_same_noise=self.opt.force_same_noise,
-        #     generator=gen,
-        # )  # score_gradients: [N, 4, 64, 64], latents: [N, 4, 64, 64]
-
+        # Attraction (latent space w/ SD)
         if self.opt.force_same_noise:
-            # 기존 경로 유지(재현 비교용)
-            gen = torch.Generator(device=self.device).manual_seed(self.seed + self.step + 12345)
+            gen = self.sd_rng
             score_gradients, latents = self.guidance_sd.train_step_gradient(
                 images, step_ratio=step_ratio if self.opt.anneal_timestep else None,
                 guidance_scale=self.opt.guidance_scale,
@@ -401,10 +416,9 @@ class GUI:
                 generator=gen,
             )
         else:
-            # 입자별 독립 generator 경로(wo 독립 노이즈용)
             score_list, lat_list = [], []
             for j in range(self.opt.num_particles):
-                gen_j = torch.Generator(device=self.device).manual_seed(self.seeds[j] + self.step + 12345)
+                gen_j = self.sd_rngs[j]
                 sg_j, lat_j = self.guidance_sd.train_step_gradient(
                     images[j:j+1], step_ratio=step_ratio if self.opt.anneal_timestep else None,
                     guidance_scale=self.opt.guidance_scale,
@@ -417,67 +431,61 @@ class GUI:
             score_gradients = torch.cat(score_list, dim=0)
             latents = torch.cat(lat_list, dim=0)
 
-        score_gradients = score_gradients.to(torch.float32)
-        latents = latents.to(torch.float32)
-        
-        # ... target/attraction_loss 계산 ...
-        t_after_sd = time.perf_counter()  # ---- TIME LOG ----
+        # ✅ 수치 안정성: float32로 계산
+        score_gradients = score_gradients.float()
+        latents = latents.float()
 
-        
+        t_after_sd = time.perf_counter()
+
         if self.opt.repulsion_type == 'svgd':
-            v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)  # [N,4,64,64]  
+            v = torch.einsum('ij,jchw->ichw', kernel.detach(), score_gradients)
             target = (latents - v).detach()
         elif self.opt.repulsion_type in ['rlsd', 'wo']:
             target = (latents - score_gradients).detach()
         else:
             raise ValueError(f"Invalid repulsion type: {self.opt.repulsion_type}")
-            
-        attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1)  # [N]
-        attraction_loss = attraction_loss.mean()
-            
-        ### optimize step ### 
+
+        attraction_loss = 0.5 * F.mse_loss(latents, target, reduction='none').view(self.opt.num_particles, -1).sum(dim=1).mean()
+
         scaled_attraction_loss = self.opt.lambda_sd * attraction_loss
         scaled_repulsion_loss = self.opt.lambda_repulsion * repulsion_loss
         total_loss = scaled_attraction_loss + scaled_repulsion_loss
-        
-        # --- 안전 가드 ---
+
         if not torch.isfinite(total_loss):
             print(f"[WARN] non-finite total_loss at step {self.step}: "
                 f"attract={scaled_attraction_loss.item():.4e}, "
                 f"repulse={scaled_repulsion_loss.item():.4e}")
-            # 그래디언트 초기화만 하고 스킵
             for j in range(self.opt.num_particles):
                 self.optimizers[j].zero_grad(set_to_none=True)
             return
 
-        # 2. Backward pass (Compute gradients)
         total_loss.backward()
-        
-        # 3. Optimize step (Update parameters)
         for j in range(self.opt.num_particles):
             self.optimizers[j].step()
-        t_after_update = time.perf_counter()  # ---- TIME LOG ----
-        
-        # densify and prune (after backward pass so gradients are available)
+        t_after_update = time.perf_counter()
+
+        # densify & prune
         for j in range(self.opt.num_particles):
             if (self.step >= self.opt.density_start_iter) and (self.step <= self.opt.density_end_iter):
-                viewspace_point_tensor, visibility_filter, radii = outputs[j]["viewspace_points"], outputs[j]["visibility_filter"], outputs[j]["radii"]
-                self.renderers[j].gaussians.max_radii2D[visibility_filter] = torch.max(self.renderers[j].gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
+                viewspace_point_tensor = outputs[j]["viewspace_points"]
+                visibility_filter = outputs[j]["visibility_filter"]
+                radii = outputs[j]["radii"]
+                self.renderers[j].gaussians.max_radii2D[visibility_filter] = torch.max(
+                    self.renderers[j].gaussians.max_radii2D[visibility_filter], radii[visibility_filter]
+                )
                 self.renderers[j].gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
-                
+
                 if self.step % self.opt.densification_interval == 0:
-                        self.renderers[j].gaussians.densify_and_prune(self.opt.densify_grad_threshold, min_opacity=0.01, extent=4, max_screen_size=1)
-                
+                    self.renderers[j].gaussians.densify_and_prune(self.opt.densify_grad_threshold, min_opacity=0.01, extent=4, max_screen_size=1)
+
                 if getattr(self.opt, 'opacity_reset_interval', 0) and self.opt.opacity_reset_interval > 0:
                     if self.step % self.opt.opacity_reset_interval == 0:
-                            self.renderers[j].gaussians.reset_opacity()
-                            
-        t_after_densify = time.perf_counter()  # ---- TIME LOG ----
-        
-        # 4. Zero gradients (Prepare for next iteration)
+                        self.renderers[j].gaussians.reset_opacity()
+
+        t_after_densify = time.perf_counter()
+
         for j in range(self.opt.num_particles):
             self.optimizers[j].zero_grad()
-        
 
         #########################################################
         # Log metrics and visualize
@@ -634,6 +642,7 @@ class GUI:
             images = outputs = score_gradients = latents = features = kernel = kernel_grad = None
             self._periodic_cuda_trim()
 
+
     
     @torch.no_grad()
     def _extract_particle_features_from_multi_view(
@@ -692,7 +701,7 @@ class GUI:
             images_VN_3HW=images,
             layer_idx=self.opt.feature_layer,
             use_amp=True,
-            chunk_size=int(getattr(self.opt, "feat_chunk", 128)),
+            chunk_size=int(getattr(self.opt, "feat_chunk", 64)),
             l2_after_each_view=True,
         )  # [N, D], [V, N, D]
 
@@ -765,10 +774,14 @@ class GUI:
 
             import nvdiffrast.torch as dr
 
-            if not self.opt.force_cuda_rast and (not self.opt.gui or os.name == 'nt'):
-                glctx = dr.RasterizeGLContext()
-            else:
-                glctx = dr.RasterizeCudaContext()
+            # if not self.opt.force_cuda_rast and (not self.opt.gui or os.name == 'nt'):
+            #     glctx = dr.RasterizeGLContext()
+            # else:
+            #     glctx = dr.RasterizeCudaContext()
+                
+            use_gl = not getattr(self.opt, "force_cuda_rast", False) and (not getattr(self.opt, "gui", False) or os.name == 'nt')
+            glctx = dr.RasterizeGLContext() if use_gl else dr.RasterizeCudaContext()
+
 
             for ver, hor in zip(vers, hors):
                 # render image
