@@ -27,6 +27,21 @@ from kernels import rbf_kernel_and_grad, cosine_kernel_and_grad
 
 class GUI:
     def __init__(self, opt):
+        
+        # 예: __init__ 바로 아래에
+        self.fast_mode = getattr(opt, "fast_mode", True)
+
+        if self.fast_mode:
+            # A100 최적화: TF32 켜기 + 비결정 허용
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            torch.backends.cudnn.benchmark = True
+            torch.set_float32_matmul_precision("high")  # PyTorch 2.x
+            # 결정성 강제 끄기
+            os.environ.pop("CUBLAS_WORKSPACE_CONFIG", None)
+            torch.backends.cudnn.deterministic = False
+            torch.use_deterministic_algorithms(False)
+
         self.opt = opt  # shared with the trainer's opt to support in-place modification of rendering parameters.
         self.W = opt.W
         self.H = opt.H
@@ -677,7 +692,7 @@ class GUI:
             images_VN_3HW=images,
             layer_idx=self.opt.feature_layer,
             use_amp=True,
-            chunk_size=int(getattr(self.opt, "feat_chunk", 64)),
+            chunk_size=int(getattr(self.opt, "feat_chunk", 128)),
             l2_after_each_view=True,
         )  # [N, D], [V, N, D]
 
