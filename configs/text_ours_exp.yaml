@@ -515,6 +515,7 @@ exp5_rbf_beta:
 # Final Comparison #
 # ------------------------------------------------------------ #
 # Experiment 6: ours best
+#TODO: change the values of the parameters
 exp6_ours_best: 
   name: exp6_ours_best
   method: grid
@@ -528,7 +529,7 @@ exp6_ours_best:
       sundae: "an ice cream sundae"
       
     # seed: [42]
-    seed: [42, 123, 456, 789]
+    seed: [42, 123, 456, 789, 321]
 
   # fixed parameters
   fixed_parameters:
@@ -600,7 +601,8 @@ exp6_ours_best:
     save_features: True
     save_features_interval: 250
 
-# Experiment 6: ours best
+# Experiment 6: baseline with same configuration with ours
+# TODO: change the values of the parameters
 exp6_baseline: 
   name: exp6_baseline
   method: grid
@@ -614,7 +616,7 @@ exp6_baseline:
       sundae: "an ice cream sundae"
       
     # seed: [42]
-    seed: [42, 123, 456, 789]
+    seed: [42, 123, 456, 789, 321]
 
   # fixed parameters
   fixed_parameters:
