@@ -44,7 +44,8 @@ setup_logging() {
   
   # Also create a symlink to the latest log
   local latest_log="$LOG_DIR/latest.log"
-  [[ -L "$latest_log" ]] && rm -f "$latest_log"
+  # Remove any existing file or symlink
+  rm -f "$latest_log"
   ln -s "$(basename "$LOG_FILE")" "$latest_log"
   
   # Log script start

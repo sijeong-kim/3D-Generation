@@ -12,7 +12,7 @@
 # Experiment 0: Baseline (wo)
 # baseline (to compare with ours), which has same configuration with ours
 # ------------------------------------------------------------ #
-# Appendix #
+# Main Experiments #
 # ------------------------------------------------------------ #
 # Experiment: baseline (to compare with ours), which has best results
 exp0_baseline_best: 
@@ -26,8 +26,8 @@ exp0_baseline_best:
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
 
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -94,8 +94,8 @@ exp0_baseline_same: # same noise: diversity minimization and same with ours
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
     
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -234,8 +234,8 @@ exp1_repulsion_kernel:
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
 
-    seed : [42]
-    # seed: [42, 123, 456, 789]
+    # seed : [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -308,10 +308,10 @@ exp2_lambda_coarse:
   sweep_parameters:
     lambda_repulsion: [1, 10, 100, 1000, 10000]  # log scale
     prompt: 
-      # hamburger: "a photo of a hamburger"
+      hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
+      tulip: "a photo of a tulip"
 
     seed: [42]
 
@@ -394,8 +394,8 @@ exp3_lambda_fine:
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
 
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -476,8 +476,8 @@ exp4_guidance_scale:
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
 
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -557,8 +557,8 @@ exp5_rbf_beta:
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
 
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -634,8 +634,8 @@ exp6_ours_best:
       icecream: "a photo of an ice cream"
       tulip: "a photo of a tulip"
 
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
