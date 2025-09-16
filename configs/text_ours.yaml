@@ -22,9 +22,9 @@ schedule_iters: 1500
 
 
 # cosine decay
-use_cosine_decay: False # use cosine decay for sigma_t
-rep_cosine_warmup: 0.0 # 0.0: no warmup, 0.1: warmup
-cosine_decay_floor: 0.3 # floor for cosine decay
+# use_cosine_decay: False # use cosine decay for sigma_t
+# rep_cosine_warmup: 0.0 # 0.0: no warmup, 0.1: warmup
+# cosine_decay_floor: 0.3 # floor for cosine decay
 
 # sigma_t
 # use_sigma_weight: False

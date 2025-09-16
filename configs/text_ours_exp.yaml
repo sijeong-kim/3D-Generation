@@ -88,6 +88,81 @@ exp0_baseline: # same noise: diversity minimization and same with ours
     save_features_interval: 250
 
 
+# 제외?
+exp0_baseline_indep: # different noise: diversity maximization
+  name: exp0_baseline_indep
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+      sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
+    
+    # seed: [42]
+    seed: [42, 123, 456, 789]
+
+  # fixed parameters
+  fixed_parameters:
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+    
+    force_same_t: True
+    force_same_noise: False
+    anneal_timestep: True
+    
+    num_particles: 8
+    invert_bg_prob: 0.5
+
+    eval_H: 512
+    eval_W: 512
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
+
+    density_start_iter: 0
+    density_end_iter: 3000
+    densification_interval: 50
+    densify_grad_threshold: 0.01
+
+    opacity_reset_interval: 700 # default
+    opacity_lr: 0.003 # ⭐️
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+    save_model: True
+    video_snapshot: True
+
+    save_features: True
+    save_features_interval: 250
+
+
+
 # Experiment 1: repulsion type x kernel type sweep --> rlsd, rbf is best...
 exp1_repulsion_kernel: 
   name: exp1_repulsion_kernel
@@ -124,8 +199,6 @@ exp1_repulsion_kernel:
     rbf_beta: 1.0
     cosine_beta: 0.5
     cosine_eps_shift: 1e-3
-
-    use_cosine_decay: False
 
     # rep_cosine_warmup: 0.2
     num_particles: 8
@@ -210,9 +283,6 @@ exp2_lambda_coarse:
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
     invert_bg_prob: 0.5
 
     eval_H: 512
@@ -296,9 +366,6 @@ exp3_lambda_fine:
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
     invert_bg_prob: 0.5
 
     eval_H: 512
@@ -380,9 +447,6 @@ exp4_guidance_scale:
     rbf_beta: 1.0
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
     
     invert_bg_prob: 0.5
 
@@ -463,10 +527,6 @@ exp5_rbf_beta:
     force_same_noise: True
     anneal_timestep: True
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    use_cosine_decay: False
-    invert_bg_prob: 0.5
-
     
     eval_H: 512
     eval_W: 512
@@ -553,9 +613,6 @@ exp6_ours_best:
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-
-    # rep_cosine_warmup: 0.2
     num_particles: 8
     # invert_bg_prob: 0.5
 
@@ -640,9 +697,6 @@ exp6_baseline:
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-
-    # rep_cosine_warmup: 0.2
     num_particles: 8
     # invert_bg_prob: 0.5
 
@@ -727,9 +781,6 @@ exp_feature_layer:
     # cosine_beta: 1.0
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
     invert_bg_prob: 0.5
 
     eval_H: 512
@@ -811,9 +862,6 @@ exp_num_particles:
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
     invert_bg_prob: 0.5
 
     eval_H: 512
@@ -873,8 +921,8 @@ exp_gaussian_reproduce:
       # sundae: "an ice cream sundae"
       # bulldozer: "a bulldozer made out of toy bricks"
 
-    seed: [42]
-    # seed: [42, 123, 456, 789]
+    # seed: [42]
+    seed: [42, 123, 456, 789, 321, 654, 987, 1234]
 
   # fixed parameters
   fixed_parameters:
@@ -908,80 +956,6 @@ exp_gaussian_reproduce:
     densify_grad_threshold: 0.01
 
     opacity_lr: 0.05
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-    save_model: True
-    video_snapshot: True
-
-    save_features: True
-    save_features_interval: 250
-
-
-# 제외?
-exp0_baseline_indep: # different noise: diversity maximization
-  name: exp0_baseline_indep
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['wo']
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
-      sundae: "an ice cream sundae"
-      bulldozer: "a bulldozer made out of toy bricks"
-    
-    seed: [42]
-    # seed: [42, 123, 456, 789]
-
-  # fixed parameters
-  fixed_parameters:
-
-    iters: 1000
-    schedule_iters: 1500
-    guidance_scale: 50
-    
-    force_same_t: True
-    force_same_noise: False
-    anneal_timestep: True
-    
-    num_particles: 8
-    invert_bg_prob: 0.5
-
-    eval_H: 512
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-      sundae: 4.0
-      bulldozer: 4.5
-
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-
-    opacity_reset_interval: 700 # default
-    opacity_lr: 0.003 # ⭐️
 
   settings:
     # visualize
@@ -1044,9 +1018,6 @@ exp_num_pts:
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
-
     invert_bg_prob: 0.5
 
     eval_H: 512
@@ -1091,96 +1062,6 @@ exp_num_pts:
     save_features: False
     # save_features_interval: 250
 
-
-# Experiment: cosine decay sweep
-exp_cosine_decay:
-  name: exp_cosine_decay
-  method: grid
-  sweep_parameters:
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-      # sundae: "an ice cream sundae"
-      # bulldozer: "a bulldozer made out of toy bricks"
-
-    use_cosine_decay: [True, False]
-    # cosine_decay_floor: [0.1, 0.3] 
-    # rep_cosine_warmup: [0.0, 0.2]
-
-  # fixed parameters
-  fixed_parameters:
-
-    # use_cosine_decay: True
-
-    cosine_decay_floor: 0.3
-    rep_cosine_warmup: 0.2
-
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-
-    # adaptive_lambda: False
-    lambda_repulsion: 1000
-
-    iters: 1000
-    schedule_iters: 1500
-    guidance_scale: 50
-
-    seed: 42
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    rbf_beta: 1.0
-    # cosine_beta: 0.5
-    # cosine_eps_shift: 1e-3
-
-    invert_bg_prob: 0.5
-
-    eval_H: 512 
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-      sundae: 4.0
-      bulldozer: 4.5
-
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-
-    opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-    
-    save_model: False
-    video_snapshot: False
-
-
 exp_opacity_lr:
   name: exp_opacity_lr
   method: grid
@@ -1216,9 +1097,6 @@ exp_opacity_lr:
     rbf_beta: 1.0
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
-
-    use_cosine_decay: False
-    # rep_cosine_warmup: 0.2
 
     invert_bg_prob: 0.5
 
