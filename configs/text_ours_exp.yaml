@@ -469,7 +469,7 @@ exp4_guidance_scale:
   name: exp4_guidance_scale
   method: grid
   sweep_parameters:
-    guidance_scale: [30, 40, 50, 60, 70, 100]
+    guidance_scale: [30, 50, 70, 100]
     prompt: 
       hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
