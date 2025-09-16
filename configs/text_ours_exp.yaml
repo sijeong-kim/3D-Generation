@@ -4,10 +4,10 @@
 # The prompts' keys are abbreviations that can be used for naming files,
 # and their values are the actual prompts for text-to-3D generation.
 #
-# USAGE:
-# sbatch scripts/run_ours_exp.sh exp_repulsion_lambda_sweep
 
-# TODO: λ_repulsion 1D coarse → fine 탐색 → 그다음 β(temperature) 단일 축 튜닝 → 마지막에 국소 2D(λ×β) 미세탐색.
+# USAGE:
+# sbatch scripts/run_ours_exp.sh exp0_baseline
+# bash scripts/run_experiments.sh exp0_baseline
 
 # Experiment 0: Baseline (wo)
 # baseline (to compare with ours), which has same configuration with ours
