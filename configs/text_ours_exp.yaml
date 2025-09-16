@@ -21,12 +21,12 @@ exp0_baseline: # same noise: diversity minimization and same with ours
   sweep_parameters:
     repulsion_type: ['wo']
     prompt: 
-      # hamburger: "a photo of a hamburger"
+      bulldozer: "a bulldozer made out of toy bricks"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
-      # sundae: "an ice cream sundae"
-      bulldozer: "a bulldozer made out of toy bricks"
+      hamburger: "a photo of a hamburger"
+      sundae: "an ice cream sundae"
     
     # seed: [42]
     seed: [42, 123, 456, 789]
@@ -517,13 +517,13 @@ exp6_ours_best:
   method: grid
   sweep_parameters:
     prompt: 
-      hamburger: "a photo of a hamburger"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      icecream: "a photo of an ice cream"
-      tulip: "a photo of a tulip"
-      sundae: "an ice cream sundae"
       bulldozer: "a bulldozer made out of toy bricks"
-
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+      hamburger: "a photo of a hamburger"
+      sundae: "an ice cream sundae"
+      
     # seed: [42]
     seed: [42, 123, 456, 789]
 
