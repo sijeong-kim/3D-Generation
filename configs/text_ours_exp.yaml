@@ -62,7 +62,7 @@ exp0_baseline: # same noise: diversity minimization and same with ours
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003 # ⭐️
+    opacity_lr: 0.01 # ⭐️
 
   settings:
     # visualize
@@ -136,7 +136,7 @@ exp0_baseline_indep: # different noise: diversity maximization
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003 # ⭐️
+    opacity_lr: 0.01 # ⭐️
 
   settings:
     # visualize
@@ -221,7 +221,7 @@ exp1_repulsion_kernel:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -302,7 +302,7 @@ exp2_lambda_coarse:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -385,7 +385,7 @@ exp3_lambda_fine:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -467,7 +467,7 @@ exp4_guidance_scale:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -545,7 +545,7 @@ exp5_rbf_beta:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -633,7 +633,7 @@ exp6_ours_best:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003 # ⭐️
+    opacity_lr: 0.01 # ⭐️
 
   settings:
     # visualize
@@ -678,8 +678,7 @@ exp6_baseline:
   # fixed parameters
   fixed_parameters:
 
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
+    repulsion_type: 'wo'
 
     lambda_repulsion: 1000
 
@@ -717,7 +716,7 @@ exp6_baseline:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003 # ⭐️
+    opacity_lr: 0.01 # ⭐️
 
   settings:
     # visualize
@@ -800,7 +799,7 @@ exp_feature_layer:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -881,7 +880,7 @@ exp_num_particles:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -1037,7 +1036,7 @@ exp_num_pts:
     densify_grad_threshold: 0.01
 
     opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
+    opacity_lr: 0.01
 
   settings:
     # visualize
@@ -1067,7 +1066,7 @@ exp_opacity_lr:
   method: grid
   sweep_parameters:
     # opacity_lr: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
-    opacity_lr: [0.001, 0.003, 0.005, 0.01, 0.05]
+    opacity_lr: [0.005, 0.01, 0.05]
     prompt: 
       # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
