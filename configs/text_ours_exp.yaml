@@ -15,8 +15,8 @@
 # Main Experiments #
 # ------------------------------------------------------------ #
 # Experiment: baseline (to compare with ours), which has best results
-exp0_baseline_best: 
-  name: exp_baseline_best
+exp0_baseline: # same noise: diversity minimization and same with ours
+  name: exp0_baseline
   method: grid
   sweep_parameters:
     repulsion_type: ['wo']
@@ -25,74 +25,8 @@ exp0_baseline_best:
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
-
-    # seed: [42]
-    seed: [42, 123, 456, 789]
-
-  # fixed parameters
-  fixed_parameters:
-    num_particles: 8
-
-    iters: 1000
-    schedule_iters: 1000
-    guidance_scale: 100
-    
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    
-    invert_bg_prob: 0.5
-
-    eval_H: 512
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    opacity_reset_interval: 700 # default
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-
-    opacity_lr: 0.05
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-    save_model: True
-    video_snapshot: True
-
-    save_features: True
-    save_features_interval: 250
-
-exp0_baseline_same: # same noise: diversity minimization and same with ours
-  name: exp0_baseline_same
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['wo']
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
+      sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
     
     # seed: [42]
     seed: [42, 123, 456, 789]
@@ -119,74 +53,8 @@ exp0_baseline_same: # same noise: diversity minimization and same with ours
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
-
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-
-    opacity_reset_interval: 700 # default
-    opacity_lr: 0.003 # ⭐️
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-    save_model: True
-    video_snapshot: True
-
-    save_features: True
-    save_features_interval: 250
-
-exp0_baseline_indep: # different noise: diversity maximization
-  name: exp0_baseline_indep
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['wo']
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
-    
-    # seed: [42]
-    seed: [42, 123, 456, 789]
-
-  # fixed parameters
-  fixed_parameters:
-
-    iters: 1000
-    schedule_iters: 1500
-    guidance_scale: 50
-    
-    force_same_t: True
-    force_same_noise: False
-    anneal_timestep: True
-    
-    num_particles: 8
-    invert_bg_prob: 0.5
-
-    eval_H: 512
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -226,16 +94,18 @@ exp1_repulsion_kernel:
   method: grid
   sweep_parameters:
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       cactus: "a small saguaro cactus planted in a clay pot"
       icecream: "a photo of an ice cream"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
       
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
 
-    # seed : [42]
-    seed: [42, 123, 456, 789]
+    seed : [42, 123]
+    # seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -269,6 +139,8 @@ exp1_repulsion_kernel:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -308,10 +180,12 @@ exp2_lambda_coarse:
   sweep_parameters:
     lambda_repulsion: [1, 10, 100, 1000, 10000]  # log scale
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
     seed: [42]
 
@@ -349,6 +223,8 @@ exp2_lambda_coarse:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -389,13 +265,15 @@ exp3_lambda_fine:
   sweep_parameters:
     lambda_repulsion: [600, 800, 1000, 1200, 1400] # 국소 탐색
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
-    # seed: [42]
-    seed: [42, 123, 456, 789]
+    seed: [42, 123]
+    # seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -431,6 +309,8 @@ exp3_lambda_fine:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
     
     density_start_iter: 0
     density_end_iter: 3000
@@ -471,13 +351,15 @@ exp4_guidance_scale:
   sweep_parameters:
     guidance_scale: [30, 50, 70, 100]
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
-    # seed: [42]
-    seed: [42, 123, 456, 789]
+    seed: [42, 123]
+    # seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -512,6 +394,8 @@ exp4_guidance_scale:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -552,13 +436,15 @@ exp5_rbf_beta:
   sweep_parameters:
     rbf_beta: [0.5, 1.0, 1.5, 2.0]
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
-    # seed: [42]
-    seed: [42, 123, 456, 789]
+    seed: [42, 123]
+    # seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -590,6 +476,8 @@ exp5_rbf_beta:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -633,6 +521,8 @@ exp6_ours_best:
       cactus: "a small saguaro cactus planted in a clay pot"
       icecream: "a photo of an ice cream"
       tulip: "a photo of a tulip"
+      sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
     # seed: [42]
     seed: [42, 123, 456, 789]
@@ -673,6 +563,8 @@ exp6_ours_best:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -709,76 +601,6 @@ exp6_ours_best:
 # ------------------------------------------------------------ #
 # Appendix #
 # ------------------------------------------------------------ #
-
-# Experiment: reproduce DreamGaussian paper results
-exp_reproduce_paper:
-  name: exp_reproduce_paper
-  method: grid
-  sweep_parameters:
-    repulsion_type: ['wo']
-
-    seed: [42, 123, 456, 789]
-    prompt: 
-      hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
-
-  # fixed parameters
-  fixed_parameters:
-    num_particles: 1
-
-    iters: 500
-    schedule_iters: 500
-    guidance_scale: 100
-    
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    
-    invert_bg_prob: 0.5
-
-    eval_H: 512
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    opacity_reset_interval: 700
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-    opacity_lr: 0.003
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-    save_model: True
-    video_snapshot: True
-
-    save_features: False
-    # save_features_interval: 250
-
-
-
 # Experiment: feature layer sweep
 exp_feature_layer:
   name: exp_feature_layer
@@ -786,10 +608,12 @@ exp_feature_layer:
   sweep_parameters:
     feature_layer: ['early', 'mid', 'last'] # 2: early, 5: mid, 11: last
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
   # fixed parameters
   fixed_parameters:
@@ -826,6 +650,8 @@ exp_feature_layer:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -866,10 +692,12 @@ exp_num_particles:
   sweep_parameters:
     num_particles: [2, 4, 8]
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
 
   # fixed parameters
   fixed_parameters:
@@ -906,6 +734,8 @@ exp_num_particles:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -942,6 +772,154 @@ exp_num_particles:
 # ------------------------------------------------------------ #
 # Plus #
 # ------------------------------------------------------------ #
+
+exp_gaussian_reproduce: 
+  name: exp_gaussian_reproduce
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      # bulldozer: "a bulldozer made out of toy bricks"
+
+    seed: [42]
+    # seed: [42, 123, 456, 789]
+
+  # fixed parameters
+  fixed_parameters:
+    num_particles: 1
+
+    iters: 500
+    schedule_iters: 500
+    guidance_scale: 100
+    
+    force_same_t: False
+    force_same_noise: False
+    anneal_timestep: True
+    
+    invert_bg_prob: 0.5
+
+    eval_H: 512
+    eval_W: 512
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
+
+    opacity_reset_interval: 700 # default
+    density_start_iter: 0
+    density_end_iter: 3000
+    densification_interval: 50
+    densify_grad_threshold: 0.01
+
+    opacity_lr: 0.05
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+    save_model: True
+    video_snapshot: True
+
+    save_features: True
+    save_features_interval: 250
+
+
+# 제외?
+exp0_baseline_indep: # different noise: diversity maximization
+  name: exp0_baseline_indep
+  method: grid
+  sweep_parameters:
+    repulsion_type: ['wo']
+    prompt: 
+      hamburger: "a photo of a hamburger"
+      icecream: "a photo of an ice cream"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      tulip: "a photo of a tulip"
+      sundae: "an ice cream sundae"
+      bulldozer: "a bulldozer made out of toy bricks"
+    
+    seed: [42]
+    # seed: [42, 123, 456, 789]
+
+  # fixed parameters
+  fixed_parameters:
+
+    iters: 1000
+    schedule_iters: 1500
+    guidance_scale: 50
+    
+    force_same_t: True
+    force_same_noise: False
+    anneal_timestep: True
+    
+    num_particles: 8
+    invert_bg_prob: 0.5
+
+    eval_H: 512
+    eval_W: 512
+
+    eval_radius: # not to crop the object adjust the radius
+      hamburger: 3.0
+      icecream: 4.0
+      cactus: 4.0
+      tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
+
+    density_start_iter: 0
+    density_end_iter: 3000
+    densification_interval: 50
+    densify_grad_threshold: 0.01
+
+    opacity_reset_interval: 700 # default
+    opacity_lr: 0.003 # ⭐️
+
+  settings:
+    # visualize
+    visualize: True
+    save_iid: False
+    visualize_fixed_viewpoint: True
+    visualize_fixed_viewpoint_interval: 100
+
+    # metrics
+    metrics: True
+    quantitative_metrics_interval: 50
+    num_views: 8
+
+    # options
+    losses_interval: 10
+    efficiency_interval: 10 
+    enable_lpips: False # disable lpips for faster training
+
+    save_model: True
+    video_snapshot: True
+
+    save_features: True
+    save_features_interval: 250
+
+
 # Experiment: num_pts sweep
 exp_num_pts:
   name: exp_num_pts
@@ -953,6 +931,8 @@ exp_num_pts:
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      # bulldozer: "a bulldozer made out of toy bricks"
 
   # fixed parameters
   fixed_parameters:
@@ -990,6 +970,8 @@ exp_num_pts:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -1024,8 +1006,8 @@ exp_num_pts:
 
 
 # Experiment: cosine decay sweep
-exp_cosine_decay_on:
-  name: exp_cosine_decay_on
+exp_cosine_decay:
+  name: exp_cosine_decay
   method: grid
   sweep_parameters:
     prompt: 
@@ -1033,13 +1015,20 @@ exp_cosine_decay_on:
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       # tulip: "a photo of a tulip"
-    cosine_decay_floor: [0.1, 0.3] 
-    rep_cosine_warmup: [0.0, 0.2]
+      # sundae: "an ice cream sundae"
+      # bulldozer: "a bulldozer made out of toy bricks"
+
+    use_cosine_decay: [True, False]
+    # cosine_decay_floor: [0.1, 0.3] 
+    # rep_cosine_warmup: [0.0, 0.2]
 
   # fixed parameters
   fixed_parameters:
 
-    use_cosine_decay: True
+    # use_cosine_decay: True
+
+    cosine_decay_floor: 0.3
+    rep_cosine_warmup: 0.2
 
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
@@ -1073,6 +1062,8 @@ exp_cosine_decay_on:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -1101,88 +1092,6 @@ exp_cosine_decay_on:
     
     save_model: False
     video_snapshot: False
-
-# Experiment: cosine decay sweep
-exp_cosine_decay_off:
-  name: exp_cosine_decay_off
-  method: grid
-  sweep_parameters:
-    prompt: 
-      # hamburger: "a photo of a hamburger"
-      icecream: "a photo of an ice cream"
-      cactus: "a small saguaro cactus planted in a clay pot"
-      # tulip: "a photo of a tulip"
-    
-  # fixed parameters
-  fixed_parameters:
-    repulsion_type: 'rlsd'
-    kernel_type: 'rbf'
-    
-    # adaptive_lambda: False
-    lambda_repulsion: 1000
-
-    iters: 1000
-    schedule_iters: 1500
-    # lambda_repulsion: 1000 
-
-    seed: 42
-    guidance_scale: 50
-
-    
-    num_particles: 8
-    force_same_t: True
-    force_same_noise: True
-    anneal_timestep: True
-    feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
-
-    use_cosine_decay: False
-
-
-    rbf_beta: 0.5
-    # cosine_beta: 0.5
-    # cosine_eps_shift: 1e-3
-
-    invert_bg_prob: 0.5
-
-    eval_H: 512 
-    eval_W: 512
-
-    eval_radius: # not to crop the object adjust the radius
-      hamburger: 3.0
-      icecream: 4.0
-      cactus: 4.0
-      tulip: 4.0
-
-    density_start_iter: 0
-    density_end_iter: 3000
-    densification_interval: 50
-    densify_grad_threshold: 0.01
-
-    opacity_reset_interval: 700 # default
-    opacity_lr: 0.003
-
-  settings:
-    # visualize
-    visualize: True
-    save_iid: False
-    visualize_fixed_viewpoint: True
-    visualize_fixed_viewpoint_interval: 100
-
-    # metrics
-    metrics: True
-    quantitative_metrics_interval: 50
-    num_views: 8
-
-    # options
-    losses_interval: 10
-    efficiency_interval: 10 
-    enable_lpips: False # disable lpips for faster training
-
-    save_model: False
-    video_snapshot: False
-
-    save_features: False
-    # save_features_interval: 250
 
 
 exp_opacity_lr:
@@ -1190,12 +1099,14 @@ exp_opacity_lr:
   method: grid
   sweep_parameters:
     # opacity_lr: [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05]
-    opacity_lr: [0.001, 0.003, 0.005, 0.01, 0.03, 0.05]
+    opacity_lr: [0.001, 0.003, 0.005, 0.01, 0.05]
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
-      # cactus: "a small saguaro cactus planted in a clay pot"
-      tulip: "a photo of a tulip"
+      cactus: "a small saguaro cactus planted in a clay pot"
+      # tulip: "a photo of a tulip"
+      # sundae: "an ice cream sundae"
+      # bulldozer: "a bulldozer made out of toy bricks"
 
   # fixed parameters
   fixed_parameters:
@@ -1232,6 +1143,8 @@ exp_opacity_lr:
       icecream: 4.0
       cactus: 4.0
       tulip: 4.0
+      sundae: 4.0
+      bulldozer: 4.5
 
     density_start_iter: 0
     density_end_iter: 3000
@@ -1262,5 +1175,3 @@ exp_opacity_lr:
 
     save_features: False
     # save_features_interval: 250
-
-# ------------------------------------------------------------ #
