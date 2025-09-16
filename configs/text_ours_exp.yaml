@@ -21,11 +21,11 @@ exp0_baseline: # same noise: diversity minimization and same with ours
   sweep_parameters:
     repulsion_type: ['wo']
     prompt: 
-      hamburger: "a photo of a hamburger"
+      # hamburger: "a photo of a hamburger"
       icecream: "a photo of an ice cream"
       cactus: "a small saguaro cactus planted in a clay pot"
       tulip: "a photo of a tulip"
-      sundae: "an ice cream sundae"
+      # sundae: "an ice cream sundae"
       bulldozer: "a bulldozer made out of toy bricks"
     
     # seed: [42]
@@ -36,7 +36,7 @@ exp0_baseline: # same noise: diversity minimization and same with ours
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
     
     force_same_t: True
     force_same_noise: True
@@ -113,7 +113,7 @@ exp1_repulsion_kernel:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
     
     force_same_t: True
     force_same_noise: True
@@ -121,7 +121,7 @@ exp1_repulsion_kernel:
   
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     cosine_beta: 0.5
     cosine_eps_shift: 1e-3
 
@@ -197,7 +197,7 @@ exp2_lambda_coarse:
     # adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     num_particles: 8
     force_same_t: True
@@ -206,7 +206,7 @@ exp2_lambda_coarse:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -283,7 +283,7 @@ exp3_lambda_fine:
     # adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     num_particles: 8
     force_same_t: True
@@ -292,7 +292,7 @@ exp3_lambda_fine:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -377,7 +377,7 @@ exp4_guidance_scale:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -456,7 +456,7 @@ exp5_rbf_beta:
     iters: 1000
     schedule_iters: 1500
 
-    guidance_scale: 50
+    guidance_scale: 30
     
     num_particles: 8
     force_same_t: True
@@ -537,7 +537,7 @@ exp6_ours_best:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
     
     force_same_t: True
     force_same_noise: True
@@ -545,7 +545,7 @@ exp6_ours_best:
   
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -626,14 +626,14 @@ exp_feature_layer:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     num_particles: 8
     force_same_t: True
     force_same_noise: True
     anneal_timestep: True
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 1.0
     # cosine_eps_shift: 1e-3
 
@@ -708,7 +708,7 @@ exp_num_particles:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     seed: 42
     force_same_t: True
@@ -717,7 +717,7 @@ exp_num_particles:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -868,7 +868,7 @@ exp0_baseline_indep: # different noise: diversity maximization
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
     
     force_same_t: True
     force_same_noise: False
@@ -943,7 +943,7 @@ exp_num_pts:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     seed: 42
     num_particles: 8
@@ -953,7 +953,7 @@ exp_num_pts:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -1038,7 +1038,7 @@ exp_cosine_decay:
 
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     seed: 42
     num_particles: 8
@@ -1048,7 +1048,7 @@ exp_cosine_decay:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -1116,7 +1116,7 @@ exp_opacity_lr:
     # adaptive_lambda: False
     iters: 1000
     schedule_iters: 1500
-    guidance_scale: 50
+    guidance_scale: 30
 
     seed: 42
     num_particles: 8
@@ -1126,7 +1126,7 @@ exp_opacity_lr:
 
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 0.5
+    rbf_beta: 1.5
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
