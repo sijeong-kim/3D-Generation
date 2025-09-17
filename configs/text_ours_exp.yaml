@@ -179,8 +179,8 @@ exp1_repulsion_kernel:
     repulsion_type: ['rlsd', 'svgd']
     kernel_type: ['cosine', 'rbf']
 
-    seed : [42, 123]
-    # seed: [42, 123, 456, 789]
+    # seed : [42, 123]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -342,8 +342,8 @@ exp3_lambda_fine:
       # sundae: "an ice cream sundae"
       bulldozer: "a bulldozer made out of toy bricks"
 
-    seed: [42, 123]
-    # seed: [42, 123, 456, 789]
+    # seed: [42, 123]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -425,8 +425,8 @@ exp4_guidance_scale:
       # sundae: "an ice cream sundae"
       bulldozer: "a bulldozer made out of toy bricks"
 
-    seed: [42, 123]
-    # seed: [42, 123, 456, 789]
+    # seed: [42, 123]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -507,8 +507,8 @@ exp5_rbf_beta:
       # sundae: "an ice cream sundae"
       bulldozer: "a bulldozer made out of toy bricks"
 
-    seed: [42, 123]
-    # seed: [42, 123, 456, 789]
+    # seed: [42, 123]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -589,7 +589,7 @@ exp6_ours_best:
       sundae: "an ice cream sundae"
       
     # seed: [42]
-    seed: [42, 123, 456, 789, 321]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
@@ -673,7 +673,7 @@ exp6_baseline:
       sundae: "an ice cream sundae"
       
     # seed: [42]
-    seed: [42, 123, 456, 789, 321]
+    seed: [42, 123, 456, 789]
 
   # fixed parameters
   fixed_parameters:
