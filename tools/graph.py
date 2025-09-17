@@ -1,3 +1,4 @@
+import os
 from graphviz import Source
 
 dot_code = """
@@ -23,5 +24,7 @@ digraph G {
 }
 """
 
-src = Source(dot_code, filename="diagram", format="png")
+from os import makedirs
+makedirs("./results", exist_ok=True)
+src = Source(dot_code, filename="./results/diagram.png", format="png")
 src.render()  # diagram.png 생성
