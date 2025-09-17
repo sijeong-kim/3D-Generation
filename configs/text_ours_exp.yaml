@@ -597,7 +597,7 @@ exp6_ours_best:
     repulsion_type: 'rlsd'
     kernel_type: 'rbf'
 
-    lambda_repulsion: 1000
+    lambda_repulsion: 1400
 
     iters: 1000
     schedule_iters: 1500
@@ -609,7 +609,7 @@ exp6_ours_best:
   
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 1.5
+    rbf_beta: 1.0
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
@@ -680,7 +680,7 @@ exp6_baseline:
 
     repulsion_type: 'wo'
 
-    lambda_repulsion: 1000
+    lambda_repulsion: 1400
 
     iters: 1000
     schedule_iters: 1500
@@ -692,7 +692,7 @@ exp6_baseline:
   
     feature_layer: 'last' # 2: early, 5: mid, 11: last -> 11
 
-    rbf_beta: 1.5
+    rbf_beta: 1.0
     # cosine_beta: 0.5
     # cosine_eps_shift: 1e-3
 
