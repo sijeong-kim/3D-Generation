@@ -26,5 +26,5 @@ digraph G {
 
 from os import makedirs
 makedirs("./results", exist_ok=True)
-src = Source(dot_code, filename="./results/diagram.png", format="png")
+src = Source(dot_code, filename="./results/structure/diagram", format="png")
 src.render()  # diagram.png 생성
