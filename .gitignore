@@ -231,3 +231,6 @@ debug/
 *.out
 
 results/
+
+
+.DS_Store
