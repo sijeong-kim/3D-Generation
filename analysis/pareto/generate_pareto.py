@@ -125,9 +125,11 @@ def select_utopia_index(df: pd.DataFrame, fidelity_col: str, diversity_col: str,
 #         ax.text(x_off, y_off, str(lab), fontsize=12, ha=ha, va=va,
 #                 bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='none', alpha=0.85))
 
-def annotate_points(ax, x_vals, y_vals, labels, edge=0.88):
+def annotate_points(ax, x_vals, y_vals, labels, edge=0.88, selected_idx: int | None = None, offset_default: float = 0.03, offset_selected: float = 0.033, special_positions: dict | None = None):
     """
-    edge: 0~1 사이. 0.88이면 우상단 12% 안쪽을 '가장자리'로 간주.
+    edge: 0~1. 0.88 means treat top/right 12% as boundary.
+    selected_idx: index to use a slightly larger offset (offset_selected)
+    special_positions: optional mapping {label_text: 'rb'|'rt'|'lb'|'lt'}
     """
     x_arr = np.asarray(x_vals, dtype=float)
     y_arr = np.asarray(y_vals, dtype=float)
@@ -137,14 +139,16 @@ def annotate_points(ax, x_vals, y_vals, labels, edge=0.88):
     # 데이터 범위 기준 오프셋(라벨 간격)
     x_rng = float(np.nanmax(x_arr) - np.nanmin(x_arr)) if np.nanmax(x_arr) != np.nanmin(x_arr) else 1.0
     y_rng = float(np.nanmax(y_arr) - np.nanmin(y_arr)) if np.nanmax(y_arr) != np.nanmin(y_arr) else 1.0
-    dx = 0.032 * x_rng
-    dy = 0.032 * y_rng
+    def get_offsets(i: int):
+        frac = offset_selected if (selected_idx is not None and i == selected_idx) else offset_default
+        return frac * x_rng, frac * y_rng
 
     # data -> axes(0~1) 변환기
     to_axes = ax.transAxes.inverted().transform
     to_disp = ax.transData.transform
 
-    for xi, yi, lab in zip(x_arr, y_arr, labels):
+    for i, (xi, yi, lab) in enumerate(zip(x_arr, y_arr, labels)):
+        dx, dy = get_offsets(i)
         # 기본: 우상단(top-right)
         x_off = xi + dx
         y_off = yi + dy
@@ -153,15 +157,25 @@ def annotate_points(ax, x_vals, y_vals, labels, edge=0.88):
         # 현재 점의 위치를 Axes 비율 좌표(0~1)로 변환
         ux, uy = to_axes(to_disp((xi, yi)))
 
-        # 규칙: (top-right) → (bottom-right) → (bottom-left) → (top-left)
-        # 1) 위쪽에 너무 가까우면 아래로
-        if uy > edge:
-            y_off = yi - dy
-            va = 'top'
-        # 2) 오른쪽에 너무 가까우면 왼쪽으로
-        if ux > edge:
-            x_off = xi - dx
-            ha = 'right'
+        # Forced positions override
+        if special_positions is not None and str(lab) in special_positions:
+            pos = str(special_positions[str(lab)]).lower()
+            if pos in ('rb','br','right-bottom','bottom-right'):
+                x_off, y_off, ha, va = xi + dx, yi - dy, 'left', 'top'
+            elif pos in ('rt','tr','right-top','top-right'):
+                x_off, y_off, ha, va = xi + dx, yi + dy, 'left', 'bottom'
+            elif pos in ('lb','bl','left-bottom','bottom-left'):
+                x_off, y_off, ha, va = xi - dx, yi - dy, 'right', 'top'
+            elif pos in ('lt','tl','left-top','top-left'):
+                x_off, y_off, ha, va = xi - dx, yi + dy, 'right', 'bottom'
+        else:
+            # 규칙: (top-right) → (bottom-right) → (bottom-left) → (top-left)
+            if uy > edge:
+                y_off = yi - dy
+                va = 'top'
+            if ux > edge:
+                x_off = xi - dx
+                ha = 'right'
         # 3) 위+오른쪽 모두 가까우면 (이미 아래+왼쪽이 적용됨) == bottom-left
         # 4) 왼쪽/아래쪽 가장자리 쪽도 처리하고 싶다면 추가 분기:
         #    if ux < 1-edge: (keep right) / if uy < 1-edge: (keep top)
@@ -172,7 +186,7 @@ def annotate_points(ax, x_vals, y_vals, labels, edge=0.88):
             bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='none', alpha=0.85)
         )
 
-def save_single(base_path: Path, x, y, *, xlabel: str, ylabel: str, cvals=None, cmap=None, cbar_label: str|None=None, sel_x=None, sel_y=None, point_labels=None):
+def save_single(base_path: Path, x, y, *, xlabel: str, ylabel: str, cvals=None, cmap=None, cbar_label: str|None=None, sel_x=None, sel_y=None, point_labels=None, selected_idx: int | None = None, special_positions: dict | None = None):
     fig, ax = plt.subplots(figsize=(6.2,4.2))
     if cvals is not None and cmap is not None:
         sc = ax.scatter(x, y, c=cvals, cmap=cmap, s=200, alpha=0.7)
@@ -196,7 +210,7 @@ def save_single(base_path: Path, x, y, *, xlabel: str, ylabel: str, cvals=None, 
     if sel_x is not None and sel_y is not None:
         add_crosshair(ax, sel_x, sel_y)
     if point_labels is not None:
-        annotate_points(ax, x, y, point_labels)
+        annotate_points(ax, x, y, point_labels, selected_idx=selected_idx, special_positions=special_positions)
     ax.grid(True, linestyle='--', alpha=0.25)
     fig.tight_layout(); fig.savefig(base_path.with_suffix('.png'), bbox_inches='tight'); fig.savefig(base_path.with_suffix('.pdf'), bbox_inches='tight'); plt.close(fig)
 
@@ -226,21 +240,21 @@ def repulsion_kernel_pareto():
         axes[0].set_xlabel('Diversity'); axes[0].set_ylabel('Fidelity')
         sel_idx = select_utopia_index(df, 'fidelity_mean_mean', 'diversity_mean_mean', 'cross_consistency_mean_mean')
         add_crosshair(axes[0], df['diversity_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], df['method'])
+        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], df['method'], selected_idx=sel_idx)
         # Fidelity vs Cross-Consistency (consistency on x-axis)
         axes[1].scatter(df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], s=200, alpha=0.7)
         _set_padded_limits(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'])
         axes[1].set_xlabel('Cross-Consistency'); axes[1].set_ylabel('Fidelity')
         axes[1].xaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[1], df['cross_consistency_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], df['method'])
+        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], df['method'], selected_idx=sel_idx)
         # Diversity vs Cross-Consistency (diversity on x-axis)
         axes[2].scatter(df['diversity_mean_mean'], df['cross_consistency_mean_mean'], s=200, alpha=0.7)
         _set_padded_limits(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'])
         axes[2].set_xlabel('Diversity'); axes[2].set_ylabel('Cross-Consistency')
         axes[2].yaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[2], df['diversity_mean_mean'].iloc[sel_idx], df['cross_consistency_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], df['method'])
+        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], df['method'], selected_idx=sel_idx)
         fig.tight_layout(); fig.savefig(REP_KERNEL_PARETO/'repulsion_methods_pareto.png', bbox_inches='tight'); fig.savefig(REP_KERNEL_PARETO/'repulsion_methods_pareto.pdf', bbox_inches='tight'); plt.close(fig)
         # separate saves under pareto
         save_single(REP_KERNEL_PARETO/'repulsion_methods_fidelity_vs_diversity', df['diversity_mean_mean'], df['fidelity_mean_mean'], xlabel='Diversity', ylabel='Fidelity', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['fidelity_mean_mean'].iloc[sel_idx], point_labels=df['method'])
@@ -259,19 +273,19 @@ def repulsion_kernel_pareto():
             _set_padded_limits(axes[0], dfk['diversity_mean_mean'], dfk['fidelity_mean_mean'])
             axes[0].set_xlabel('Diversity'); axes[0].set_ylabel('Fidelity')
             add_crosshair(axes[0], dfk['diversity_mean_mean'].iloc[sel_k], dfk['fidelity_mean_mean'].iloc[sel_k])
-            annotate_points(axes[0], dfk['diversity_mean_mean'], dfk['fidelity_mean_mean'], dfk['kernel'])
+            annotate_points(axes[0], dfk['diversity_mean_mean'], dfk['fidelity_mean_mean'], dfk['kernel'], selected_idx=sel_k)
             # F vs C
             axes[1].scatter(dfk['cross_consistency_mean_mean'], dfk['fidelity_mean_mean'], s=220, alpha=0.85)
             _set_padded_limits(axes[1], dfk['cross_consistency_mean_mean'], dfk['fidelity_mean_mean'])
             axes[1].set_xlabel('Cross-Consistency'); axes[1].set_ylabel('Fidelity'); axes[1].xaxis.set_major_locator(mticker.MaxNLocator(4))
             add_crosshair(axes[1], dfk['cross_consistency_mean_mean'].iloc[sel_k], dfk['fidelity_mean_mean'].iloc[sel_k])
-            annotate_points(axes[1], dfk['cross_consistency_mean_mean'], dfk['fidelity_mean_mean'], dfk['kernel'])
+            annotate_points(axes[1], dfk['cross_consistency_mean_mean'], dfk['fidelity_mean_mean'], dfk['kernel'], selected_idx=sel_k)
             # D vs C (diversity on x-axis)
             axes[2].scatter(dfk['diversity_mean_mean'], dfk['cross_consistency_mean_mean'], s=220, alpha=0.85)
             _set_padded_limits(axes[2], dfk['diversity_mean_mean'], dfk['cross_consistency_mean_mean'])
             axes[2].set_xlabel('Diversity'); axes[2].set_ylabel('Cross-Consistency'); axes[2].yaxis.set_major_locator(mticker.MaxNLocator(4))
             add_crosshair(axes[2], dfk['diversity_mean_mean'].iloc[sel_k], dfk['cross_consistency_mean_mean'].iloc[sel_k])
-            annotate_points(axes[2], dfk['diversity_mean_mean'], dfk['cross_consistency_mean_mean'], dfk['kernel'])
+            annotate_points(axes[2], dfk['diversity_mean_mean'], dfk['cross_consistency_mean_mean'], dfk['kernel'], selected_idx=sel_k)
             fig.tight_layout(); fig.savefig(REP_KERNEL_PARETO/'kernel_types_pareto.png', bbox_inches='tight'); fig.savefig(REP_KERNEL_PARETO/'kernel_types_pareto.pdf', bbox_inches='tight'); plt.close(fig)
             # single panels under pareto
             save_single(REP_KERNEL_PARETO/'kernel_types_fidelity_vs_diversity', dfk['diversity_mean_mean'], dfk['fidelity_mean_mean'], xlabel='Diversity', ylabel='Fidelity', sel_x=dfk['diversity_mean_mean'].iloc[sel_k], sel_y=dfk['fidelity_mean_mean'].iloc[sel_k], point_labels=dfk['kernel'])
@@ -293,22 +307,25 @@ def repulsion_kernel_pareto():
             _set_padded_limits(axes[0], df4['diversity_mean_mean'], df4['fidelity_mean_mean'])
             axes[0].set_xlabel('Diversity'); axes[0].set_ylabel('Fidelity')
             add_crosshair(axes[0], df4['diversity_mean_mean'].iloc[sel], df4['fidelity_mean_mean'].iloc[sel])
-            annotate_points(axes[0], df4['diversity_mean_mean'], df4['fidelity_mean_mean'], labels)
+            annotate_points(axes[0], df4['diversity_mean_mean'], df4['fidelity_mean_mean'], labels, selected_idx=sel, special_positions={"SVGD-RBF":"lt"})
             axes[1].scatter(df4['cross_consistency_mean_mean'], df4['fidelity_mean_mean'], s=220, alpha=0.85)
             _set_padded_limits(axes[1], df4['cross_consistency_mean_mean'], df4['fidelity_mean_mean'])
             axes[1].set_xlabel('Cross-Consistency'); axes[1].set_ylabel('Fidelity'); axes[1].xaxis.set_major_locator(mticker.MaxNLocator(4))
             add_crosshair(axes[1], df4['cross_consistency_mean_mean'].iloc[sel], df4['fidelity_mean_mean'].iloc[sel])
-            annotate_points(axes[1], df4['cross_consistency_mean_mean'], df4['fidelity_mean_mean'], labels)
+            annotate_points(axes[1], df4['cross_consistency_mean_mean'], df4['fidelity_mean_mean'], labels, selected_idx=sel)
             axes[2].scatter(df4['diversity_mean_mean'], df4['cross_consistency_mean_mean'], s=220, alpha=0.85)
             _set_padded_limits(axes[2], df4['diversity_mean_mean'], df4['cross_consistency_mean_mean'])
             axes[2].set_xlabel('Diversity'); axes[2].set_ylabel('Cross-Consistency'); axes[2].yaxis.set_major_locator(mticker.MaxNLocator(4))
             add_crosshair(axes[2], df4['diversity_mean_mean'].iloc[sel], df4['cross_consistency_mean_mean'].iloc[sel])
-            annotate_points(axes[2], df4['diversity_mean_mean'], df4['cross_consistency_mean_mean'], labels)
+            annotate_points(axes[2], df4['diversity_mean_mean'], df4['cross_consistency_mean_mean'], labels, selected_idx=sel, special_positions={"SVGD-COS":"rt","SVGD-RBF":"lt"})
             fig.tight_layout(); fig.savefig(REP_KERNEL_PARETO/'method_kernel_combined_pareto.png', bbox_inches='tight'); fig.savefig(REP_KERNEL_PARETO/'method_kernel_combined_pareto.pdf', bbox_inches='tight'); plt.close(fig)
             # single panels
-            save_single(REP_KERNEL_PARETO/'method_kernel_fidelity_vs_diversity', df4['diversity_mean_mean'], df4['fidelity_mean_mean'], xlabel='Diversity', ylabel='Fidelity', sel_x=df4['diversity_mean_mean'].iloc[sel], sel_y=df4['fidelity_mean_mean'].iloc[sel], point_labels=labels)
+            mk_fd_specials = {"SVGD-RBF": "lb"}
+            save_single(REP_KERNEL_PARETO/'method_kernel_fidelity_vs_diversity', df4['diversity_mean_mean'], df4['fidelity_mean_mean'], xlabel='Diversity', ylabel='Fidelity', sel_x=df4['diversity_mean_mean'].iloc[sel], sel_y=df4['fidelity_mean_mean'].iloc[sel], point_labels=labels, selected_idx=sel, special_positions=mk_fd_specials)
             save_single(REP_KERNEL_PARETO/'method_kernel_fidelity_vs_consistency', df4['cross_consistency_mean_mean'], df4['fidelity_mean_mean'], xlabel='Cross-Consistency', ylabel='Fidelity', sel_x=df4['cross_consistency_mean_mean'].iloc[sel], sel_y=df4['fidelity_mean_mean'].iloc[sel], point_labels=labels)
-            save_single(REP_KERNEL_PARETO/'method_kernel_consistency_vs_diversity', df4['diversity_mean_mean'], df4['cross_consistency_mean_mean'], xlabel='Diversity', ylabel='Cross-Consistency', sel_x=df4['diversity_mean_mean'].iloc[sel], sel_y=df4['cross_consistency_mean_mean'].iloc[sel], point_labels=labels)
+            # Force SVGD-COS label to bottom (right-bottom) for clarity
+            mk_specials = {"SVGD-COS": "rt", "SVGD-RBF": "lt"}
+            save_single(REP_KERNEL_PARETO/'method_kernel_consistency_vs_diversity', df4['diversity_mean_mean'], df4['cross_consistency_mean_mean'], xlabel='Diversity', ylabel='Cross-Consistency', sel_x=df4['diversity_mean_mean'].iloc[sel], sel_y=df4['cross_consistency_mean_mean'].iloc[sel], point_labels=labels, selected_idx=sel, special_positions=mk_specials)
 
 def lambda_cfg_beta_pareto():
     # Lambda
@@ -321,17 +338,17 @@ def lambda_cfg_beta_pareto():
         _set_padded_limits(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'])
         axes[0].set_xlabel('Diversity'); axes[0].set_ylabel('Fidelity');
         add_crosshair(axes[0], df['diversity_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['lambda_repulsion']])
+        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['lambda_repulsion']], selected_idx=sel_idx)
         sc1 = axes[1].scatter(df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], c=df['lambda_repulsion'], cmap='viridis', s=200, alpha=0.7)
         _set_padded_limits(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'])
         axes[1].set_xlabel('Cross-Consistency'); axes[1].set_ylabel('Fidelity'); axes[1].xaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[1], df['cross_consistency_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['lambda_repulsion']])
+        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['lambda_repulsion']], selected_idx=sel_idx)
         sc2 = axes[2].scatter(df['diversity_mean_mean'], df['cross_consistency_mean_mean'], c=df['lambda_repulsion'], cmap='viridis', s=200, alpha=0.7)
         _set_padded_limits(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'])
         axes[2].set_xlabel('Diversity'); axes[2].set_ylabel('Cross-Consistency'); axes[2].yaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[2], df['diversity_mean_mean'].iloc[sel_idx], df['cross_consistency_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], [f"{int(v)}" for v in df['lambda_repulsion']])
+        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], [f"{int(v)}" for v in df['lambda_repulsion']], selected_idx=sel_idx, special_positions={"1000":"rb"})
         # One colorbar only, on the right of the last subplot
         divider = make_axes_locatable(axes[2])
         cax = divider.append_axes("right", size="3.5%", pad=0.2)
@@ -340,7 +357,9 @@ def lambda_cfg_beta_pareto():
         # separate saves under pareto
         save_single(HYPERPARAM_PARETO/'lambda_repulsion_fidelity_vs_diversity', df['diversity_mean_mean'], df['fidelity_mean_mean'], xlabel='Diversity', ylabel='Fidelity', cvals=df['lambda_repulsion'], cmap='viridis', cbar_label='Lambda Value', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['fidelity_mean_mean'].iloc[sel_idx], point_labels=[f"{int(v)}" for v in df['lambda_repulsion']])
         save_single(HYPERPARAM_PARETO/'lambda_repulsion_fidelity_vs_consistency', df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], xlabel='Cross-Consistency', ylabel='Fidelity', cvals=df['lambda_repulsion'], cmap='viridis', cbar_label='Lambda Value', sel_x=df['cross_consistency_mean_mean'].iloc[sel_idx], sel_y=df['fidelity_mean_mean'].iloc[sel_idx], point_labels=[f"{int(v)}" for v in df['lambda_repulsion']])
-        save_single(HYPERPARAM_PARETO/'lambda_repulsion_consistency_vs_diversity', df['diversity_mean_mean'], df['cross_consistency_mean_mean'], xlabel='Diversity', ylabel='Cross-Consistency', cvals=df['lambda_repulsion'], cmap='viridis', cbar_label='Lambda Value', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['cross_consistency_mean_mean'].iloc[sel_idx], point_labels=[f"{int(v)}" for v in df['lambda_repulsion']])
+        # Force label for 1000 to right-bottom for dissertation figure clarity
+        specials = {"1000": "rb"}
+        save_single(HYPERPARAM_PARETO/'lambda_repulsion_consistency_vs_diversity', df['diversity_mean_mean'], df['cross_consistency_mean_mean'], xlabel='Diversity', ylabel='Cross-Consistency', cvals=df['lambda_repulsion'], cmap='viridis', cbar_label='Lambda Value', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['cross_consistency_mean_mean'].iloc[sel_idx], point_labels=[f"{int(v)}" for v in df['lambda_repulsion']], selected_idx=sel_idx, special_positions=specials)
 
     # CFG
     cfg = RESULTS_CSV / 'exp4_guidance_scale' / 'Guidance_Scale_Analysis_Parameter_Analysis_Averaged.csv'
@@ -352,17 +371,17 @@ def lambda_cfg_beta_pareto():
         _set_padded_limits(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'])
         axes[0].set_xlabel('Diversity'); axes[0].set_ylabel('Fidelity')
         add_crosshair(axes[0], df['diversity_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['guidance_scale']])
+        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['guidance_scale']], selected_idx=sel_idx)
         sc1 = axes[1].scatter(df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], c=df['guidance_scale'], cmap='plasma', s=200, alpha=0.7)
         _set_padded_limits(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'])
         axes[1].set_xlabel('Cross-Consistency'); axes[1].set_ylabel('Fidelity'); axes[1].xaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[1], df['cross_consistency_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['guidance_scale']])
+        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], [f"{int(v)}" for v in df['guidance_scale']], selected_idx=sel_idx)
         sc2 = axes[2].scatter(df['diversity_mean_mean'], df['cross_consistency_mean_mean'], c=df['guidance_scale'], cmap='plasma', s=200, alpha=0.7)
         _set_padded_limits(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'])
         axes[2].set_xlabel('Diversity'); axes[2].set_ylabel('Cross-Consistency'); axes[2].yaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[2], df['diversity_mean_mean'].iloc[sel_idx], df['cross_consistency_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], [f"{int(v)}" for v in df['guidance_scale']])
+        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], [f"{int(v)}" for v in df['guidance_scale']], selected_idx=sel_idx)
         divider = make_axes_locatable(axes[2])
         cax = divider.append_axes("right", size="3.5%", pad=0.2)
         fig.colorbar(sc, cax=cax, label='CFG')
@@ -381,24 +400,25 @@ def lambda_cfg_beta_pareto():
         _set_padded_limits(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'])
         axes[0].set_xlabel('Diversity'); axes[0].set_ylabel('Fidelity')
         add_crosshair(axes[0], df['diversity_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], [f"{v:.1f}" for v in df['rbf_beta']])
+        annotate_points(axes[0], df['diversity_mean_mean'], df['fidelity_mean_mean'], [f"{v:.1f}" for v in df['rbf_beta']], selected_idx=sel_idx)
         sc1 = axes[1].scatter(df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], c=df['rbf_beta'], cmap='coolwarm', s=200, alpha=0.7)
         _set_padded_limits(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'])
         axes[1].set_xlabel('Cross-Consistency'); axes[1].set_ylabel('Fidelity'); axes[1].xaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[1], df['cross_consistency_mean_mean'].iloc[sel_idx], df['fidelity_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], [f"{v:.1f}" for v in df['rbf_beta']])
+        annotate_points(axes[1], df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], [f"{v:.1f}" for v in df['rbf_beta']], selected_idx=sel_idx)
         sc2 = axes[2].scatter(df['diversity_mean_mean'], df['cross_consistency_mean_mean'], c=df['rbf_beta'], cmap='coolwarm', s=200, alpha=0.7)
         _set_padded_limits(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'])
         axes[2].set_xlabel('Diversity'); axes[2].set_ylabel('Cross-Consistency'); axes[2].yaxis.set_major_locator(mticker.MaxNLocator(4))
         add_crosshair(axes[2], df['diversity_mean_mean'].iloc[sel_idx], df['cross_consistency_mean_mean'].iloc[sel_idx])
-        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], [f"{v:.1f}" for v in df['rbf_beta']])
+        annotate_points(axes[2], df['diversity_mean_mean'], df['cross_consistency_mean_mean'], [f"{v:.1f}" for v in df['rbf_beta']], selected_idx=sel_idx, special_positions={"1.0":"lb"})
         divider = make_axes_locatable(axes[2])
         cax = divider.append_axes("right", size="3.5%", pad=0.2)
         fig.colorbar(sc, cax=cax, label='RBF Beta')
         fig.tight_layout(); fig.savefig(HYPERPARAM_PARETO/'rbf_beta_pareto.png', bbox_inches='tight'); fig.savefig(HYPERPARAM_PARETO/'rbf_beta_pareto.pdf', bbox_inches='tight'); plt.close(fig)
         save_single(HYPERPARAM_PARETO/'rbf_beta_fidelity_vs_diversity', df['diversity_mean_mean'], df['fidelity_mean_mean'], xlabel='Diversity', ylabel='Fidelity', cvals=df['rbf_beta'], cmap='coolwarm', cbar_label='RBF Beta', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['fidelity_mean_mean'].iloc[sel_idx], point_labels=[f"{v:.1f}" for v in df['rbf_beta']])
         save_single(HYPERPARAM_PARETO/'rbf_beta_fidelity_vs_consistency', df['cross_consistency_mean_mean'], df['fidelity_mean_mean'], xlabel='Cross-Consistency', ylabel='Fidelity', cvals=df['rbf_beta'], cmap='coolwarm', cbar_label='RBF Beta', sel_x=df['cross_consistency_mean_mean'].iloc[sel_idx], sel_y=df['fidelity_mean_mean'].iloc[sel_idx], point_labels=[f"{v:.1f}" for v in df['rbf_beta']])
-        save_single(HYPERPARAM_PARETO/'rbf_beta_consistency_vs_diversity', df['diversity_mean_mean'], df['cross_consistency_mean_mean'], xlabel='Diversity', ylabel='Cross-Consistency', cvals=df['rbf_beta'], cmap='coolwarm', cbar_label='RBF Beta', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['cross_consistency_mean_mean'].iloc[sel_idx], point_labels=[f"{v:.1f}" for v in df['rbf_beta']])
+        rb_specials = {"1.0": "lb"}
+        save_single(HYPERPARAM_PARETO/'rbf_beta_consistency_vs_diversity', df['diversity_mean_mean'], df['cross_consistency_mean_mean'], xlabel='Diversity', ylabel='Cross-Consistency', cvals=df['rbf_beta'], cmap='coolwarm', cbar_label='RBF Beta', sel_x=df['diversity_mean_mean'].iloc[sel_idx], sel_y=df['cross_consistency_mean_mean'].iloc[sel_idx], point_labels=[f"{v:.1f}" for v in df['rbf_beta']], selected_idx=sel_idx, special_positions=rb_specials)
 
 def combined_fd_1x3():
     # Build three panels: methods, kernels, method×kernel
@@ -435,7 +455,9 @@ def combined_fd_1x3():
         idx = select_utopia_index(df_tmp, 'fidelity', 'diversity', 'consistency') if len(y) else None
         if idx is not None:
             add_crosshair(ax, x[idx], y[idx])
-        annotate_points(ax, x, y, labels)
+        # specials per panel
+        specials = {"SVGD-COS":"rb"} if 'Method×Kernel' in title else None
+        annotate_points(ax, x, y, labels, selected_idx=idx, special_positions=specials)
         ax.set_xlabel('Diversity'); ax.set_ylabel('Fidelity'); ax.set_title(title)
         ax.grid(True, linestyle='--', alpha=0.3)
     fig.tight_layout()
@@ -526,13 +548,16 @@ def hyperparams_fd_1x3():
         # annotate with parameter values
         if 'lambda_repulsion' in df.columns:
             labels = [f"{int(v)}" for v in df['lambda_repulsion']]
+            specials = {"1000":"rb"}
         elif 'guidance_scale' in df.columns:
             labels = [f"{int(v)}" for v in df['guidance_scale']]
+            specials = None
         elif 'rbf_beta' in df.columns:
             labels = [f"{v:.1f}" for v in df['rbf_beta']]
+            specials = {"1.0":"lb"}
         else:
             labels = ['' for _ in range(len(x))]
-        annotate_points(ax, x, y, labels)
+        annotate_points(ax, x, y, labels, selected_idx=sel_idx, special_positions=specials)
         ax.set_xlabel('Diversity'); ax.set_ylabel('Fidelity'); ax.set_title(title)
         ax.grid(True, linestyle='--', alpha=0.3)
     fig.tight_layout()
