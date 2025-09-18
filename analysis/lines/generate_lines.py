@@ -10,8 +10,10 @@ sns.set_palette('colorblind')
 
 ROOT = Path('/Users/sj/3D-Generation')
 RESULTS_CSV = ROOT / 'results' / 'csv'
-OUT_DIR = ROOT / 'results' / 'lines'
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+HYPERPARAM_DIR = ROOT / 'results' / 'hyperparameters'
+HYPERPARAM_LINES = HYPERPARAM_DIR / 'lines'
+for d in [HYPERPARAM_LINES]:
+    d.mkdir(parents=True, exist_ok=True)
 
 def line_with_ring(ax, x, y, ystd, sel_x, sel_y, xlabel, ylabel):
     ax.plot(x, y, marker='o', linewidth=2)
@@ -36,7 +38,7 @@ def main():
         line_with_ring(axes[0], x, df['fidelity_mean_mean'].values, df['fidelity_mean_std'].values, sel_x, df['fidelity_mean_mean'].iloc[sel_idx], 'Lambda', 'Fidelity')
         line_with_ring(axes[1], x, df['diversity_mean_mean'].values, df['diversity_mean_std'].values, sel_x, df['diversity_mean_mean'].iloc[sel_idx], 'Lambda', 'Diversity')
         line_with_ring(axes[2], x, df['cross_consistency_mean_mean'].values, df['cross_consistency_mean_std'].values, sel_x, df['cross_consistency_mean_mean'].iloc[sel_idx], 'Lambda', 'Consistency')
-        fig.tight_layout(); fig.savefig(OUT_DIR / 'lambda_repulsion_lines.png', bbox_inches='tight'); fig.savefig(OUT_DIR / 'lambda_repulsion_lines.pdf', bbox_inches='tight'); plt.close(fig)
+        fig.tight_layout(); fig.savefig(HYPERPARAM_LINES / 'lambda_repulsion_lines.png', bbox_inches='tight'); fig.savefig(HYPERPARAM_LINES / 'lambda_repulsion_lines.pdf', bbox_inches='tight'); plt.close(fig)
 
     # CFG
     cfg_file = RESULTS_CSV / 'exp4_guidance_scale' / 'Guidance_Scale_Analysis_Parameter_Analysis_Averaged.csv'
@@ -49,7 +51,7 @@ def main():
         line_with_ring(axes[0], x, df['fidelity_mean_mean'].values, df['fidelity_mean_std'].values, sel_x, df['fidelity_mean_mean'].iloc[sel_idx], 'CFG', 'Fidelity')
         line_with_ring(axes[1], x, df['diversity_mean_mean'].values, df['diversity_mean_std'].values, sel_x, df['diversity_mean_mean'].iloc[sel_idx], 'CFG', 'Diversity')
         line_with_ring(axes[2], x, df['cross_consistency_mean_mean'].values, df['cross_consistency_mean_std'].values, sel_x, df['cross_consistency_mean_mean'].iloc[sel_idx], 'CFG', 'Consistency')
-        fig.tight_layout(); fig.savefig(OUT_DIR / 'guidance_scale_lines.png', bbox_inches='tight'); fig.savefig(OUT_DIR / 'guidance_scale_lines.pdf', bbox_inches='tight'); plt.close(fig)
+        fig.tight_layout(); fig.savefig(HYPERPARAM_LINES / 'guidance_scale_lines.png', bbox_inches='tight'); fig.savefig(HYPERPARAM_LINES / 'guidance_scale_lines.pdf', bbox_inches='tight'); plt.close(fig)
 
     # RBF beta
     beta_file = RESULTS_CSV / 'exp5_rbf_beta' / 'RBF_Beta_Parameter_Analysis_Parameter_Analysis_Averaged.csv'
@@ -62,7 +64,7 @@ def main():
         line_with_ring(axes[0], x, df['fidelity_mean_mean'].values, df['fidelity_mean_std'].values, sel_x, df['fidelity_mean_mean'].iloc[sel_idx], 'RBF Beta', 'Fidelity')
         line_with_ring(axes[1], x, df['diversity_mean_mean'].values, df['diversity_mean_std'].values, sel_x, df['diversity_mean_mean'].iloc[sel_idx], 'RBF Beta', 'Diversity')
         line_with_ring(axes[2], x, df['cross_consistency_mean_mean'].values, df['cross_consistency_mean_std'].values, sel_x, df['cross_consistency_mean_mean'].iloc[sel_idx], 'RBF Beta', 'Consistency')
-        fig.tight_layout(); fig.savefig(OUT_DIR / 'rbf_beta_lines.png', bbox_inches='tight'); fig.savefig(OUT_DIR / 'rbf_beta_lines.pdf', bbox_inches='tight'); plt.close(fig)
+        fig.tight_layout(); fig.savefig(HYPERPARAM_LINES / 'rbf_beta_lines.png', bbox_inches='tight'); fig.savefig(HYPERPARAM_LINES / 'rbf_beta_lines.pdf', bbox_inches='tight'); plt.close(fig)
 
 if __name__ == '__main__':
     main()
