@@ -237,6 +237,33 @@ def get_experiment_description(exp_name: str) -> str:
     return descriptions.get(exp_name, f"Experiment: {exp_name}")
 
 
+def get_descriptive_experiment_name(exp_name: str) -> str:
+    """
+    Convert technical experiment names to more descriptive names.
+    
+    Args:
+        exp_name: Technical experiment name
+        
+    Returns:
+        Descriptive experiment name
+    """
+    name_mapping = {
+        "exp0_baseline": "Baseline_Experiment",
+        "exp0_baseline_indep": "Baseline_Independent_Experiment", 
+        "exp1_repulsion_kernel": "Repulsion_Method_and_Kernel_Analysis",
+        "exp2_lambda_coarse": "Lambda_Repulsion_Coarse_Search",
+        "exp3_lambda_fine": "Lambda_Repulsion_Fine_Search",
+        "exp4_guidance_scale": "Guidance_Scale_Analysis",
+        "exp5_rbf_beta": "RBF_Beta_Parameter_Analysis",
+        "exp_feature_layer": "Feature_Layer_Analysis",
+        "exp_num_particles": "Number_of_Particles_Analysis",
+        "exp_num_pts": "Number_of_Points_Analysis",
+        "exp_opacity_lr": "Opacity_Learning_Rate_Analysis",
+        "exp_gaussian_reproduce": "Gaussian_Reproduction_Experiment"
+    }
+    return name_mapping.get(exp_name, exp_name)
+
+
 def create_consolidated_config(experiments: Dict[str, Dict[str, Any]], results_dir: Path) -> None:
     """
     Create consolidated configuration documentation.
@@ -273,12 +300,22 @@ def create_consolidated_config(experiments: Dict[str, Dict[str, Any]], results_d
         exp_params = extract_experiment_parameters(exp_name, config)
         consolidated_config['experiment_suite']['experiments'][exp_name] = exp_params
     
+    # Create global configuration directory
+    global_config_dir = results_dir / "global_config"
+    global_config_dir.mkdir(exist_ok=True)
+    
     # Save consolidated configuration
     config_output_path = results_dir / "experiment_configuration.yaml"
     with open(config_output_path, 'w') as f:
         yaml.dump(consolidated_config, f, default_flow_style=False, sort_keys=False)
     
+    # Also save in global config directory with descriptive name
+    global_config_path = global_config_dir / "All_Experiments_Configuration.yaml"
+    with open(global_config_path, 'w') as f:
+        yaml.dump(consolidated_config, f, default_flow_style=False, sort_keys=False)
+    
     print(f"Saved consolidated configuration to {config_output_path}")
+    print(f"Also saved to global config directory: {global_config_path}")
     
     # Create a simplified summary
     summary_output_path = results_dir / "experiment_summary.md"
@@ -308,7 +345,36 @@ def create_consolidated_config(experiments: Dict[str, Dict[str, Any]], results_d
         for prompt, desc in consolidated_config['prompts'].items():
             f.write(f"- **\"{prompt}\"**: {desc}\n")
     
+    # Also save markdown summary in global config directory with descriptive name
+    global_summary_path = global_config_dir / "All_Experiments_Summary.md"
+    with open(global_summary_path, 'w') as f:
+        f.write("# 3D Generation Experiment Suite\n\n")
+        f.write("## Overview\n\n")
+        f.write(f"Total experiments: {len(experiments)}\n\n")
+        
+        f.write("## Experiments\n\n")
+        for exp_name, config in experiments.items():
+            exp_params = extract_experiment_parameters(exp_name, config)
+            f.write(f"### {exp_name}\n")
+            f.write(f"**Description:** {exp_params['description']}\n\n")
+            
+            if 'parameters' in exp_params:
+                f.write("**Key Parameters:**\n")
+                for param, value in exp_params['parameters'].items():
+                    f.write(f"- {param}: {value}\n")
+                f.write("\n")
+        
+        f.write("## Metrics\n\n")
+        f.write("- **Fidelity**: Image fidelity metric (higher is better)\n")
+        f.write("- **Diversity**: Inter-particle diversity metric (higher is better)\n")
+        f.write("- **Cross-consistency**: Cross-view consistency metric (higher is better)\n\n")
+        
+        f.write("## Prompts\n\n")
+        for prompt, desc in consolidated_config['prompts'].items():
+            f.write(f"- **\"{prompt}\"**: {desc}\n")
+    
     print(f"Saved experiment summary to {summary_output_path}")
+    print(f"Also saved to global config directory: {global_summary_path}")
 
 
 def main():
