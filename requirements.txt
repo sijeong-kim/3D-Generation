@@ -51,3 +51,5 @@ ipykernel
 pytest
 
 PyMCubes
+
+umap-learn

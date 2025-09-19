@@ -680,16 +680,17 @@ class GUI:
                 else:
                     f = self.feature_extractor.extract_cls_from_layer(layer_idx, x)
             if l2_after_each_view:
-                f = F.normalize(f, dim=-1)
+                f = F.normalize(f, dim=-1, eps=1e-12)
             feats_list.append(f)
             i = j
 
         feats = torch.cat(feats_list, dim=0)        # [V*N, D]
         feats = feats.view(V, N, -1)                # [V, N, D]
+
         # 뷰 평균 → 파티클 대표 특징
         particle_feats = feats.mean(dim=0)          # [N, D]
-        particle_feats = F.normalize(particle_feats, dim=-1)
-        view_feats = F.normalize(feats, dim=-1) if not l2_after_each_view else feats  # [V, N, D]
+        particle_feats = F.normalize(particle_feats, dim=-1, eps=1e-12)
+        view_feats = F.normalize(feats, dim=-1, eps=1e-12) if not l2_after_each_view else feats  # [V, N, D]
         return particle_feats, view_feats
 
                 
@@ -697,44 +698,55 @@ class GUI:
     def save_features(self, images, step=None):  # images: [V, N, 3, H, W]
         step = int(self.step if step is None else step)
         # 멀티뷰 → 파티클 대표 특징 뽑기
+        
+        # --- save_features ---
         particle_feats, view_feats = self._extract_particle_features_from_multi_view(
             images_VN_3HW=images,
             layer_idx=self.opt.feature_layer,
-            use_amp=True,
+            use_amp=False,  # force AMP off for saving
             chunk_size=int(getattr(self.opt, "feat_chunk", 64)),
             l2_after_each_view=True,
-        )  # [N, D], [V, N, D]
+        )
 
-        # FP16으로 축소 후 CPU로 비블로킹 복사
-        pf16 = particle_feats.to(torch.float16).contiguous()
-        vf16 = view_feats.to(torch.float16).contiguous()
+        # health log: BEFORE fix
+        orig_bad_p = (~torch.isfinite(particle_feats)).any(dim=1).sum().item()
+        orig_bad_v = (~torch.isfinite(view_feats)).view(-1, view_feats.shape[-1]).any(dim=1).sum().item()
 
-        if torch.cuda.is_available():
-            if self._io_stream is None:
-                self._io_stream = torch.cuda.Stream()
-            with torch.cuda.stream(self._io_stream):
-                pf16_cpu = pf16.to("cpu", non_blocking=True)
-                vf16_cpu = vf16.to("cpu", non_blocking=True)
-            torch.cuda.current_stream().wait_stream(self._io_stream)
-        else:
-            pf16_cpu = pf16
-            vf16_cpu = vf16
+        # repair + renormalize
+        def _finite_renorm(x, eps=1e-12):
+            x = torch.nan_to_num(x, nan=0.0, posinf=0.0, neginf=0.0)
+            n = x.norm(dim=-1, keepdim=True).clamp_min(eps)
+            return x / n
 
-        out_path = os.path.join(self.features_outdir, f"step_{step:06d}.pt")
+        particle_feats = _finite_renorm(particle_feats)
+        view_feats     = _finite_renorm(view_feats)
+
+        # health log: AFTER fix
+        post_bad_p = (~torch.isfinite(particle_feats)).any(dim=1).sum().item()
+        post_bad_v = (~torch.isfinite(view_feats)).view(-1, view_feats.shape[-1]).any(dim=1).sum().item()
+        if orig_bad_p or orig_bad_v or post_bad_p or post_bad_v:
+            print(f"[WARN] step {step}: feats non-finite → before fix: particle={orig_bad_p}, view={orig_bad_v} | "
+                f"after fix: particle={post_bad_p}, view={post_bad_v}")
+
+        # Save FP32 (update comment)
+        # Move to CPU non-blocking
+        pf32_cpu = particle_feats.to(torch.float32).cpu()
+        vf32_cpu = view_feats.to(torch.float32).cpu()
+
         torch.save(
             {
                 "step": step,
                 "V": int(images.shape[0]),
                 "N": int(images.shape[1]),
                 "particle_ids": torch.arange(self.opt.num_particles, dtype=torch.int32),
-                "particle_feats_fp16": pf16_cpu,  # [N, D]
-                "view_feats_fp16": vf16_cpu,      # [V, N, D]
+                "particle_feats": pf32_cpu,   # [N, D], float32
+                "view_feats": vf32_cpu,       # [V, N, D], float32
+                "dtype": "float32",
                 "model_name": self.opt.feature_extractor_model_name,
                 "layer_idx": int(self.opt.feature_layer),
             },
             out_path
         )
-        print(f"[INFO] saved features: {out_path}")
 
     @torch.no_grad()
     def save_model(self, mode='geo', texture_size=1024, particle_id=0, step=None):
