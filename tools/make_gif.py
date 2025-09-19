@@ -37,16 +37,24 @@ def find_multi_view_sequence(run_dir: Path) -> Optional[Path]:
     if not mv_dir.exists():
         return None
 
-    candidates: List[Tuple[int, Path]] = []
+    # Prefer combined all-particles sequences; ignore iid per-particle sequences
+    all_candidates: List[Tuple[int, Path]] = []
+    other_candidates: List[Tuple[int, Path]] = []
     for child in mv_dir.iterdir():
         if child.is_dir():
+            name_lower = child.name.lower()
             step_value = _parse_step_from_prefix(child.name)
-            candidates.append((step_value, child))
-    if not candidates:
-        return None
+            if "all_particles" in name_lower:
+                all_candidates.append((step_value, child))
+            else:
+                other_candidates.append((step_value, child))
 
-    candidates.sort(key=lambda t: t[0])
-    return candidates[-1][1]
+    if all_candidates:
+        all_candidates.sort(key=lambda t: t[0])
+        return all_candidates[-1][1]
+
+    # No all-particles sequence available; skip MV to avoid iid-only videos
+    return None
 
 
 def collect_mv_frames(sequence_dir: Path) -> List[Path]:
@@ -178,6 +186,6 @@ if __name__ == "__main__":
 
 """
 python tools/make_gif.py exp_gaussian_reproduce --fps-mv 30 --fps-fv 8 --overwrite
-
- python3 tools/make_multi_viewpoints_gif.py exp0_baseline --fps 30
+python tools/make_gif.py exp0_baseline --fps-mv 30 --fps-fv 8 --overwrite
+python tools/make_gif.py exp0_ours_best --fps-mv 30 --fps-fv 8 --overwrite
 """
