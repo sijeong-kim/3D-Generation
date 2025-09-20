@@ -8,11 +8,19 @@ Compare multiple runs (e.g., early/mid/last) at a given step on one 2D plane.
 - Saves scatter plot + meta.json under results/features
 
 
+# Plotting 
 python analysis/feature/compare_runs_joint_embedding.py \
   --panel-steps 1 200 400 600 800 1000 --dpi 300 --figsize 6 6
+  
+python analysis/feature/compare_runs_joint_embedding.py --step 001000
+
+
+# Metrics only
+python analysis/feature/compare_runs_joint_embedding.py --metrics
+
 """
 
-import argparse, json, re
+import argparse, json, re, csv
 from pathlib import Path
 import numpy as np
 import torch
@@ -22,6 +30,17 @@ from sklearn.manifold import TSNE
 from matplotlib.patches import Ellipse
 from typing import List, Tuple
 from matplotlib.lines import Line2D
+try:
+    from analysis.feature.diversity import diversity_trace
+except Exception:
+    # Fallback if running as a plain script without package context
+    import numpy as _np
+    def diversity_trace(Y2d: _np.ndarray) -> float:
+        if Y2d is None or Y2d.size == 0:
+            return float("nan")
+        Yc = Y2d - Y2d.mean(axis=0, keepdims=True)
+        C = _np.cov(Yc, rowvar=False)
+        return float(_np.trace(C))
 try:
     from scipy.spatial import ConvexHull
     HAS_SCIPY = True
@@ -332,6 +351,7 @@ def main():
     ap.add_argument("--no-pdf", action="store_true")
     ap.add_argument("--no-svg", action="store_true")
     ap.add_argument("--palette", nargs="*", default=None, help="Optional list of hex colors to use for runs")
+    ap.add_argument("--metrics", action="store_true", help="Compute diversity across all common steps and save CSV only (no plots)")
     # optional panel across multiple steps (keeps per-step output)
     ap.add_argument("--panel-steps", nargs="*", type=int, default=None,
                     help="If provided, also generate a 2x3 panel for these steps (e.g., 1 200 400 600 800 1000)")
@@ -355,6 +375,42 @@ def main():
     if isinstance(legend_loc_value, list):
         legend_loc_value = " ".join(legend_loc_value)
     legend_loc_value = legend_loc_value.replace("_", " ")
+
+    # -------- metrics-only mode across all steps --------
+    if args.metrics and args.step is None:
+        def _list_steps(run_dir: Path):
+            feats_dir = run_dir / "features"
+            steps = []
+            if feats_dir.exists():
+                for p in feats_dir.glob("step_*.pt"):
+                    m = re.search(r"step_(\d+)\.pt$", p.name)
+                    if m:
+                        steps.append(int(m.group(1)))
+            return sorted(set(steps))
+
+        run_a = Path("exp") / args.runs[0]
+        run_b = Path("exp") / args.runs[1]
+        steps_a = _list_steps(run_a)
+        steps_b = _list_steps(run_b)
+        common_steps = [s for s in steps_a if s in set(steps_b)]
+        if not common_steps:
+            raise SystemExit("No common steps found for metrics computation")
+
+        csv_path = out_dir / "compare_baseline_vs_ours.csv"
+        with open(csv_path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["step","baseline_diversity_trace","ours_diversity_trace","delta","improvement_pct"]) 
+            for s in common_steps:
+                Xa, _ = load_features(find_step_file(run_a, f"{s:06d}"), view_mode=args.view_mode, view_index=args.view_index)
+                Xb, _ = load_features(find_step_file(run_b, f"{s:06d}"), view_mode=args.view_mode, view_index=args.view_index)
+                Y_list_s, _ = joint_embed([Xa, Xb], method="pca", seed=args.seed, perplexity=args.perplexity)
+                db = diversity_trace(Y_list_s[0])
+                do = diversity_trace(Y_list_s[1])
+                delta = float(do - db) if np.isfinite(db) and np.isfinite(do) else float("nan")
+                impr = float((do - db) / (db + 1e-12) * 100.0) if np.isfinite(db) and np.isfinite(do) else float("nan")
+                w.writerow([f"{s:06d}", f"{db:.6g}", f"{do:.6g}", f"{delta:.6g}", f"{impr:.6g}"])
+        print(f"[INFO] saved diversity timeseries CSV → {csv_path}")
+        return
 
     X_list, metas, labels = [], [], []
     if args.step is not None:
@@ -393,6 +449,16 @@ def main():
             palette=list(args.palette) if args.palette else None,
         )
         out_png = out_base.with_suffix(".png")
+        # diversity-only metrics
+        db = diversity_trace(Y_list[0])
+        do = diversity_trace(Y_list[1]) if len(Y_list) > 1 else float("nan")
+        delta = float(do - db) if np.isfinite(db) and np.isfinite(do) else float("nan")
+        impr = float((do - db) / (db + 1e-12) * 100.0) if np.isfinite(db) and np.isfinite(do) else float("nan")
+        analysis = {
+            "diversity_trace": {labels[0]: float(db), labels[1]: float(do)},
+            "diversity_delta": delta,
+            "diversity_improvement_pct": impr,
+        }
         wrote_single = True
 
     # optional panel generation
@@ -506,10 +572,24 @@ def main():
             "figsize": [float(args.figsize[0]), float(args.figsize[1])],
             "transparent": bool(args.transparent),
             "palette": list(args.palette) if args.palette else None,
+            "analysis": analysis,
         }
         meta_name = f"compare_runs_{info['method'].lower()}_{int(args.step):06d}.meta.json"
         with open(out_dir / meta_name, "w") as f:
             json.dump(meta_out, f, indent=2)
+        # Save diversity to CSV (append or create)
+        csv_path = out_dir / f"compare_runs_diversity_{int(args.step):06d}.csv"
+        with open(csv_path, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["step","baseline_diversity_trace","ours_diversity_trace","delta","improvement_pct"])
+            w.writerow([
+                f"{int(args.step):06d}",
+                f"{analysis['diversity_trace'][labels[0]]:.6g}",
+                f"{analysis['diversity_trace'][labels[1]]:.6g}",
+                f"{analysis['diversity_delta']:.6g}",
+                f"{analysis['diversity_improvement_pct']:.6g}",
+            ])
+        print(f"[INFO] saved CSV → {csv_path}")
         print(f"[INFO] saved → {out_png}")
         print(f"[INFO] saved meta → {out_dir}")
     else:
