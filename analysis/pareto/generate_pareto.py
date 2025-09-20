@@ -168,6 +168,14 @@ def annotate_points(ax, x_vals, y_vals, labels, edge=0.88, selected_idx: int | N
                 x_off, y_off, ha, va = xi - dx, yi - dy, 'right', 'top'
             elif pos in ('lt','tl','left-top','top-left'):
                 x_off, y_off, ha, va = xi - dx, yi + dy, 'right', 'bottom'
+            elif pos in ('lm','left-middle'):
+                x_off, y_off, ha, va = xi - dx, yi, 'right', 'center'
+            elif pos in ('rm','right-middle'):
+                x_off, y_off, ha, va = xi + dx, yi, 'left', 'center'
+            elif pos in ('tm','top-middle'):
+                x_off, y_off, ha, va = xi, yi + dy, 'center', 'bottom'
+            elif pos in ('bm','bottom-middle'):
+                x_off, y_off, ha, va = xi, yi - dy, 'center', 'top'
         else:
             # 규칙: (top-right) → (bottom-right) → (bottom-left) → (top-left)
             if uy > edge:
@@ -183,7 +191,7 @@ def annotate_points(ax, x_vals, y_vals, labels, edge=0.88, selected_idx: int | N
         ax.text(
             x_off, y_off, str(lab),
             fontsize=12, ha=ha, va=va,
-            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='none', alpha=0.85)
+            bbox=dict(boxstyle='round,pad=0.2', fc='white', ec='none', alpha=0.5)
         )
 
 def save_single(base_path: Path, x, y, *, xlabel: str, ylabel: str, cvals=None, cmap=None, cbar_label: str|None=None, sel_x=None, sel_y=None, point_labels=None, selected_idx: int | None = None, special_positions: dict | None = None):
@@ -554,7 +562,7 @@ def hyperparams_fd_1x3():
             specials = None
         elif 'rbf_beta' in df.columns:
             labels = [f"{v:.1f}" for v in df['rbf_beta']]
-            specials = {"1.0":"lb"}
+            specials = {"1.0":"lm", "1.5":"lm"}
         else:
             labels = ['' for _ in range(len(x))]
         annotate_points(ax, x, y, labels, selected_idx=sel_idx, special_positions=specials)
