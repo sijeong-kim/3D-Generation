@@ -143,27 +143,89 @@ def save_frames(frames_dir: Path, steps, Y_list, xlim, ylim, title, annotate=Tru
         ax.set_xlim(*xlim); ax.set_ylim(*ylim)
         ax.set_xlabel("PC-1"); ax.set_ylabel("PC-2")
         ax.grid(True, alpha=0.3); ax.set_title(f"Step {s}")
-        fig.suptitle(title, y=0.98); fig.tight_layout(rect=[0,0,1,0.95])
+        fig.tight_layout()
         fp = frames_dir / f"particles_step_{s:06d}.png"
         fig.savefig(fp); plt.close(fig)
         paths.append(fp)
     return paths
 
-def save_panel(panel_path: Path, steps, Y_list, xlim, ylim, title):
-    cols = len(steps); rows = 1
-    fig, axes = plt.subplots(rows, cols, figsize=(cols*3.6, 3.6), dpi=160)
-    if cols == 1: axes = np.array([axes])
+def save_panel_pages(panel_base_path: Path, steps, Y_list, xlim, ylim, title, rows=1, cols=None):
+    if cols is None:
+        cols = len(steps)
+    per_page = max(1, rows * cols)
+    total = len(steps)
+    page_paths = []
     N = Y_list[0].shape[0]; col_idx = stable_colors(N)
-    for i,(s,Y) in enumerate(zip(steps,Y_list)):
-        ax = axes[i]
+
+    for page_idx, start in enumerate(range(0, total, per_page), start=1):
+        end = min(start + per_page, total)
+        steps_page = steps[start:end]
+        Y_page = Y_list[start:end]
+        r = rows
+        c = min(cols, len(steps_page)) if rows == 1 else cols
+        fig, axes = plt.subplots(r, c, figsize=(c*3.6, r*3.6), dpi=160)
+        axes = np.atleast_2d(axes)
+
+        for i,(s,Y) in enumerate(zip(steps_page, Y_page)):
+            rr, cc = divmod(i, c)
+            ax = axes[rr, cc]
+            ax.set_aspect("equal", adjustable="box")
+            ax.scatter(Y[:,0], Y[:,1], c=[col_idx[j] for j in range(Y.shape[0])],
+                       cmap="tab10", s=50, alpha=0.95, edgecolors="none")
+            for j,(x,y) in enumerate(Y): ax.text(x,y,str(j),fontsize=8,ha="center",va="center",alpha=0.9)
+            ax.set_xlim(*xlim); ax.set_ylim(*ylim); ax.grid(True, alpha=0.3)
+            ax.set_title(f"Step {s}", fontsize=10)
+            if i==0: ax.set_xlabel("PC-1"); ax.set_ylabel("PC-2")
+        # hide unused axes
+        total_cells = r*c
+        for k in range(len(steps_page), total_cells):
+            rr, cc = divmod(k, c)
+            axes[rr, cc].axis("off")
+
+        fig.tight_layout()
+        # first page also saved as panel_all_steps.png for backward compatibility
+        if page_idx == 1:
+            first_path = panel_base_path.with_name("panel_all_steps.png")
+            fig.savefig(first_path)
+            page_paths.append(first_path)
+        page_path = panel_base_path.with_name(f"panel_p{page_idx:03d}.png")
+        fig.savefig(page_path)
+        page_paths.append(page_path)
+        plt.close(fig)
+    return page_paths
+
+
+def save_panel_single(panel_path: Path, steps, Y_list, xlim, ylim, title, rows=2, cols=3):
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*3.6, rows*3.6), dpi=160)
+    axes = np.atleast_2d(axes)
+    N = Y_list[0].shape[0] if Y_list else 0
+    col_idx = stable_colors(N)
+
+    for i,(s,Y) in enumerate(zip(steps, Y_list)):
+        rr, cc = divmod(i, cols)
+        ax = axes[rr, cc]
         ax.set_aspect("equal", adjustable="box")
         ax.scatter(Y[:,0], Y[:,1], c=[col_idx[j] for j in range(Y.shape[0])],
                    cmap="tab10", s=50, alpha=0.95, edgecolors="none")
-        for j,(x,y) in enumerate(Y): ax.text(x,y,str(j),fontsize=8,ha="center",va="center",alpha=0.9)
+        for j,(x,y) in enumerate(Y):
+            ax.text(x,y,str(j),fontsize=8,ha="center",va="center",alpha=0.9)
         ax.set_xlim(*xlim); ax.set_ylim(*ylim); ax.grid(True, alpha=0.3)
         ax.set_title(f"Step {s}", fontsize=10)
-        if i==0: ax.set_xlabel("PC-1"); ax.set_ylabel("PC-2")
-    fig.suptitle(title, y=0.99); fig.tight_layout(rect=[0,0,1,0.97]); fig.savefig(panel_path); plt.close(fig)
+        if rr == rows-1:
+            ax.set_xlabel("PC-1")
+        if cc == 0:
+            ax.set_ylabel("PC-2")
+
+    # hide unused axes
+    total_cells = rows*cols
+    for k in range(len(steps), total_cells):
+        rr, cc = divmod(k, cols)
+        axes[rr, cc].axis("off")
+
+    fig.tight_layout()
+    fig.savefig(panel_path)
+    plt.close(fig)
+    return panel_path
 
 def maybe_gif(frame_paths, out_path: Path, fps=2):
     try:
@@ -179,7 +241,7 @@ def maybe_gif(frame_paths, out_path: Path, fps=2):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", type=str, default="exp")
-    ap.add_argument("--exp",  type=str, required=True)
+    ap.add_argument("--exp",  type=str, default="exp6_ours_best_feature")
     ap.add_argument("--run",  type=str, required=True)
     ap.add_argument("--view-mode", type=str, default="mean", choices=["mean","first","index"])
     ap.add_argument("--view-index", type=int, default=0)
@@ -188,10 +250,32 @@ def main():
     ap.add_argument("--no-symmetric", dest="symmetric", action="store_false")
     ap.add_argument("--center", type=str, default="per-step", choices=["per-step","global"],
                     help="how to center before building the global PCA basis")
+    # output controls
+    ap.add_argument("--output-root", type=str, default="results/features",
+                    help="Root directory for results. If --category is given, saves under <output-root>/<category>/<run>/analysis_particles_pca")
+    ap.add_argument("--category", type=str, default=None, choices=["ours","baseline"],
+                    help="If provided, route outputs to results/features/{category}/<run>/analysis_particles_pca. If omitted, infer from run name (RLSD -> ours; otherwise baseline).")
+    ap.add_argument("--step-interval", type=int, default=None,
+                    help="If set (e.g., 200), subsample steps approximately every given interval (keeps steps where step % interval == 0, plus first/last if needed)")
+    ap.add_argument("--panel-rows", type=int, default=1)
+    ap.add_argument("--panel-cols", type=int, default=None,
+                    help="Number of columns in panel; default uses all selected steps on one row. Use with --panel-rows for grids like 2x3.")
+    ap.add_argument("--panel-steps", nargs='*', type=int, default=None,
+                    help="Explicit list of step numbers to show in the panel (e.g., 1 200 400 600 800 1000). Overrides --step-interval selection.")
     args = ap.parse_args()
 
     base = Path(args.base)
-    out_root = base / args.exp / args.run
+
+    # decide output directory
+    category = args.category
+    if category is None:
+        category = "ours" if ("RLSD" in args.run or "rlsd" in args.run.lower()) else "baseline"
+
+    if args.output_root:
+        out_root = Path(args.output_root) / category / args.run
+    else:
+        out_root = base / args.exp / args.run
+
     out_dir = out_root / "analysis_particles_pca"
     frames_dir = out_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
@@ -211,10 +295,46 @@ def main():
 
     title = f"{args.exp}/{args.run} — Global PCA on particle features (layer={meta.get('layer_idx')}, agg={args.view_mode})"
 
+    # select steps for panel
+    steps_plot, Y_plot = steps, Y_list
+    if args.panel_steps:
+        # explicit selection; keep order provided
+        explicit = []
+        for target in args.panel_steps:
+            if target in steps:
+                idx = steps.index(target)
+                explicit.append((target, Y_list[idx]))
+        if explicit:
+            steps_plot = [s for s,_ in explicit]
+            Y_plot = [y for _,y in explicit]
+    elif args.step_interval is not None and args.step_interval > 0:
+        # interval-based selection; fill a grid if rows*cols specified
+        selected = []
+        # always include the first step
+        if steps:
+            selected.append(steps[0])
+        for s in steps:
+            if (s % args.step_interval) == 0 and s not in selected:
+                selected.append(s)
+        # ensure last included
+        if steps and steps[-1] not in selected:
+            selected.append(steps[-1])
+        selected = sorted(set(selected))
+        steps_plot = selected
+        Y_plot = [Y_list[steps.index(s)] for s in steps_plot]
+
     # save
-    frames = save_frames(frames_dir, steps, Y_list, xlim, ylim, title, annotate=True)
-    panel_path = out_dir / "panel_all_steps.png"
-    save_panel(panel_path, steps, Y_list, xlim, ylim, title)
+    frames = save_frames(frames_dir, steps_plot, Y_plot, xlim, ylim, title, annotate=True)
+    # If rows*cols is provided and finite, create a single panel trimmed/padded to fit
+    if args.panel_rows and args.panel_cols:
+        k = int(args.panel_rows) * int(args.panel_cols)
+        steps_panel = steps_plot[:k]
+        Y_panel = Y_plot[:k]
+        save_panel_single(out_dir / "panel_all_steps.png", steps_panel, Y_panel, xlim, ylim, title,
+                          rows=int(args.panel_rows), cols=int(args.panel_cols))
+    else:
+        save_panel_pages(out_dir / "panel_all_steps.png", steps_plot, Y_plot, xlim, ylim, title,
+                         rows=int(args.panel_rows), cols=(int(args.panel_cols) if args.panel_cols else None))
     gif_path = maybe_gif(frames, out_dir / "evolution.gif", fps=2)
 
     with open(out_dir / "meta.json", "w") as f:
@@ -229,7 +349,7 @@ def main():
         }, f, indent=2)
 
     print(f"[INFO] saved frames→{frames_dir}")
-    print(f"[INFO] saved panel → {panel_path}")
+    print(f"[INFO] saved panel pages → {out_dir}")
     if gif_path: print(f"[INFO] saved GIF   → {gif_path}")
 
 if __name__ == "__main__":
@@ -243,5 +363,30 @@ python analysis/feature/analyse_particles_per_step_pca.py \
   --view-mode mean --center per-step
 # 특정 뷰만 쓰려면:
 # --view-mode index --view-index 0
+
+
+(torch-gpu) -----------------------------------------------------------------------------------------
+~/3D-Generation (main*) » python analysis/feature/analyse_particles_per_step_pca.py \
+  --run WO__ICE__S42 --category baseline \       
+  --view-mode mean \
+  --panel-steps 1 200 400 600 800 1000 \
+  --panel-rows 2 --panel-cols 3
+[INFO] found 11 step files
+[INFO] steps: 11, particles/step≈8 dim=768
+[INFO] saved frames→results/features/baseline/WO__ICE__S42/analysis_particles_pca/frames
+[INFO] saved panel pages → results/features/baseline/WO__ICE__S42/analysis_particles_pca
+[INFO] saved GIF   → results/features/baseline/WO__ICE__S42/analysis_particles_pca/evolution.gif
+(torch-gpu) -----------------------------------------------------------------------------------------
+~/3D-Generation (main*) » python analysis/feature/analyse_particles_per_step_pca.py \
+  --run RLSD__RBF__ICE__S42 --category ours \    
+  --view-mode mean \
+  --panel-steps 1 200 400 600 800 1000 \
+  --panel-rows 2 --panel-cols 3
+[INFO] found 11 step files
+[INFO] steps: 11, particles/step≈8 dim=768
+[INFO] saved frames→results/features/ours/RLSD__RBF__ICE__S42/analysis_particles_pca/frames
+[INFO] saved panel pages → results/features/ours/RLSD__RBF__ICE__S42/analysis_particles_pca
+[INFO] saved GIF   → results/features/ours/RLSD__RBF__ICE__S42/analysis_particles_pca/evolution.gif
+(torch-gpu) ----------------------------------------------------------------------------------------
 
 """
