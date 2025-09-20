@@ -232,6 +232,7 @@ debug/
 *.out
 
 results/
+results_save/
 
 
 .DS_Store
