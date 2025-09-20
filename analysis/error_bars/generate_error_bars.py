@@ -95,6 +95,23 @@ def repulsion_error_bars():
         _save_errs(OUT_R_ERR/'kernels_fidelity', keys, df['fidelity_mean_mean'].values, df['fidelity_mean_std'].values, 'Kernel', 'Fidelity')
         _save_errs(OUT_R_ERR/'kernels_diversity', keys, df['diversity_mean_mean'].values, df['diversity_mean_std'].values, 'Kernel', 'Diversity')
         _save_errs(OUT_R_ERR/'kernels_consistency', keys, df['cross_consistency_mean_mean'].values, df['cross_consistency_mean_std'].values, 'Kernel', 'Cross-Consistency')
+    # Method + Kernel combined comparison (SVGD-COS, SVGD-RBF, RLSD-RBF, RLSD-COS)
+    mkfile = RESULTS_CSV / 'exp1_repulsion_kernel' / 'Repulsion_Method_and_Kernel_Analysis_Complete_Analysis.csv'
+    if mkfile.exists():
+        df = pd.read_csv(mkfile, comment='#')
+        df['combo'] = df['method'].astype(str) + '-' + df['kernel'].astype(str)
+        desired_order = ['SVGD-COS', 'SVGD-RBF', 'RLSD-RBF', 'RLSD-COS']
+        df['combo'] = pd.Categorical(df['combo'], categories=desired_order, ordered=True)
+        df = df.sort_values('combo')
+        keys = df['combo'].astype(str).values
+        _save_errs(OUT_R_ERR/'method_kernel_fidelity', keys, df['fidelity_mean_mean'].values, df['fidelity_mean_std'].values, 'Method-Kernel', 'Fidelity')
+        _save_errs(OUT_R_ERR/'method_kernel_diversity', keys, df['diversity_mean_mean'].values, df['diversity_mean_std'].values, 'Method-Kernel', 'Diversity')
+        _save_errs(OUT_R_ERR/'method_kernel_consistency', keys, df['cross_consistency_mean_mean'].values, df['cross_consistency_mean_std'].values, 'Method-Kernel', 'Cross-Consistency')
+        _save_triptych(OUT_R_ERR/'method_kernel_1x3', keys,
+                       df['fidelity_mean_mean'].values, df['fidelity_mean_std'].values,
+                       df['diversity_mean_mean'].values, df['diversity_mean_std'].values,
+                       df['cross_consistency_mean_mean'].values, df['cross_consistency_mean_std'].values,
+                       'Method-Kernel')
 
 def main():
     hyperparam_error_bars()
