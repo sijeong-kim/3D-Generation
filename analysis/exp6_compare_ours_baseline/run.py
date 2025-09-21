@@ -37,21 +37,50 @@ def collect_step1000_metrics(exp_dir: Path, prompt_reverse_map: Dict[str, str]) 
         # Sanitize any accidental leading comment markers
         if isinstance(keyword_label, str):
             keyword_label = re.sub(r"^[#\s]+", "", keyword_label).strip()
+
+        # Quantitative metrics
         qcsv = cfg / "metrics" / "quantitative_metrics.csv"
-        if not qcsv.exists():
+        # Efficiency metrics
+        ecsv = cfg / "metrics" / "efficiency.csv"
+        if not qcsv.exists() and not ecsv.exists():
             continue
-        df = pd.read_csv(qcsv)
-        if "step" not in df.columns:
-            continue
-        row = df[df["step"] == 1000]
-        if row.empty:
-            # try nearest <= 1000
-            row = df[df["step"] <= 1000].sort_values("step").tail(1)
-            if row.empty:
-                continue
-        r = row.iloc[0].to_dict()
-        r.update({"prompt": keyword_label, "seed": seed})
-        rows.append(r)
+
+        rec: Dict[str, object] = {"prompt": keyword_label, "seed": seed}
+
+        if qcsv.exists():
+            dfq = pd.read_csv(qcsv)
+            if "step" in dfq.columns:
+                rowq = dfq[dfq["step"] == 1000]
+                if rowq.empty:
+                    rowq = dfq[dfq["step"] <= 1000].sort_values("step").tail(1)
+                if not rowq.empty:
+                    rec.update(rowq.iloc[0].to_dict())
+
+        if ecsv.exists():
+            dfe = pd.read_csv(ecsv)
+            step_col = "step" if "step" in dfe.columns else None
+            if step_col is not None:
+                rowe = dfe[dfe[step_col] == 1000]
+                if rowe.empty:
+                    rowe = dfe[dfe[step_col] <= 1000].sort_values(step_col).tail(1)
+                if not rowe.empty:
+                    e = rowe.iloc[0].to_dict()
+                    # Keep only known efficiency keys if present
+                    for k in [
+                        "step_wall_ms",
+                        "step_gpu_ms",
+                        "render_ms",
+                        "sd_guidance_ms",
+                        "backprop_ms",
+                        "densify_ms",
+                        "pixels",
+                        "px_per_s",
+                        "memory_allocated_mb",
+                        "max_memory_allocated_mb",
+                    ]:
+                        if k in e:
+                            rec[k] = e[k]
+        rows.append(rec)
     return pd.DataFrame(rows)
 
 
@@ -174,6 +203,12 @@ def _pretty_metric_name(metric: str) -> str:
         "inter_particle_diversity_mean": "Diversity (↑)",
         "fidelity_mean": "Fidelity (↑)",
         "cross_view_consistency_mean": "Consistency (↑)",
+        # Efficiency
+        "step_wall_ms": "Step time (ms) (↓)",
+        "step_gpu_ms": "GPU step time (ms) (↓)",
+        "px_per_s": "Throughput (px/s) (↑)",
+        "memory_allocated_mb": "Memory (MB) (↓)",
+        "max_memory_allocated_mb": "Peak memory (MB) (↓)",
     }
     return mapping.get(metric, metric)
 
@@ -206,8 +241,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ours_dir", type=str, default="/Users/sj/3D-Generation/exp/exp6_ours_best")
     parser.add_argument("--baseline_dir", type=str, default="/Users/sj/3D-Generation/exp/exp6_baseline")
-    parser.add_argument("--csv_out_dir", type=str, default="/Users/sj/3D-Generation/results/csv/exp6_compare_ours_baseline")
-    parser.add_argument("--fig_out_dir", type=str, default="/Users/sj/3D-Generation/results/exp6_compare_ours_baseline")
+    parser.add_argument("--csv_out_dir", type=str, default="/Users/sj/3D-Generation/results/efficiency/exp6_compare_ours_baseline")
+    parser.add_argument("--fig_out_dir", type=str, default="/Users/sj/3D-Generation/results/efficiency/exp6_compare_ours_baseline")
     args = parser.parse_args()
 
     ensure_dirs([args.csv_out_dir, args.fig_out_dir])
@@ -238,7 +273,7 @@ def main():
     ours_df = collect_step1000_metrics(Path(args.ours_dir), prompt_reverse_map)
     base_df = collect_step1000_metrics(Path(args.baseline_dir), prompt_reverse_map)
 
-    # Save raw per-run step1000 CSVs
+    # Save raw per-run step1000 CSVs (include efficiency columns if present)
     ours_df.to_csv(Path(args.csv_out_dir) / "ours_step1000_per_run.csv", index=False)
     base_df.to_csv(Path(args.csv_out_dir) / "baseline_step1000_per_run.csv", index=False)
 
@@ -247,24 +282,47 @@ def main():
         "cross_view_consistency_mean",
         "fidelity_mean",
     ]
+    eff_cols = [
+        "step_wall_ms",
+        "step_gpu_ms",
+        "px_per_s",
+        "memory_allocated_mb",
+        "max_memory_allocated_mb",
+    ]
 
-    ours_per_prompt = aggregate_per_prompt(ours_df, metrics_cols)
-    base_per_prompt = aggregate_per_prompt(base_df, metrics_cols)
+    ours_per_prompt = aggregate_per_prompt(ours_df, metrics_cols + eff_cols)
+    base_per_prompt = aggregate_per_prompt(base_df, metrics_cols + eff_cols)
     ours_per_prompt.to_csv(Path(args.csv_out_dir) / "ours_step1000_per_prompt.csv", index=False)
     base_per_prompt.to_csv(Path(args.csv_out_dir) / "baseline_step1000_per_prompt.csv", index=False)
+
+    # Also save efficiency-only per-prompt CSVs for convenience
+    ours_per_prompt[ ["prompt"] + eff_cols ].to_csv(Path(args.csv_out_dir) / "ours_step1000_eff_per_prompt.csv", index=False)
+    base_per_prompt[ ["prompt"] + eff_cols ].to_csv(Path(args.csv_out_dir) / "baseline_step1000_eff_per_prompt.csv", index=False)
 
     # Overall aggregate over prompts (mean of per-prompt means)
     overall = pd.DataFrame({
         "metric": metrics_cols,
-        "baseline_mean": [base_per_prompt[m].mean() if not base_per_prompt.empty else float('nan') for m in metrics_cols],
-        "ours_mean": [ours_per_prompt[m].mean() if not ours_per_prompt.empty else float('nan') for m in metrics_cols],
+        "baseline_mean": [base_per_prompt[m].mean() if (m in base_per_prompt.columns and not base_per_prompt.empty) else float('nan') for m in metrics_cols],
+        "ours_mean": [ours_per_prompt[m].mean() if (m in ours_per_prompt.columns and not ours_per_prompt.empty) else float('nan') for m in metrics_cols],
     })
     overall.to_csv(Path(args.csv_out_dir) / "overall_step1000_aggregates.csv", index=False)
+
+    # Efficiency overall aggregate
+    overall_eff = pd.DataFrame({
+        "metric": eff_cols,
+        "baseline_mean": [base_per_prompt[m].mean() if (m in base_per_prompt.columns and not base_per_prompt.empty) else float('nan') for m in eff_cols],
+        "ours_mean": [ours_per_prompt[m].mean() if (m in ours_per_prompt.columns and not ours_per_prompt.empty) else float('nan') for m in eff_cols],
+    })
+    overall_eff.to_csv(Path(args.csv_out_dir) / "overall_step1000_efficiency.csv", index=False)
 
     # Plots: diversity, fidelity, consistency (per-prompt)
     plot_bars(base_per_prompt, ours_per_prompt, "inter_particle_diversity_mean", Path(args.fig_out_dir) / "diversity_per_prompt.png")
     plot_bars(base_per_prompt, ours_per_prompt, "fidelity_mean", Path(args.fig_out_dir) / "fidelity_per_prompt.png")
     plot_bars(base_per_prompt, ours_per_prompt, "cross_view_consistency_mean", Path(args.fig_out_dir) / "consistency_per_prompt.png")
+
+    # Efficiency plots (per-prompt): time and memory
+    plot_bars(base_per_prompt, ours_per_prompt, "step_wall_ms", Path(args.fig_out_dir) / "time_per_prompt.png")
+    plot_bars(base_per_prompt, ours_per_prompt, "max_memory_allocated_mb", Path(args.fig_out_dir) / "memory_per_prompt.png")
 
     # Also plot overall bar for diversity, fidelity, consistency
     for metric, fname in [
@@ -274,6 +332,23 @@ def main():
     ]:
         vals = [overall.loc[overall["metric"] == metric, "baseline_mean"].values[0],
                 overall.loc[overall["metric"] == metric, "ours_mean"].values[0]]
+        plt.figure(figsize=(3.2, 4))
+        baseline_color = "#4C78A8"
+        ours_color = "#F58518"
+        edge_color = "#2f2f2f"
+        plt.bar(["Baseline", "Ours"], vals, color=[baseline_color, ours_color], edgecolor=edge_color, linewidth=0.6)
+        plt.ylabel(_pretty_metric_name(metric))
+        plt.tight_layout()
+        plt.savefig(Path(args.fig_out_dir) / fname, dpi=300, bbox_inches='tight')
+        plt.close()
+
+    # Overall efficiency plots
+    for metric, fname in [
+        ("step_wall_ms", "time_overall.png"),
+        ("max_memory_allocated_mb", "memory_overall.png"),
+    ]:
+        vals = [overall_eff.loc[overall_eff["metric"] == metric, "baseline_mean"].values[0],
+                overall_eff.loc[overall_eff["metric"] == metric, "ours_mean"].values[0]]
         plt.figure(figsize=(3.2, 4))
         baseline_color = "#4C78A8"
         ours_color = "#F58518"
@@ -329,6 +404,24 @@ def main():
         fig2.tight_layout()
         fig2.savefig(Path(args.fig_out_dir) / "combined_overall.png", dpi=300, bbox_inches='tight')
         plt.close(fig2)
+
+        # Combined efficiency per-prompt: time & memory
+        fig3, axes3 = plt.subplots(1, 2, figsize=(max(8, len(prompts)*1.2), 3.8))
+        for ax, metric in zip(axes3, ["step_wall_ms", "max_memory_allocated_mb"]):
+            base_vals = [float(base_idx.get(metric, pd.Series()).get(p, float('nan'))) for p in prompts]
+            ours_vals = [float(ours_idx.get(metric, pd.Series()).get(p, float('nan'))) for p in prompts]
+            ax.bar([xi - width/2 for xi in x], base_vals, width=width, label="Baseline",
+                   color=baseline_color, edgecolor=edge_color, linewidth=0.6)
+            ax.bar([xi + width/2 for xi in x], ours_vals, width=width, label="Ours",
+                   color=ours_color, edgecolor=edge_color, linewidth=0.6)
+            ax.set_xticks(x)
+            ax.set_xticklabels([p.title() if '_' not in p else p.replace('_',' ') for p in prompts], rotation=45, ha='right')
+            ax.set_ylabel(_pretty_metric_name(metric))
+        handles3, labels3 = axes3[0].get_legend_handles_labels()
+        fig3.legend(handles3, labels3, loc='upper center', bbox_to_anchor=(0.5, 1.06), ncol=2, frameon=False)
+        fig3.tight_layout(rect=[0, 0, 1, 0.95])
+        fig3.savefig(Path(args.fig_out_dir) / "combined_efficiency_per_prompt.png", dpi=300, bbox_inches='tight')
+        plt.close(fig3)
     except Exception:
         # Avoid failing the whole script if combined plots error out
         pass

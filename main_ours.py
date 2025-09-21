@@ -733,6 +733,9 @@ class GUI:
         pf32_cpu = particle_feats.to(torch.float32).cpu()
         vf32_cpu = view_feats.to(torch.float32).cpu()
 
+        # output path @ features/
+        out_path = os.path.join(self.features_outdir, f"step_{step:06d}.pt")
+
         torch.save(
             {
                 "step": step,

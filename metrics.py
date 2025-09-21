@@ -1,29 +1,7 @@
-"""
-3D Gaussian Splatting Evaluation Metrics Module
+"""Evaluation metrics for 3D Gaussian Splatting.
 
-Provides comprehensive evaluation capabilities for 3D Gaussian Splatting models,
-enabling quantitative assessment of generation quality, diversity, and consistency.
-
-Key Components:
-- MetricsModel: Evaluation-time model wrapper (OpenCLIP, DINO, LPIPS)
-- MetricsCalculator: Batch processing and logging utilities
-
-Supported Metrics:
-- Fidelity: Text-image alignment using CLIP embeddings
-- Diversity: Inter-particle variation using DINO features  
-- Consistency: Cross-viewpoint stability using DINO features
-- Perceptual Similarity: LPIPS-based distance measurements
-
-Supported Models:
-- CLIP: ViT-L-14, ViT-bigG-14 (OpenAI/LAION weights)
-- DINO: ViT-Base-Patch16-224 (timm/torch.hub)
-- LPIPS: AlexNet, VGG, SqueezeNet backbones
-
-Usage:
-    >>> mm = MetricsModel(device="auto", eval_clip_model_name="ViT-bigG-14")
-    >>> calc = MetricsCalculator({"metrics": True, "outdir": "./out"}, prompt="a photo of a hamburger")
-    >>> # Compute metrics with calc.compute_* methods
-    >>> # Log results with calc.log_metrics(...)
+Provides CLIP/DINO/LPIPS-backed metrics and CSV logging via
+`MetricsModel` and `MetricsCalculator`.
 """
 
 from __future__ import annotations
@@ -44,13 +22,11 @@ except Exception as e:  # pragma: no cover
         f"Original error: {e}"
     )
 
-# Optional: torchvision for transforms / interpolation flags
+# Optional: torchvision interpolation flag
 try:
-    import torchvision.transforms as T  # type: ignore
     from torchvision.transforms import InterpolationMode  # type: ignore
     _HAS_TORCHVISION = True
 except Exception:  # pragma: no cover
-    T = None  # type: ignore
     InterpolationMode = None  # type: ignore
     _HAS_TORCHVISION = False
 
@@ -76,29 +52,7 @@ def _autocast_enabled(device: str) -> bool:
 
 
 class MetricsModel:
-    """
-    Evaluation-time model wrapper for 3D Gaussian Splatting metrics.
-    
-    Manages multiple pre-trained models for different evaluation tasks:
-    - CLIP models for text-image fidelity assessment
-    - DINO models for diversity and consistency analysis
-    - LPIPS networks for perceptual similarity measurements
-    
-    Provides unified interfaces for feature extraction, preprocessing,
-    and model management with automatic device placement and precision control.
-    
-    Attributes:
-        device: PyTorch device for model execution
-        precision: Computational precision ('fp16' or 'fp32')
-        eval_clip_model: OpenCLIP model for evaluation
-        eval_clip_tokenizer: CLIP text tokenizer
-        eval_preprocess: CLIP image preprocessing pipeline
-        dino_model: DINO ViT model for diversity features (optional)
-        dino_preprocess: DINO image preprocessing pipeline (optional)
-        lpips: LPIPS network for perceptual similarity (optional)
-        _cached_text: Cached text prompt for efficiency
-        _cached_text_feats: Cached text features for efficiency
-    """
+    """Wraps CLIP/DINO/LPIPS models for feature extraction at eval time."""
 
     DEFAULT_PRETRAIN = {
         "ViT-L-14": "openai",
@@ -162,26 +116,21 @@ class MetricsModel:
         )
 
         # Evaluation CLIP
-        self.eval_clip_model, _, clip_preprocess = open_clip.create_model_and_transforms(
+        self.eval_clip_model, _, self.eval_preprocess = open_clip.create_model_and_transforms(
             eval_clip_model_name, pretrained=used_pretrained, device=self.device
         )
         self.eval_clip_model.eval()
 
         # Tokenizer for CLIP
         self.eval_clip_tokenizer = open_clip.get_tokenizer(eval_clip_model_name)
-        self.eval_preprocess = clip_preprocess if _HAS_TORCHVISION else None
 
-        # RLSD Diversity (DINO)
+        # DINO (diversity/consistency)
         self.dino_model = None
-        self.dino_preprocess = None
         try:
             import timm  # type: ignore
 
             self.dino_model = timm.create_model("vit_base_patch16_224.dino", pretrained=True)
             self.dino_model.to(self.device).eval()
-            if _HAS_TORCHVISION:
-                cfg = getattr(timm.data, "resolve_data_config")({}, model=self.dino_model)
-                self.dino_preprocess = timm.data.create_transform(**cfg, is_training=False)
         except Exception as e1:
             try:
                 # Torch Hub fallback (v1)
@@ -189,21 +138,11 @@ class MetricsModel:
                     "facebookresearch/dino", "dino_vitb16", trust_repo=True
                 ).to(self.device)  # type: ignore
                 self.dino_model.eval()
-                if _HAS_TORCHVISION:
-                    self.dino_preprocess = T.Compose(
-                        [
-                            T.Resize(256, interpolation=InterpolationMode.BICUBIC) if InterpolationMode else T.Resize(256),
-                            T.CenterCrop(224),
-                            T.ToTensor(),
-                            T.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-                        ]
-                    )
             except Exception as e2:
                 warnings.warn(
                     f"[metrics] DINO load failed; diversity features unavailable.\nPrimary: {e1}\nFallback: {e2}"
                 )
                 self.dino_model = None
-                self.dino_preprocess = None
 
         # LPIPS (optional)
         self.lpips = None
@@ -220,85 +159,6 @@ class MetricsModel:
         # Cache for text features
         self._cached_text: Optional[str] = None
         self._cached_text_feats: Optional[Tensor] = None
-
-    # ------------------------ Preprocessing helpers ------------------------
-    def preprocess_images_for_clip(self, images: Sequence) -> Tensor:
-        """
-        Preprocess images for CLIP model evaluation.
-        
-        Applies CLIP-specific preprocessing pipeline including resizing, normalization,
-        and tensor conversion. Falls back to basic stacking if torchvision is unavailable.
-        
-        Args:
-            images: Sequence of input images. Can be:
-                   - List[PIL.Image]: PIL images
-                   - List[torch.Tensor]: CHW or HWC tensors with values in [0, 1]
-                   - Mixed sequence of PIL and tensors
-        
-        Returns:
-            torch.Tensor: Preprocessed images with shape [B, 3, H, W] where:
-                         - B: Batch size (number of images)
-                         - 3: RGB channels
-                         - H, W: Height and width (typically 224x224 for CLIP)
-                         - Values normalized to CLIP statistics
-        
-        Note:
-            - Images are automatically resized to CLIP's expected input size
-            - Normalization uses CLIP-specific mean/std values
-            - If torchvision is unavailable, performs basic tensor stacking
-            - All images are moved to the model's device
-        
-        Raises:
-            ValueError: If no images are provided
-        """
-        if not images:
-            raise ValueError("No images provided")
-        if self.eval_preprocess is None:
-            stacked = torch.stack([
-                img if isinstance(img, torch.Tensor) else torch.as_tensor(img) for img in images
-            ])
-            return stacked.to(self.device)
-        processed = [self.eval_preprocess(img) for img in images]
-        return torch.stack(processed).to(self.device)
-
-    def preprocess_images_for_dino(self, images: Sequence) -> Tensor:
-        """
-        Preprocess images for DINO model evaluation.
-        
-        Applies DINO-specific preprocessing pipeline including resizing, normalization,
-        and tensor conversion. Falls back to basic stacking if timm is unavailable.
-        
-        Args:
-            images: Sequence of input images. Can be:
-                   - List[PIL.Image]: PIL images
-                   - List[torch.Tensor]: CHW or HWC tensors with values in [0, 1]
-                   - Mixed sequence of PIL and tensors
-        
-        Returns:
-            torch.Tensor: Preprocessed images with shape [B, 3, H, W] where:
-                         - B: Batch size (number of images)
-                         - 3: RGB channels
-                         - H, W: Height and width (224x224 for DINO)
-                         - Values normalized to ImageNet statistics
-        
-        Note:
-            - Images are automatically resized to DINO's expected input size (224x224)
-            - Normalization uses ImageNet mean/std values
-            - If timm is unavailable, performs basic tensor stacking
-            - All images are moved to the model's device
-        
-        Raises:
-            ValueError: If no images are provided
-        """
-        if not images:
-            raise ValueError("No images provided")
-        if self.dino_preprocess is None:
-            stacked = torch.stack([
-                img if isinstance(img, torch.Tensor) else torch.as_tensor(img) for img in images
-            ])
-            return stacked.to(self.device)
-        processed = [self.dino_preprocess(img) for img in images]
-        return torch.stack(processed).to(self.device)
 
     # ------------------------ Encoding APIs ------------------------
     @torch.no_grad()
@@ -619,8 +479,8 @@ class MetricsCalculator:
         
         # Initialize all attributes to None
         self.metrics_model = None
-        self.metrics_writer, self.losses_writer, self.efficiency_writer, self.kernel_stats_writer = None, None, None, None
-        self.metrics_csv_file, self.losses_csv_file, self.efficiency_csv_file, self.kernel_stats_csv_file = None, None, None, None
+        self.metrics_writer, self.losses_writer, self.efficiency_writer = None, None, None
+        self.metrics_csv_file, self.losses_csv_file, self.efficiency_csv_file = None, None, None
         self.clip_input_res, self.dino_input_res = None, None
         self.clip_mean, self.clip_std = None, None
         self.imagenet_mean, self.imagenet_std = None, None
@@ -649,18 +509,7 @@ class MetricsCalculator:
         # Feature normalization is already handled in MetricsModel.encode_*
         self.features_normalized = False
 
-        # (Optional) training-time CLIP; keep if other parts of your pipeline use it
-        if _get("init_train_clip", True):
-            self.train_clip_model_name = "ViT-bigG-14"
-            self.train_clip_pretrained = "laion2b_s39b_b160k"
-            self.train_clip_model, _, self.train_clip_preprocess = open_clip.create_model_and_transforms(
-                self.train_clip_model_name, pretrained=self.train_clip_pretrained, device=self.device
-            )
-            self.train_clip_tokenizer = open_clip.get_tokenizer(self.train_clip_model_name)
-        else:
-            self.train_clip_model = None
-            self.train_clip_tokenizer = None
-            self.train_clip_preprocess = None
+        # Training-time CLIP is unnecessary for metrics; keep only evaluation models
 
         # Metrics models (evaluation-time): configurable CLIP + LPIPS
         eval_clip_model_name = _get("eval_clip_model_name", "ViT-bigG-14")
@@ -724,29 +573,13 @@ class MetricsCalculator:
         # Explicit units: time in milliseconds, memory in megabytes
         self.efficiency_writer.writerow(["step", "step_wall_ms", "step_gpu_ms", "render_ms", "sd_guidance_ms", "backprop_ms", "densify_ms", "pixels", "px_per_s", "memory_allocated_mb", "max_memory_allocated_mb"])  # noqa: N806
 
-        # Kernel statistics header
-        # self.kernel_stats_writer.writerow([
-        #     "step", "neff_mean", "neff_std", "row_sum_mean", "row_sum_std", 
-        #     "gradient_norm_mean", "gradient_norm_std"
-        # ])
-
-        self._warned_metrics = set()  # already warned metric names
-
-        # expected range specs (adjust as needed)
-        self._metric_ranges = {
-            "inter_particle_diversity": (0.0, 2.0),            # 1 - mean_cos (normal [0,2])
-            "cross_view_consistency": (-1.0, 1.0),             # mean cosine
-            "fidelity": (-1.0, 1.0),                           # CLIP cosine
-            "lpips": (0.0, 2.0),                               # safe range
-            "time_ms": (0.0, float("inf")),
-            "memory_MB": (0.0, float("inf")),
-        }
+        # Internal ranges and warnings removed for simplicity
 
     # ------------------------ lifecycle ------------------------
     def close(self) -> None:
         """Close any open CSV files."""
         
-        for f in ("metrics_csv_file", "losses_csv_file", "efficiency_csv_file", "kernel_stats_csv_file"):
+        for f in ("metrics_csv_file", "losses_csv_file", "efficiency_csv_file"):
             if hasattr(self, f) and getattr(self, f):
                 try:
                     getattr(self, f).close()
