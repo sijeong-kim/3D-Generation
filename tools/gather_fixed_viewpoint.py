@@ -18,6 +18,13 @@ has fewer than two tokens, the whole run directory name is used.
 
 This script does not perform image conversion. The destination file preserves
 the source extension (.png/.jpg/.jpeg). Use --overwrite to replace files.
+
+
+Usage:
+python tools/gather_fixed_viewpoint.py --exp-name exp1_repulsion_kernel
+  - For exp1 (repulsion-kernel ablation), filenames become
+    <method>_<kernel>_<PROMPT>_<SSEED>.png, e.g., rlsd_cos_BULL_S123.png
+  - Otherwise, use --name-mode and --name-tokens to control naming.
 """
 
 import argparse
@@ -43,8 +50,10 @@ def parse_args() -> argparse.Namespace:
                     help="Overwrite existing files at destination")
     ap.add_argument("--verbose", action="store_true",
                     help="Verbose logging")
-    ap.add_argument("--name-mode", type=str, default="last2", choices=["last2", "run"],
-                    help="How to derive destination basename: last2 tokens of run or full run name")
+    ap.add_argument("--name-mode", type=str, default="last2", choices=["last2", "run", "tokens"],
+                    help="How to derive destination basename: last2 tokens, specific number of tokens, or full run name")
+    ap.add_argument("--name-tokens", type=int, default=0,
+                    help="If --name-mode=tokens, join the last N tokens (auto if 0)")
     ap.add_argument("--suffix", type=str, default=None,
                     help="Optional suffix to append to basename before extension (e.g., _fv)")
     return ap.parse_args()
@@ -95,7 +104,7 @@ def pick_existing_image(dir_path: Path, stems: List[str]) -> Optional[Path]:
     return None
 
 
-def derive_basename(run_dir_name: str, mode: str = "last2") -> str:
+def derive_basename(run_dir_name: str, mode: str = "last2", tokens: int = 2) -> str:
     """Derive destination basename from run directory name.
 
     - last2: join the last two tokens split by "__" with underscore
@@ -103,10 +112,29 @@ def derive_basename(run_dir_name: str, mode: str = "last2") -> str:
     """
     if mode == "run":
         return run_dir_name
-    tokens = run_dir_name.split("__")
-    if len(tokens) >= 2:
-        return f"{tokens[-2]}_{tokens[-1]}"
+    parts = run_dir_name.split("__")
+    if mode == "tokens":
+        n = tokens if tokens and tokens > 0 else 2
+        n = min(n, len(parts))
+        return "_".join(parts[-n:]) if n > 0 else run_dir_name
+    # default last2
+    if len(parts) >= 2:
+        return f"{parts[-2]}_{parts[-1]}"
     return run_dir_name
+
+
+def extract_exp1_ablation_label(run_dir_name: str) -> Optional[str]:
+    """Return lowercase '<method>_<kernel>' for exp1-style names like
+    'RLSD__COS__BULL__S123' or 'SVGD__RBF__ICE__S42'.
+    """
+    parts = run_dir_name.split("__")
+    if len(parts) < 2:
+        return None
+    method, kernel = parts[0].strip().lower(), parts[1].strip().lower()
+    # restrict to known sets to avoid accidental misuse
+    if method in {"rlsd", "svgd"} and kernel in {"cos", "rbf"}:
+        return f"{method}_{kernel}"
+    return None
 
 
 def ensure_dir(path: Path) -> None:
@@ -136,7 +164,8 @@ def main() -> int:
     out_dir = Path(args.out_root) / args.exp_name
     ensure_dir(out_dir)
 
-    run_dirs = [p for p in exp_dir.iterdir() if p.is_dir()]
+    # Exclude hidden and 'logs' directories
+    run_dirs = [p for p in exp_dir.iterdir() if p.is_dir() and not p.name.startswith('.') and p.name != 'logs']
     if args.verbose:
         print(f"[INFO] scanning runs under {exp_dir} ({len(run_dirs)} dirs)")
 
@@ -144,6 +173,12 @@ def main() -> int:
     copied = 0
     skipped = 0
     missing: List[str] = []
+    handled_dests = set()  # avoid repeated messages for same destination
+
+    # Auto naming policy: for repulsion-kernel experiments, use last 4 tokens to avoid collisions
+    auto_is_exp1 = ("repulsion_kernel" in args.exp_name) or ("exp1" in args.exp_name)
+    auto_mode = "tokens" if auto_is_exp1 else args.name_mode
+    auto_tokens = args.name_tokens if args.name_tokens > 0 else (4 if auto_is_exp1 else 2)
 
     for run_dir in sorted(run_dirs, key=lambda p: p.name):
         fv_dir = find_fixed_viewpoint_dir(run_dir)
@@ -160,13 +195,32 @@ def main() -> int:
                 print(f"[WARN] no step image in {fv_dir} (looked for {stems})")
             continue
 
-        base_name = derive_basename(run_dir.name, mode=args.name_mode)
+        if auto_is_exp1:
+            parts = run_dir.name.split("__")
+            label = extract_exp1_ablation_label(run_dir.name)
+            # Fallback to generic derivation if pattern not recognized
+            if label is None:
+                base_name = derive_basename(run_dir.name, mode=auto_mode, tokens=auto_tokens)
+            else:
+                # Append prompt and seed when available to avoid collisions
+                if len(parts) >= 4:
+                    prompt, seed = parts[2], parts[3]
+                    base_name = f"{label}_{prompt}_{seed}"
+                else:
+                    base_name = label
+        else:
+            base_name = derive_basename(run_dir.name, mode=auto_mode, tokens=auto_tokens)
         ext = src.suffix.lower()
         if args.suffix:
             dst_name = f"{base_name}{args.suffix}{ext}"
         else:
             dst_name = f"{base_name}{ext}"
         dst = out_dir / dst_name
+
+        # If this destination was already handled, avoid duplicate prints/ops
+        if str(dst) in handled_dests:
+            continue
+        handled_dests.add(str(dst))
 
         ok, msg = copy_image(src, dst, overwrite=args.overwrite, dry_run=args.dry_run, verbose=args.verbose)
         print(msg)
@@ -179,7 +233,8 @@ def main() -> int:
     print(f"[DONE] copied={copied} skipped={skipped} out_dir={out_dir}")
     if missing:
         print("[MISS] the following runs had missing images or dirs:")
-        for m in missing:
+        # Deduplicate messages to keep output concise
+        for m in sorted(set(missing)):
             print(f"  - {m}")
 
     return 0
