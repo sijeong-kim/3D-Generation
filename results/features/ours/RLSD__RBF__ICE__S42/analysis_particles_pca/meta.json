@@ -1,0 +1,32 @@
+{
+  "exp": "exp6_ours_best_feature",
+  "run": "RLSD__RBF__ICE__S42",
+  "layer_idx": 11,
+  "model_name": "facebook/dinov2-base",
+  "view_mode": "mean",
+  "view_index": 0,
+  "num_steps": 11,
+  "steps": [
+    1,
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    800,
+    900,
+    1000
+  ],
+  "center_for_basis": "per-step",
+  "symmetric_limits": true,
+  "xlim": [
+    -0.7514511734247208,
+    0.7514511734247208
+  ],
+  "ylim": [
+    -0.7514511734247208,
+    0.7514511734247208
+  ]
+}
