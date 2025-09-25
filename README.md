@@ -4,9 +4,9 @@
 
 # Diversifying 3D Gaussian Splatting with Repulsion Mechanisms
 
-[![Python](https://img.shields.io/badge/Python-3.12.11-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10.x-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-red.svg)](https://pytorch.org/)
-[![CUDA](https://img.shields.io/badge/CUDA-13.0-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 *MSc Individual Project - Imperial College London*
@@ -46,11 +46,11 @@ This repository presents research on diversifying 3D Gaussian Splatting using re
 ### ⚙️ System Environment
 | Component | Specification |
 |-----------|---------------|
-| **Operating System** | Ubuntu 22.04.1 LTS (Linux 6.2.0-36-generic) |
-| **Python Version** | 3.12.11 (conda-forge) |
-| **CUDA Version** | 13.0 (Driver: 580.65.06) |
-| **PyTorch Version** | 2.8.0+cu128 |
-| **cuDNN Version** | 91002 |
+| **Operating System** | Ubuntu 22.04 LTS |
+| **Python Version** | 3.10.x |
+| **CUDA Toolkit** | 12.8 |
+| **PyTorch** | 2.8.0+cu128 |
+| **cuDNN** | 9.10.2 |
 
 ### 🖥️ Hardware Configuration
 | Component | Specification |
@@ -64,7 +64,7 @@ This repository presents research on diversifying 3D Gaussian Splatting using re
 |---------|---------|
 | **PyTorch** | 2.8.0+cu128 |
 | **CUDA** | 12.8 |
-| **cuDNN** | 91002 |
+| **cuDNN** | 9.10.2 |
 | **Extensions** | diff-gaussian-rasterization, simple-knn |
 
 ### 📦 Installation
@@ -77,8 +77,8 @@ cd 3D-Generation
 # Setup environment (interactive mode)
 bash scripts/envs/setup_interactive.sh
 
-# Or setup environment for SLURM cluster
-bash scripts/envs/setup_slurm.sh
+# Or setup environment for SLURM/cluster
+bash scripts/envs/setup_sbatch.sh
 ```
 
 ### ⚙️ Default Configuration
@@ -88,65 +88,55 @@ bash scripts/envs/setup_slurm.sh
 | **Initial 3D Gaussian Particles** | 1000 | Number of initial Gaussian splats |
 | **Densification Interval** | Every 50 steps | Frequency of particle densification |
 | **Default Prompt** | "a photo of a hamburger" | Text prompt for 3D generation |
-| **Feature Layer** | 11 | CLIP feature extraction layer |
+| **Feature Layer** | 11 | DINOv2 feature layer index (11 = last) |
 | **Repulsion Type** | 'wo' (without) | Baseline: no repulsion mechanism |
+| **Opacity LR** | 0.05 | Opacity learning rate |
 
 
 
 ## 🚀 Quick Start
 
-### Interactive Mode (Local/Development)
+### Interactive Mode (Local)
 
 ```bash
-# Run a single experiment
-python main_ours.py --config configs/text_ours.yaml --prompt "a photo of a hamburger"
+# Single run (baseline, writes to logs/ by default)
+python main_ours.py --config configs/text_ours.yaml prompt="a photo of a hamburger"
 
-# Run hyperparameter experiments
+# Single run (ours RLSD–RBF, writes to exp/)
+python main_ours.py --config configs/text_ours.yaml \
+  prompt="a photo of a hamburger" \
+  repulsion_type=rlsd kernel_type=rbf guidance_scale=50 \
+  lambda_repulsion=1000 rbf_beta=0.5 feature_layer=last \
+  num_particles=8 outdir=exp/single_run
+
+# Experiment sweeps (configs in configs/text_ours_exp.yaml)
 bash scripts/experiments/run_exp_interactive.sh exp0_baseline
+bash scripts/experiments/run_exp_interactive.sh exp6_ours_best
 
-# Run with dry-run to preview experiments
-bash scripts/experiments/run_exp_interactive.sh exp0_baseline --dry-run
+# Preview without running
+bash scripts/experiments/run_exp_interactive.sh exp6_ours_best --dry_run
 ```
 
-### SLURM Cluster Mode (Production)
+### SLURM/Cluster Mode
 
 ```bash
-# Submit experiment job to SLURM
-sbatch scripts/experiments/run_exp_sbatch.sh exp0_baseline
-
-# Submit multiple experiments
-sbatch scripts/experiments/run_exp_sbatch.sh exp0_baseline exp1_1_lambda_coarse
+# Submit an experiment sweep
+sbatch scripts/exp_sbatch/run_exp_sbatch.sh exp6_ours_best
 ```
 
-### 📊 Results Analysis
+### 📊 Results
 
-```bash
-# Aggregate and analyze experiment results
-python gather_results.py --exp_dir exp/ --output_dir analysis_results/
-
-# Generate specific plot types
-python gather_results.py --exp_dir exp/ --output_dir analysis_results/ --plot_type pareto
-python gather_results.py --exp_dir exp/ --output_dir analysis_results/ --plot_type boxplot
-
-# Filter experiments by parameters (using key=value directory naming)
-ls exp/*/kernel_type=cosine*                    # All cosine kernel experiments
-ls exp/*/repulsion_type=svgd*                   # All SVGD experiments
-ls exp/*/prompt=hamburger*                      # All hamburger experiments
-find exp/ -name "*lambda_repulsion=1000*"       # All experiments with lambda=1000
-find exp/ -name "*kernel_type=cosine*" -name "*repulsion_type=rlsd*"  # RLSD + cosine
-```
+- Interactive runs write per-run outputs under `exp/<sweep_name>/<config_name>/` (preferred) or `logs/` for direct single runs.
+- See `analysis/` for scripts to generate figures and CSV summaries.
 
 ## 📁 Output Structure
 
 ### Experiment Results
-- **New experiments**: `exp/<experiment_name>/`
-- **Legacy experiments**: `logs/<experiment_name>/`
-- **SLURM outputs**: `outputs/<SLURM_JOB_ID>/`
+- **Experiments (default)**: `exp/<sweep_name>/<config_name>/`
+- **Direct single runs**: `logs/`
 
 ### Log Files
-- **Job stdout**: `outputs/<SLURM_JOB_ID>/output.out`
-- **Job stderr**: `outputs/<SLURM_JOB_ID>/error.err`
-- **Experiment logs**: `exp/<experiment_name>/*/stdout.log`, `stderr.log`
+- **Interactive sweeps**: `exp/<sweep_name>/<config_name>/out`, `err`, `run_metadata.yaml`, `config.yaml`, `figures/`
 
 ## 🔗 References
 - **DreamGaussian**: [Paper](https://arxiv.org/abs/2309.16553) | [Code](https://github.com/ashawkey/dreamgaussian)
@@ -159,87 +149,37 @@ find exp/ -name "*kernel_type=cosine*" -name "*repulsion_type=rlsd*"  # RLSD + c
 
 - Project Root Structure
     ```bash
-    /vol/bitbucket/sk2324/3D-Generation/
-    ├── exp/               # 👈 New experiment results (hp_ours.py)
-    ├── logs/              # 👈 Legacy experiment results
-    ├── outputs/           # 👈 SLURM job outputs  
-    ├── configs/           # 👈 Configuration files
-    ├── scripts/           # 👈 SLURM batch scripts
-    ├── metrics/           # 👈 Empty (legacy)
-    ├── hp_ours.py         # 👈 Main hyperparameter script
-    ├── gather_results.py  # 👈 Results aggregation script
+    3D-Generation/
+    ├── exp/                      # 👈 Experiment outputs (preferred)
+    ├── logs/                     # 👈 Direct single-run outputs
+    ├── configs/                  # 👈 Base + sweep YAMLs
+    ├── scripts/
+    │   ├── experiments/         # 👈 Local interactive runner
+    │   └── exp_sbatch/          # 👈 SLURM submit helpers
+    ├── analysis/                # 👈 Analysis/plotting scripts
+    ├── results/                 # 👈 Precomputed figures/CSVs
+    ├── main_ours.py             # 👈 Training entrypoint
+    ├── hp_ours.py               # 👈 Legacy HP utilities
     └── [other project files]
     ```
 
-- **New Experiment Results (`exp/`)** - Enhanced hyperparameter experiments
+- **Experiment Outputs (`exp/`)**
     ```bash
-    exp/experiment_name/                    # e.g., exp0_baseline, exp1_1_lambda_coarse
-    ├── prompt=hamburger_repulsion_type=svgd_kernel_type=rbf_lambda_repulsion=600/
-    │   ├── figures/                       # 👈 Auto-created analysis plots directory
-    │   │   ├── pareto_plot.png
-    │   │   ├── boxplot_comparison.png
-    │   │   └── lambda_analysis.png
-    │   ├── config.yaml                    # 👈 Experiment configuration
-    │   ├── stdout.log                     # 👈 Standard output log
-    │   ├── stderr.log                     # 👈 Error log (with auto-tail on failure)
-    │   ├── run_metadata.yaml              # 👈 System/environment metadata
-    │   ├── .done                          # 👈 Completion marker (prevents re-runs)
-    │   └── ... (other experiment files)
-    ├── prompt=icecream_repulsion_type=rlsd_kernel_type=cosine_lambda_repulsion=800/
-    │   └── ... (similar structure)
-    └── experiment_summary.yaml            # 👈 Aggregated results summary
-    ```
-
-- **Legacy Experiments Results (`logs/`)** - Original experiment structure
-    - Debug Experiments (`run_ours_debug.sh`)
-        ```bash
-        logs/debug_001/                    # 3 runs total
-        ├── run_001_[hash]_s42/           # SVGD method
-        │   ├── metrics/                  # 👈 CSV files here
-        │   │   ├── quantitative_metrics.csv
-        │   │   ├── losses.csv
-        │   │   └── efficiency.csv
-        │   └── experiment_config.json
-        ├── run_002_[hash]_s42/           # RLSD method  
-        │   └── metrics/
-        └── run_003_[hash]_s42/           # Baseline (wo)
-            └── metrics/
-        ```
-    - Hyperparameter Tuning (`run_ours_hp.sh`)
-        ```bash
-        logs/exp_001/                     # Coarse search: 81 runs
-        ├── run_001_[hash]_s42/           # svgd, layer=2, lambda=1, seed=42
-        │   └── metrics/
-        ├── run_002_[hash]_s42/           # svgd, layer=2, lambda=100, seed=42
-        │   └── metrics/
-        ├── ...                           # 79 more combinations
-        └── run_081_[hash]_s456/          # wo, layer=10, lambda=10000, seed=456
-            └── metrics/
-
-        logs/exp_002/                     # Fine search: 35 runs
-        logs/exp_003/                     # Generalization: 15 runs  
-        logs/exp_004/                     # Efficiency: 36 runs
-        logs/exp_005/                     # Multi-view: 36 runs
-        ```
-- SLURM Job Outputs (`outputs/`)
-    ```bash
-    outputs/[job_id]/
-    ├── output.out                    # 👈 Job stdout
-    └── error.err                     # 👈 Job stderr/errors
+    exp/<sweep_name>/<config_name>/
+    ├── config.yaml
+    ├── out
+    ├── err
+    ├── run_metadata.yaml
+    └── figures/
     ```
 
 - Configuration Files (`configs/`)
     ```bash
     configs/
-    ├── text_ours.yaml               # 👈 Base configuration
-    ├── text_ours_debug.yaml         # 👈 Debug: 3 quick tests
-    └── text_ours_hp.yaml            # 👈 HP: 203 full experiments
-    ```
-- execution scripts (`scripts/`)
-    ```bash
-    scripts/
-    ├── run_ours_debug.sh            # 👈 Debug: --mem=16G, 30min
-    └── run_ours_hp.sh               # 👈 HP: --mem=32G, 48hours
+    ├── text_ours.yaml          # Base config (single run)
+    ├── text_ours_exp.yaml      # Sweep definitions (Exp0–Exp6, appendix)
+    ├── text_baseline.yaml
+    └── text_pure_baseline.yaml
     ```
 
 
