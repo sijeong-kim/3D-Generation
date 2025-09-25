@@ -89,7 +89,8 @@ bash scripts/envs/setup_sbatch.sh
 | **Densification Interval** | Every 50 steps | Frequency of particle densification |
 | **Default Prompt** | "a photo of a hamburger" | Text prompt for 3D generation |
 | **Feature Layer** | 11 | DINOv2 feature layer index (11 = last) |
-| **Repulsion Type** | 'wo' (without) | Baseline: no repulsion mechanism |
+| **Repulsion Type** | 'rlsd' | Repulsive Mechanism |
+| **Kernel Type** | 'RBF' | Similarity Kernel |
 | **Opacity LR** | 0.05 | Opacity learning rate |
 
 
@@ -142,6 +143,7 @@ sbatch scripts/exp_sbatch/run_exp_sbatch.sh exp6_ours_best
 - **DreamGaussian**: [Paper](https://arxiv.org/abs/2309.16553) | [Code](https://github.com/ashawkey/dreamgaussian)
 - **3D Gaussian Splatting**: [Paper](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/)
 - **Stein Variational Gradient Descent**: [Paper](https://arxiv.org/abs/1608.04471)
+- **Repulsive Latent Score Distillation for Solving Inverse Problems**: [Paper](https://arxiv.org/abs/2406.16683)
 
 
 
