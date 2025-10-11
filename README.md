@@ -15,7 +15,7 @@
 
 ## 📋 Project Overview
 
-This repository presents research on diversifying 3D Gaussian Splatting using repulsion mechanisms. The project extends DreamGaussian by implementing Stein Variational Gradient Descent (SVGD) and Regularized Least-Squares Descent (RLSD) to improve the diversity and quality of generated 3D objects.
+This repository presents research on diversifying 3D Gaussian Splatting using repulsion mechanisms. The project extends DreamGaussian by implementing Stein Variational Gradient Descent (SVGD) and Repulsive Latent Score Distillation for Solving Inverse Problems (RLSD) to improve the diversity and quality of generated 3D objects.
 
 ### 🎯 Key Features
 
