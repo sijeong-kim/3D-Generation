@@ -90,7 +90,7 @@ bash scripts/envs/setup_sbatch.sh
 | **Default Prompt** | "a photo of a hamburger" | Text prompt for 3D generation |
 | **Feature Layer** | 11 | DINOv2 feature layer index (11 = last) |
 | **Repulsion Type** | 'rlsd' | Repulsive Mechanism |
-| **Kernel Type** | 'RBF' | Similarity Kernel |
+| **Kernel Type** | 'rbf' | Similarity Kernel |
 | **Opacity LR** | 0.05 | Opacity learning rate |
 
 
