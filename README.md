@@ -4,12 +4,16 @@
 
 # Diversifying 3D Gaussian Splatting with Repulsion Mechanisms
 
+*MSc Individual Project - Imperial College London*
+
+🔗 Thesis link: https://drive.google.com/drive/folders/1-srX_A1wcZU5nQPZSbhdtTYjVQeiMRPc?usp=drive_link
+
 [![Python](https://img.shields.io/badge/Python-3.10.x-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-red.svg)](https://pytorch.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.8-green.svg)](https://developer.nvidia.com/cuda-toolkit)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-*MSc Individual Project - Imperial College London*
+
 
 </div>
 
