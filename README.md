@@ -4,9 +4,7 @@
 
 # Diversifying 3D Gaussian Splatting with Repulsion Mechanisms
 
-*MSc Individual Project - Imperial College London*
-
-🔗 Thesis link: https://drive.google.com/drive/folders/1-srX_A1wcZU5nQPZSbhdtTYjVQeiMRPc?usp=drive_link
+*MSc Individual Project - Imperial College London* 👉 🔗 [Thesis Link](https://drive.google.com/file/d/1bXC_UATHPmgX-QN7wO7KhChED2zLHzpK/view?usp=drive_link)
 
 [![Python](https://img.shields.io/badge/Python-3.10.x-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.8.0-red.svg)](https://pytorch.org/)
