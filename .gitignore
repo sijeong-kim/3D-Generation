@@ -217,7 +217,7 @@ outputs/
 *.jpg
 *.jpeg
 *.gif
-*.pdf
+
 
 # backups
 backups/
