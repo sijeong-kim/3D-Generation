@@ -8,67 +8,102 @@ Author: **Sijeong Kim**
 
 </div>
 
-## Overview
 
-This repository explores how **repulsion-based optimization** can make text-to-3D generation **more diverse, more consistent, and more stable** using **3D Gaussian Splatting**.
+## 📌 Overview
 
-🚩 Problem  
-Text-to-3D pipelines often suffer from **mode collapse**, producing nearly identical shapes or weak geometry.
+This repository investigates how **repulsion-based optimization** can improve diversity and stability in text-to-3D generation using **3D Gaussian Splatting (3DGS)**.
 
-✨ Core Idea  
-Introduce **feature-space repulsion** (using DINOv2) into DreamGaussian training to spread particles apart in semantic space while preserving fidelity.
+### 🚩 Problem
+Standard SDS-based text-to-3D pipelines often produce:
+- nearly identical shapes across runs,
+- mode collapse,
+- unstable geometry or over-smoothing.
 
-## Key Contributions
+### ✨ Core Idea
+Introduce **feature-space repulsion** (DINOv2 / CLIP features) into DreamGaussian training so that Gaussian particles spread apart in semantic space while maintaining fidelity.
 
-✔  **Repulsion mechanisms** implemented for 3DGS  
-- **SVGD**
-- **RLSD-style repulsion**
+
+## ✅ Key Contributions
+
+✔ **Repulsion variants implemented**
+- SVGD repulsion
+- RLSD-style feature repulsion
 - Baseline (no repulsion)
 
-✔  **Feature-space guidance**
-- CLIP/DINOv2 feature similarity → kernel-based repulsion
-- Supports RBF + Cosine kernels
+✔ **Feature-space guidance**
+- DINOv2 / CLIP embeddings
+- RBF & cosine kernels
 
-✔  **Large-scale evaluation**
-- **98%↑ semantic diversity** while **preserving CLIP fidelity**
+✔ **Large-scale evaluation**
+- **↑ 98% semantic diversity**  
+- **CLIP fidelity preserved** (ΔCLIP ≈ −0.006)
 - **Multi-view consistency C > 0.83**
 - **Human perceptual study (n = 41)**
 
-✔  **Fully modular pipeline**
+✔ **Reproducible research pipeline**
 - Automatic sweeps
-- Parallel training (N scenes simultaneously)
-- Reproducible experiment logs, CSVs, and figures
+- Multi-scene parallel training
+- Run metadata, configs, CSVs, and plots auto-generated
+
 
 ---
 
-## Demo Results
+## 🎬 Demo Results
 
-> ✅ (GIFs / rendered scenes will be inserted here after upload)  
-> Example comparisons: **Baseline vs SVGD vs RLSD-Feature**
+*(Rendered meshes, view sweeps, and GIF comparisons will be uploaded soon.)*  
+Comparisons include:
+
+- Baseline SDS  
+- SVGD-Repulsion  
+- RLSD-Feature Repulsion
 
 ---
 
-## Installation
+## 🚀 Installation
 
 ```bash
 git clone https://github.com/sijeong-kim/3D-Generation.git
 cd 3D-Generation
-bash scripts/envs/setup_interactive.sh
-```
 
-For SLURM/cluster users:
-```bash
+# Local interactive environment
+bash scripts/envs/setup_interactive.sh
+
+# Or cluster environment (SLURM)
 bash scripts/envs/setup_sbatch.sh
 ```
-## Quick Start
 
+
+## ⚡️ Quick Start
+
+### ✅ Single run (baseline)
+
+```bash
+python main_ours.py --config configs/text_baseline.yaml \
+    prompt="a photo of a hamburger"
+```
+
+### ✅ Repulsion-enabled run (ours)
+```bash
+python main_ours.py --config configs/text_ours.yaml \
+    prompt="a photo of a hamburger" \
+    repulsion_type=rlsd \
+    kernel_type=rbf \
+    lambda_repulsion=1000 \
+    num_particles=8 \
+    outdir=exp/demo
+```
+### ✅ Automatic experiment sweeps
 ```bash
 bash scripts/experiments/run_exp_interactive.sh exp6_ours_best
 ```
+### ✅ SLURM (cluster)
+```bash
+sbatch scripts/exp_sbatch/run_exp_sbatch.sh exp6_ours_best
+```
 
-## Output Structure
+## 📁 Output Structure
 
-```lua
+```bash
 exp/
   ├── <sweep_name>/<config_name>/
   │    ├── config.yaml
@@ -82,29 +117,34 @@ exp/
 ```bash
 3D-Generation/
 ├── configs/               # YAML configs & sweep definitions
-├── scripts/               # interactive + SLURM runners
-├── analysis/              # result parsing & plot generation
-├── results/               # sample outputs and CSVs
-├── main_ours.py           # training pipeline
-└── hp_ours.py             # legacy HP utils
+├── scripts/
+│   ├── experiments/       # Local interactive runs
+│   └── exp_sbatch/        # SLURM submit helpers
+├── analysis/              # Result parsing & plotting
+├── guidance/              # Feature extraction (CLIP/DINOv2) + RNG hooks
+├── results/               # Example outputs & CSVs
+├── main_ours.py           # Main training pipeline (ours)
+├── main_pure_baseline.py  # DreamGaussian baseline
+├── kernels.py             # RBF & cosine kernels
+├── feature_extractor.py   # Feature-space similarity backend
+├── gs_renderer.py         # Gaussian Splatting renderer utilities
+├── metrics.py             # CLIP, consistency, and diversity metrics
+└── visualizer.py          # Particle visualization
 ```
 
 ---
 
 ## References
 
-DreamGaussian — [https://github.com/ashawkey/dreamgaussian](https://github.com/ashawkey/dreamgaussian)
-
-3D Gaussian Splatting — [https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/)
-
-SVGD — [Liu & Wang (NeurIPS 2016)](https://arxiv.org/abs/1608.04471)
-
-RLSD — [https://arxiv.org/abs/2406.16683](https://arxiv.org/abs/2406.16683)
+- DreamGaussian — [https://github.com/ashawkey/dreamgaussian](https://github.com/ashawkey/dreamgaussian)
+- 3D Gaussian Splatting — [https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/)
+- SVGD — [Liu & Wang (NeurIPS 2016)](https://arxiv.org/abs/1608.04471)
+- RLSD — [https://arxiv.org/abs/2406.16683](https://arxiv.org/abs/2406.16683)
 
 ---
 
 ## Acknowledgements
 
-This research was conducted as part of the MSc programme at Imperial College London.
-Limited AI-assisted tools (GitHub Copilot, Cursor) were used only for boilerplate support;
-all core implementation and experiments were authored by Sijeong Kim.
+This work was conducted as part of the MSc programme at Imperial College London.
+GitHub Copilot and Cursor were used only for boilerplate refactoring;
+all design, implementation, experiments, and the report were completed by **Sijeong Kim**.
