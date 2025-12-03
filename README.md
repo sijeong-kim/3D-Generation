@@ -60,6 +60,7 @@ Introduce **feature-space repulsion** (DINOv2 / CLIP features) into DreamGaussia
 | "an ice cream sundae" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.SUND__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.SUND__S42.gif" width="260"> |
 | "a photo of a hamburger" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.HAMB__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.HAMB__S42.gif" width="260"> |
 | "a photo of a tulip" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.TUL__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.TUL__S42.gif" width="260"> |
+| "a bulldozer made out of toy bricks" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.BULL__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.BULL__S42.gif" width="260"> |
 
 ---
 
