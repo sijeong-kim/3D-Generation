@@ -51,12 +51,15 @@ Introduce **feature-space repulsion** (DINOv2 / CLIP features) into DreamGaussia
 
 ## 🎬 Demo Results
 
-*(Rendered meshes, view sweeps, and GIF comparisons will be uploaded soon.)*  
-Comparisons include:
+### Comparison of Our Best Model with Baseline (seed=42)
 
-- Baseline SDS  
-- SVGD-Repulsion  
-- RLSD-Feature Repulsion
+| Prompt | Baseline | Ours (Best) |
+|--------|----------|-------------|
+| "a small saguaro cactus plated in a clay pot" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.CACT__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.CACT__S42.gif" width="260"> |
+| "a photo of an ice cream" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.ICE__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.ICE__S42.gif" width="260"> |
+| "an ice cream sundae" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.SUND__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.SUND__S42.gif" width="260"> |
+| "a photo of a hamburger" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.HAMB__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.HAMB__S42.gif" width="260"> |
+| "a photo of a tulip" | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/baseline.TUL__S42.gif" width="260"> | <img src="https://github.com/sijeong-kim/3D-Generation/releases/download/v1.0.0/ours_best.TUL__S42.gif" width="260"> |
 
 ---
 
